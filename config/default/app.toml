@@ -1,0 +1,7 @@
+# config/default/app.toml
+
+[application]
+name = "Sudharm SIMS"
+version = "2.2.0"
+environment = "development"
+debug = false

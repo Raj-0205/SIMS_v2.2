@@ -1,0 +1,20 @@
+.venv/
+venv/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+*.db
+*.db-shm
+*.db-wal
+# Generated audit / forensic artifacts
+audit_report.json
+evidence_*.txt
+forensic_output.txt
+svp_report.json
+
+# Local backup files
+*.bak
+
+# Runtime logs
+runtime/logs/*
+!runtime/logs/.gitkeep

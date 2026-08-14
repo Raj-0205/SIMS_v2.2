@@ -1,0 +1,11 @@
+# config/default/database.toml
+
+[database]
+engine = "sqlite"
+path = "database/sims.db"
+
+busy_timeout = 5000
+journal_mode = "WAL"
+foreign_keys = true
+cache_size = -20000
+synchronous = "NORMAL"

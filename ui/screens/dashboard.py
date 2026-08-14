@@ -1,0 +1,70 @@
+# ui/screens/dashboard.py
+
+import flet as ft
+
+from ui.layout.navigation import NavigationMenu
+from ui.layout.content_host import ContentHost
+
+# ISOLATION MODE
+# Uncomment these after UI migration is complete.
+# from modules.admission.views.admission_form import AdmissionForm
+# from modules.student.views.student_home import StudentHome
+# from modules.course.views.course_home import CourseHome
+
+__all__ = ["DashboardScreen"]
+
+
+class DashboardScreen(ft.Row):
+    """Main ERP Dashboard."""
+
+    def __init__(self, page: ft.Page):
+        super().__init__(
+            expand=True,
+            spacing=0,
+        )
+
+        self._page = page
+
+        self.content_host = ContentHost()
+
+        self.nav_menu = NavigationMenu(
+            on_nav_change=lambda route: self._page.push_route(route)
+        )
+
+        self.route_map = {
+            "/dashboard": ft.Text(
+                "Dashboard Boot Successful",
+                size=24,
+            ),
+
+            # Enable one-by-one after migration.
+            # "/students": StudentHome(),
+            # "/admissions": AdmissionForm(),
+            # "/courses": CourseHome(),
+        }
+
+        self.placeholder_view = ft.Text(
+            "Module Under Construction",
+            size=24,
+            color=ft.Colors.GREY_400,
+        )
+
+        self.controls = [
+            self.nav_menu,
+            ft.VerticalDivider(
+                width=1,
+                color=ft.Colors.GREY_300,
+            ),
+            self.content_host,
+        ]
+
+    def mount_view(self, route: str):
+
+        self.nav_menu.set_route(route)
+
+        view = self.route_map.get(
+            route,
+            self.placeholder_view,
+        )
+
+        self.content_host.mount(view)
