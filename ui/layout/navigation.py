@@ -69,5 +69,10 @@ class NavigationMenu(ft.NavigationRail):
     def set_route(self, route: str):
         if route in self.routes:
             self.selected_index = self.routes.index(route)
-            if self.page:
-                self.update()
+            try:
+                # Flet 0.85 throws RuntimeError when accessing self.page before the control is mounted.
+                # We catch it safely, allowing the index state to update before UI rendering.
+                if self.page:
+                    self.update()
+            except RuntimeError:
+                pass
