@@ -30,7 +30,7 @@ class BaseRepository:
         Provides a safe database connection managed by the TransactionManager.
         Child repositories should NEVER manage connections manually.
         """
-        conn = TransactionManager.get_connection()
+        conn = TransactionManager.connection()
         try:
             yield conn
         except Exception as exc:
