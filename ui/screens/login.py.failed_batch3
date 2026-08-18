@@ -21,7 +21,8 @@ class LoginScreen(ft.Container):
             label="Username",
             autofocus=True,
         )
-
+        
+        # Password prefill strictly removed for security
         self.password_field = ft.TextField(
             label="Password",
             password=True,
@@ -77,8 +78,9 @@ class LoginScreen(ft.Container):
             self.update()
             return
 
+        # Core Auth Boundary Check
         user = AuthService.authenticate(username, password)
-
+        
         if user:
             AuthService.login(self._page, user)
             self._page.navigate("/dashboard")

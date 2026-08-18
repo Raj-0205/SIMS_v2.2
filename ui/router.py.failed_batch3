@@ -7,13 +7,12 @@ from core.security.auth import AuthService
 
 __all__ = ["AppRouter"]
 
-
 class AppRouter:
     """
-    The ultimate route gatekeeper.
+    The ultimate route gatekeeper. 
     Enforces Fail-Closed logic, whitelists protected routes, and handles logouts.
     """
-
+    
     PROTECTED_ROUTES = {
         "/dashboard",
         "/students",
@@ -37,7 +36,7 @@ class AppRouter:
     def handle_route_change(self, e: ft.RouteChangeEvent) -> None:
         route = e.route
         is_auth = AuthService.is_authenticated(self.page)
-
+        
         target_route = route
 
         # 1. Logout Interception
@@ -58,19 +57,22 @@ class AppRouter:
             target_route = "/dashboard" if is_auth else "/login"
 
         # 4. Redirect & Loop Prevention
+        # If target doesn't match requested route, navigate and abort current render.
+        # Flet will fire a new on_route_change event with the updated, safe route.
         if target_route != route:
             self.page.navigate(target_route)
             return
 
-        # 5. View Mounting
+        # 5. View Mounting (Executes only for authorized final routes)
         self.page.views.clear()
 
         if target_route == "/login":
             self.page.views.append(ft.View(route="/login", controls=[LoginScreen(self.page)]))
         else:
             if not self.dashboard:
+                # Inject navigation callback to strip dashboard of route authority
                 self.dashboard = DashboardScreen(self.page, on_route_request=self.request_navigation)
             self.dashboard.mount_view(target_route)
             self.page.views.append(ft.View(route=target_route, controls=[self.dashboard], padding=0))
-
+            
         self.page.update()

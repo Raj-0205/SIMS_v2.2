@@ -1,3 +1,4 @@
+
 # ui/screens/dashboard.py
 
 import flet as ft
@@ -19,6 +20,8 @@ class DashboardScreen(ft.Row):
         )
 
         self._page = page
+        
+        # Receives intent callback from Router to maintain layout isolation
         self.on_route_request = on_route_request
 
         self.content_host = ContentHost()

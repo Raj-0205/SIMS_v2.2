@@ -1,0 +1,177 @@
+========================================
+    BATCH 3 SCOPE EVIDENCE EXTRACTION   
+========================================
+
+===== 1. ui/screens/login.py =====
+# ui/screens/login.py
+
+import flet as ft
+
+__all__ = ["LoginScreen"]
+
+
+class LoginScreen(ft.Container):
+    """Initial entry point simulating route protection."""
+
+    def __init__(self, page: ft.Page) -> None:
+        super().__init__(
+            expand=True,
+            alignment=ft.Alignment.CENTER,
+        )
+
+        self._page = page
+
+        self.content = ft.Card(
+            elevation=5,
+            content=ft.Container(
+                width=400,
+                padding=40,
+                content=ft.Column(
+                    tight=True,
+                    spacing=25,
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    controls=[
+                        ft.Icon(
+                            ft.Icons.ACCOUNT_CIRCLE,
+                            size=80,
+                        ),
+                        ft.Text(
+                            "SIMS v2.2",
+                            size=28,
+                            weight=ft.FontWeight.BOLD,
+                        ),
+                        ft.TextField(
+                            label="Username",
+                            value="admin",
+                            autofocus=True,
+                        ),
+                        ft.TextField(
+                            label="Password",
+                            value="admin",
+                            password=True,
+                            can_reveal_password=True,
+                        ),
+                        ft.ElevatedButton(
+                            content=ft.Text("Login to ERP"),
+                            icon=ft.Icons.LOGIN,
+                            width=200,
+                            height=45,
+                            # TODO (Production): Replace with AuthenticationService
+                            on_click=lambda _: self._page.go("/dashboard"),
+                        ),
+                    ],
+                ),
+            ),
+        )
+
+===== 2. ui/router.py =====
+# ui/router.py
+
+import flet as ft
+from ui.screens.login import LoginScreen
+from ui.screens.dashboard import DashboardScreen
+
+__all__ = ["AppRouter"]
+
+class AppRouter:
+    def __init__(self, page: ft.Page) -> None:
+        self.page = page
+        self.page.on_route_change = self.handle_route_change
+        self.dashboard = None
+
+    def handle_route_change(self, e: ft.RouteChangeEvent) -> None:
+        route = e.route
+        self.page.views.clear()
+
+        if route == "/login":
+            self.page.views.append(ft.View(route="/login", controls=[LoginScreen(self.page)]))
+        else:
+            if not self.dashboard:
+                self.dashboard = DashboardScreen(self.page)
+            if route == "/":
+                route = "/dashboard"
+                
+            self.dashboard.mount_view(route)
+            self.page.views.append(ft.View(route=route, controls=[self.dashboard], padding=0))
+            
+        self.page.update()
+
+===== 3. ui/layout/navigation.py =====
+# ui/layout/navigation.py
+
+import flet as ft
+from typing import Callable
+
+__all__ = ["NavigationMenu"]
+
+
+class NavigationMenu(ft.NavigationRail):
+
+    def __init__(self, on_nav_change: Callable[[str], None]):
+        super().__init__(
+            selected_index=0,
+            label_type=ft.NavigationRailLabelType.ALL,
+            extended=True,
+            min_width=200,
+            min_extended_width=200,
+            group_alignment=-0.95,
+        )
+
+        self.on_nav_change = on_nav_change
+
+        self.routes = [
+            "/dashboard",
+            "/students",
+            "/admissions",
+            "/courses",
+            "/fees",
+            "/batch",
+            "/settings",
+        ]
+
+        self.destinations = [
+            ft.NavigationRailDestination(
+                icon=ft.Icons.DASHBOARD,
+                label="Dashboard",
+            ),
+            ft.NavigationRailDestination(
+                icon=ft.Icons.PEOPLE,
+                label="Students",
+            ),
+            ft.NavigationRailDestination(
+                icon=ft.Icons.APP_REGISTRATION,
+                label="Admissions",
+            ),
+            ft.NavigationRailDestination(
+                icon=ft.Icons.MENU_BOOK,
+                label="Courses",
+            ),
+            ft.NavigationRailDestination(
+                icon=ft.Icons.MONETIZATION_ON,
+                label="Fees",
+            ),
+            ft.NavigationRailDestination(
+                icon=ft.Icons.GROUP_WORK,
+                label="Batch",
+            ),
+            ft.NavigationRailDestination(
+                icon=ft.Icons.SETTINGS,
+                label="Settings",
+            ),
+        ]
+
+        self.on_change = self.handle_change
+
+    def handle_change(self, e: ft.ControlEvent):
+        self.on_nav_change(self.routes[e.control.selected_index])
+
+    def set_route(self, route: str):
+        if route in self.routes:
+            self.selected_index = self.routes.index(route)
+            try:
+                # Flet 0.85 throws RuntimeError when accessing self.page before the control is mounted.
+                # We catch it safely, allowing the index state to update before UI rendering.
+                if self.page:
+                    self.update()
+            except RuntimeError:
+                pass

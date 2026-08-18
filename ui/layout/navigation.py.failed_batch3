@@ -10,11 +10,17 @@ class NavigationMenu(ft.NavigationRail):
     """Emits navigation intent only. Includes logout trail trigger."""
 
     def __init__(self, on_nav_change: Callable[[str], None]):
-
-        logout_button = ft.IconButton(
-            icon=ft.Icons.LOGOUT,
-            tooltip="Logout",
-            on_click=lambda _: on_nav_change("/logout"),
+        
+        # Emit logout intent purely as a route request
+        logout_button = ft.Container(
+            content=ft.IconButton(
+                icon=ft.Icons.LOGOUT,
+                tooltip="Logout",
+                on_click=lambda _: on_nav_change("/logout")
+            ),
+            expand=True,
+            alignment=ft.alignment.bottom_center,
+            padding=ft.padding.only(bottom=20)
         )
 
         super().__init__(
