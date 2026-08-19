@@ -1,0 +1,10803 @@
+# SIMS_AI_MASTER_PROMPT.md
+
+# Official AI Development Constitution for SIMS v2.1
+
+> **Purpose**
+>
+> This document is the master instruction manual for any AI assisting in the development of SIMS v2.1 (Sudharm Infotech Management System).
+>
+> Before generating a single line of code, the AI must completely understand this document and the complete project blueprint.
+>
+> This document overrides default coding habits whenever they conflict with the approved architecture of SIMS.
+
+---
+
+# 1. Project Identity
+
+Project Name
+
+Sudharm Infotech Management System
+
+Short Name
+
+SIMS
+
+Version
+
+2.1
+
+Application Type
+
+Offline Desktop ERP
+
+Client
+
+Sudharm Infotech
+
+MKCL Authorized Learning Center
+
+Project Owner
+
+Prajwal "Raj" Pagar
+
+Organization
+
+ARP Group of Technology, Research & Development
+
+---
+
+# 2. Read First
+
+Before writing any code, you **must** read the complete project documentation.
+
+Read in this exact order.
+
+1. Part 01
+2. Part 02
+3. Part 03
+4. Part 04
+5. Part 05
+6. Part 06
+7. Part 07
+8. Part 08
+9. Part 09
+10. Part 10
+11. Part 11
+12. Part 12
+13. Part 13
+14. Part 14
+
+Never skip any document.
+
+Never assume information that already exists in the documentation.
+
+---
+
+# 3. Project Nature
+
+This project is
+
+* A real production software.
+* Developed for an actual client.
+* Used daily inside an institute.
+* Expected to remain maintainable for many years.
+
+This project is **NOT**
+
+* A college assignment
+* A prototype
+* A tutorial
+* A demo project
+* A hackathon submission
+* A quick MVP
+
+Every implementation must reflect production standards.
+
+---
+
+# 4. Primary Objective
+
+Your objective is **not** to write code quickly.
+
+Your objective is to build reliable software.
+
+Every decision should improve
+
+* Stability
+* Maintainability
+* Performance
+* Security
+* User Experience
+
+---
+
+# 5. Development Rules
+
+Always
+
+* Build module by module.
+* Explain important architectural decisions.
+* Generate reusable code.
+* Follow the approved folder structure.
+* Follow naming conventions.
+* Keep UI, Business Logic and Database separated.
+* Respect business rules.
+* Preserve backward compatibility whenever possible.
+
+Never
+
+* Skip validations.
+* Skip error handling.
+* Mix unrelated modules.
+* Ignore documentation.
+* Invent workflows.
+* Generate placeholder implementations.
+* Remove existing functionality without approval.
+
+---
+
+# 6. Architecture Rules
+
+Follow this architecture without exception.
+
+```text
+UI
+
+↓
+
+Controller
+
+↓
+
+Service
+
+↓
+
+Repository
+
+↓
+
+Database
+```
+
+No direct database access from UI.
+
+No SQL inside UI.
+
+No business logic inside UI.
+
+Repositories only communicate with the database.
+
+Services contain business rules.
+
+---
+
+# 7. Code Quality Standards
+
+Generate
+
+Production-quality code.
+
+Requirements
+
+Type hints
+
+Meaningful variable names
+
+Meaningful class names
+
+Proper folder placement
+
+Reusable functions
+
+Modular design
+
+Readable formatting
+
+Avoid
+
+Long functions
+
+Duplicate logic
+
+Magic numbers
+
+Hardcoded values
+
+Unused code
+
+Dead code
+
+---
+
+# 8. Database Rules
+
+Use SQLite.
+
+Parameterized queries only.
+
+Never concatenate SQL strings.
+
+Never bypass repositories.
+
+Maintain foreign-key integrity.
+
+Use transactions for critical operations.
+
+Respect Activity Logs.
+
+Respect Backup System.
+
+Never corrupt financial data.
+
+---
+
+# 9. UI Rules
+
+The UI should feel
+
+Modern
+
+Minimal
+
+Professional
+
+Fast
+
+Readable
+
+Use reusable components.
+
+Avoid duplicate dialogs.
+
+Avoid inconsistent spacing.
+
+Avoid unnecessary animations.
+
+Speed is more important than visual effects.
+
+---
+
+# 10. Business Rules
+
+Business rules defined in the Blueprint are final.
+
+Never modify
+
+Admission workflow
+
+Fee workflow
+
+Receipt workflow
+
+Reports
+
+Backup workflow
+
+Activity Logs
+
+without explicit approval.
+
+---
+
+# 11. Communication Rules
+
+If any information is missing,
+
+ASK.
+
+Never guess.
+
+Examples
+
+Institute Logo
+
+Receipt Design
+
+Report Format
+
+Theme Colors
+
+Icons
+
+Course Fees
+
+Batch Timing
+
+Address
+
+Sample Data
+
+PDF Design
+
+Branding
+
+If uncertain,
+
+Stop.
+
+Ask.
+
+Continue only after clarification.
+
+---
+
+# 12. Existing Project Knowledge
+
+You already have
+
+Complete Blueprint
+
+Business Rules
+
+Architecture
+
+Database Design
+
+UI Standards
+
+Folder Structure
+
+Coding Standards
+
+Project Identity
+
+Never recreate these from memory.
+
+Always follow the approved documentation.
+
+---
+
+# 13. Error Handling
+
+Every feature must include
+
+Input Validation
+
+Exception Handling
+
+User-friendly Error Messages
+
+Logging
+
+Recovery where possible
+
+Application must never crash because of expected user actions.
+
+---
+
+# 14. Documentation Rules
+
+Every completed module should include
+
+Purpose
+
+Workflow
+
+Dependencies
+
+Database Relations
+
+Business Rules
+
+Developer Notes
+
+Future Notes (if applicable)
+
+Documentation must remain synchronized with implementation.
+
+---
+
+# 15. Development Workflow
+
+Always follow this order.
+
+Planning
+
+↓
+
+Documentation
+
+↓
+
+Database
+
+↓
+
+Business Logic
+
+↓
+
+UI
+
+↓
+
+Testing
+
+↓
+
+Review
+
+↓
+
+Completion
+
+Do not skip steps.
+
+---
+
+# 16. Coding Workflow
+
+When asked to build a module,
+
+follow this sequence.
+
+1. Explain module architecture.
+
+2. Design database changes.
+
+3. Explain business rules.
+
+4. Explain folder placement.
+
+5. Generate models.
+
+6. Generate repositories.
+
+7. Generate services.
+
+8. Generate controllers.
+
+9. Generate UI.
+
+10. Testing checklist.
+
+Never generate an entire application in one response.
+
+---
+
+# 17. Project Scope
+
+SIMS focuses on
+
+Admissions
+
+Students
+
+Courses
+
+Payments
+
+Receipts
+
+Reports
+
+Inquiry CRM
+
+Notifications
+
+Backup
+
+Settings
+
+Activity Logs
+
+User Management
+
+Themes
+
+Search
+
+Trash
+
+Do not add unrelated enterprise modules.
+
+---
+
+# 18. Performance Goals
+
+Application startup should remain fast.
+
+Large databases should remain responsive.
+
+Use
+
+Pagination
+
+Indexes
+
+Lazy Loading
+
+Optimized Queries
+
+Avoid unnecessary database operations.
+
+---
+
+# 19. Security Rules
+
+Hash passwords.
+
+Protect Admin functions.
+
+Validate user input.
+
+Respect permissions.
+
+Protect financial records.
+
+Protect backups.
+
+Never expose sensitive information.
+
+---
+
+# 20. Future Changes
+
+If a better implementation exists,
+
+Explain
+
+Benefits
+
+Trade-offs
+
+Migration impact
+
+Wait for approval before changing the approved architecture.
+
+---
+
+# 21. AI Behavior Rules
+
+If the requested implementation conflicts with the Blueprint,
+
+Inform the project owner.
+
+Explain why.
+
+Suggest an alternative.
+
+Wait for approval.
+
+Do not silently change architecture.
+
+---
+
+# 22. Missing Information Policy
+
+Whenever project-specific information is required,
+
+Ask the project owner.
+
+The project owner will provide
+
+Institute Details
+
+Branding
+
+Colors
+
+Images
+
+Logos
+
+Fees
+
+Documents
+
+Templates
+
+Sample Data
+
+Contact Information
+
+Any other required information.
+
+Never fabricate missing project data.
+
+---
+
+# 23. Completion Definition
+
+A module is complete only when
+
+Business Logic
+
+Database
+
+Validation
+
+Activity Logs
+
+Error Handling
+
+UI
+
+Testing Checklist
+
+Documentation
+
+have all been completed.
+
+---
+
+# 24. Final Principle
+
+Every line of code should solve a real business problem.
+
+Do not add features because they are technically interesting.
+
+Do not remove features because they require additional effort.
+
+Respect the blueprint.
+
+Respect the architecture.
+
+Respect the business logic.
+
+---
+
+# 25. Official Instruction
+
+You are not acting as a code generator.
+
+You are acting as
+
+* Software Architect
+* Senior Python Developer
+* ERP System Designer
+* Database Designer
+* UI/UX Engineer
+* Technical Lead
+* Code Reviewer
+* Documentation Engineer
+* Quality Assurance Engineer
+
+Your responsibility is to help build a reliable production-grade ERP that can be maintained for years.
+
+Whenever information is unclear, ask the project owner before proceeding.
+
+---
+
+# End of SIMS_AI_MASTER_PROMPT.md
+# SIMS v2.1 - Official Project Blueprint
+
+## Part 01 - Project Foundation & Development Constitution
+
+> **Version:** 2.1
+> **Project Name:** Sudharm Infotech Management System (SIMS)
+> **Project Type:** Offline Desktop ERP
+> **Development Status:** Complete Redesign (Version 2.1)
+> **Primary Developer:** Raj Pagar
+> **Client:** Hemant Mahale Sir (Sudharm Infotech)
+> **Technology Stack:** Python + Flet + SQLite + Git + Ubuntu Linux
+
+---
+
+# 1. Document Purpose
+
+This document is the official blueprint of SIMS v2.1.
+
+This is **NOT** a college project document.
+
+This is **NOT** a software proposal.
+
+This is **NOT** a feature list.
+
+This document is the complete software specification used for designing and developing the production version of SIMS v2.1.
+
+Every module, business rule, workflow, validation, UI decision, database relationship and application behaviour must follow this document.
+
+Whenever there is a conflict between generated code and this document, **this document always wins.**
+
+---
+
+# 2. About SIMS
+
+SIMS (Sudharm Infotech Management System) is a complete offline ERP developed for Sudharm Infotech (MKCL Authorized Learning Center).
+
+The software manages the complete institute workflow from inquiry to admission, payments, reports, certificates and administration.
+
+The application is designed to eliminate manual work while keeping the workflow extremely fast for daily office operations.
+
+The application is optimized for desktop use.
+
+Primary users are institute administrators and office staff.
+
+---
+
+# 3. Vision
+
+Develop a production-grade desktop ERP that replaces manual registers, spreadsheets and repetitive administrative work with a fast, reliable and easy-to-use application.
+
+The software must remain simple for operators while internally following professional software architecture.
+
+The application should become the primary operating software of the institute.
+
+---
+
+# 4. Objectives
+
+* Complete student lifecycle management.
+* Fast admission process.
+* Accurate fee management.
+* Receipt generation.
+* Financial tracking.
+* Student history.
+* Inquiry management.
+* Reporting.
+* Offline-first architecture.
+* Reliable backup system.
+* Professional UI.
+* Modular architecture.
+* Future scalability.
+
+---
+
+# 5. Project Scope
+
+SIMS manages:
+
+* Authentication
+* Dashboard
+* Admissions
+* Student Management
+* Courses
+* Batches
+* Fee Management
+* Installments
+* Receipt Generation
+* Reports
+* Inquiry CRM
+* Settings
+* Backup & Restore
+* User Management
+* Activity Logs
+* Notifications
+* Theme Management
+* PDF Export
+* Search
+* Trash Management
+
+---
+
+# 6. Primary Design Philosophy
+
+The software should feel like a professional desktop application.
+
+Speed is more important than unnecessary animations.
+
+Every frequently used action should require minimum clicks.
+
+The interface should remain clean even after adding future modules.
+
+Every screen must have a clear purpose.
+
+No screen should become overcrowded.
+
+Every feature must belong to the correct module.
+
+---
+
+# 7. Development Philosophy
+
+The application will be developed as a modular ERP.
+
+Business Logic, UI and Database must remain completely separated.
+
+No business logic should exist inside UI files.
+
+Reusable components should always be preferred.
+
+No duplicate code.
+
+Every module should be independently maintainable.
+
+The architecture should support future expansion without major rewrites.
+
+---
+
+# 8. Target Users
+
+Primary Users
+
+* Institute Owner
+* Administrator
+* Office Staff
+
+Future Users
+
+* Faculty
+* Accountant
+* Multi-Center Operators
+
+---
+
+# 9. User Goals
+
+Users should be able to:
+
+* Register inquiries.
+* Complete admissions quickly.
+* Search any student instantly.
+* Receive installment payments.
+* Generate receipts.
+* View reports.
+* Export PDF.
+* Export Excel.
+* Track pending fees.
+* Track history.
+* Backup data safely.
+
+---
+
+# 10. Core Principles
+
+## Principle 1
+
+One source of truth.
+
+Every student record exists only once.
+
+---
+
+## Principle 2
+
+Everything should be searchable.
+
+---
+
+## Principle 3
+
+Every important action should leave history.
+
+---
+
+## Principle 4
+
+Data should never disappear immediately.
+
+Deleted records go to Trash.
+
+---
+
+## Principle 5
+
+Critical actions require confirmation.
+
+---
+
+## Principle 6
+
+Automation over repetitive work.
+
+---
+
+## Principle 7
+
+Fast keyboard-driven workflow.
+
+---
+
+## Principle 8
+
+Offline First.
+
+Internet is never required for normal operation.
+
+---
+
+# 11. Technology Stack
+
+Programming Language
+
+* Python
+
+Framework
+
+* Flet
+
+Database
+
+* SQLite
+
+Version Control
+
+* Git
+
+Operating System
+
+* Ubuntu Linux
+
+Architecture
+
+* Modular Layered Architecture
+
+---
+
+# 12. Global Navigation Structure
+
+Dashboard
+
+Admissions
+
+Students
+
+Courses
+
+Payments
+
+Reports
+
+Inquiry CRM
+
+Settings
+
+Each module must remain independent.
+
+---
+
+# 13. Global Features
+
+The following features are available across the entire application.
+
+## Universal Search
+
+Search using:
+
+* Student Name
+* Admission ID
+* Mobile Number
+
+Search results may include:
+
+* Student
+* Admission
+* Payment
+* Receipt
+* Inquiry
+
+The search bar remains globally accessible.
+
+---
+
+## Floating Notifications
+
+Top-right notification system.
+
+Used for:
+
+* Admission Saved
+* Payment Received
+* Draft Saved
+* Photo Uploaded
+* Receipt Generated
+* Backup Completed
+* Backup Failed
+* Birthday Reminder
+* Duplicate Detection Warning
+
+Notifications are stored in history.
+
+---
+
+## Keyboard Shortcuts
+
+Global shortcuts are available throughout the application.
+
+Examples include:
+
+* New Admission
+* Search
+* Save
+* Dashboard
+* Reports
+* Students
+* Courses
+* Backup
+* Payment
+* Refresh
+
+Complete shortcut list is maintained in Settings.
+
+---
+
+## Theme System
+
+Application supports four built-in themes.
+
+Theme changes update the complete application.
+
+Dark/Light mode toggle is permanently visible at the bottom-left sidebar.
+
+Switching mode should happen instantly.
+
+---
+
+## Backup System
+
+Automatic Backup
+
+Manual Backup
+
+Backup Restore
+
+Backup Status
+
+Backup Logs
+
+Backup Scheduling
+
+Backup Verification
+
+---
+
+## Activity Logs
+
+Every important action creates a log entry.
+
+Examples:
+
+* Student Edited
+* Fee Updated
+* Payment Added
+* Course Changed
+* Settings Updated
+
+Every log contains:
+
+* User
+* Date
+* Time
+* Old Value
+* New Value
+
+---
+
+## Trash System
+
+Records are never permanently deleted immediately.
+
+Deleted records move to Trash.
+
+Supported actions:
+
+* Restore
+* Permanent Delete
+
+---
+
+## PDF Export
+
+Professional PDF generation supported throughout the application.
+
+Examples:
+
+* Student Form
+* Receipts
+* Reports
+
+---
+
+# 14. Global Business Rules
+
+Student and Admission are different entities.
+
+One student may have multiple admissions in future.
+
+Payments belong to Admissions.
+
+Receipts are immutable after generation.
+
+Activity logs are permanent.
+
+Duplicate mobile numbers should generate warnings.
+
+Warnings must not automatically block admissions.
+
+Draft admissions can be resumed later.
+
+Every important transaction updates Dashboard statistics automatically.
+
+---
+
+# 15. UI Philosophy
+
+The UI must remain minimal.
+
+No unnecessary decorations.
+
+No clutter.
+
+Consistent spacing.
+
+Consistent typography.
+
+Consistent button positions.
+
+Consistent colors.
+
+Consistent icons.
+
+Consistent navigation.
+
+The user should always know where they are inside the application.
+
+---
+
+# 16. Performance Goals
+
+Application startup should be fast.
+
+Search should feel instant.
+
+Large student databases should remain responsive.
+
+Database operations should remain optimized.
+
+The application should work smoothly on low-end office systems.
+
+---
+
+# 17. Code Quality Rules
+
+Production-quality code only.
+
+No shortcuts.
+
+No experimental code inside production.
+
+Meaningful names.
+
+Type hints.
+
+Reusable components.
+
+Proper folder structure.
+
+Proper documentation.
+
+No duplicate logic.
+
+---
+
+# 18. AI Development Constitution
+
+Any AI generating code for SIMS v2.1 must follow these rules:
+
+* Never redesign the business workflow without approval.
+* Never remove features from this blueprint.
+* Never merge unrelated modules.
+* Preserve modular architecture.
+* Follow separation of concerns.
+* Generate production-ready code only.
+* Explain architectural changes before implementation.
+* Prefer reusable components over duplicate implementations.
+* Respect business rules defined in this document.
+* Maintain backward compatibility wherever possible.
+
+---
+
+# 19. Development Roadmap
+
+Part 01 - Project Foundation
+
+Part 02 - UI/UX Master Blueprint
+
+Part 03 - Authentication & Dashboard
+
+Part 04 - Admissions
+
+Part 05 - Student Management
+
+Part 06 - Courses, Batches & Inquiry CRM
+
+Part 07 - Payments & Receipts
+
+Part 08 - Reports & Analytics
+
+Part 09 - Settings, Backup & Themes
+
+Part 10 - Database Architecture
+
+Part 11 - Software Architecture & Development Standards
+
+Part 12 - Future Roadmap, Testing & Deployment
+
+---
+
+# End of Part 01
+# SIMS v2.1 - Official Project Blueprint
+
+# Part 02 - UI/UX Master Blueprint
+
+> This document defines the complete UI/UX philosophy, layout hierarchy, navigation flow, interaction behavior and design standards of SIMS v2.1. Every screen, dialog, form and component in the application must follow this blueprint.
+
+---
+
+# 1. UI Design Philosophy
+
+SIMS is a desktop ERP application. The UI should prioritize speed, clarity and usability over visual effects.
+
+The interface should be:
+
+* Professional
+* Clean
+* Modern
+* Consistent
+* Fast
+* Minimal
+* Easy to learn
+* Easy to operate for non-technical office staff
+
+The user should never feel lost while navigating the application.
+
+Every action should be obvious.
+
+Every important operation should be accessible within two or three clicks.
+
+---
+
+# 2. Design Principles
+
+## Simple Navigation
+
+Users should never search for features.
+
+Navigation should be predictable.
+
+---
+
+## Consistency
+
+Every page should follow the same design language.
+
+Spacing
+
+Typography
+
+Colors
+
+Buttons
+
+Icons
+
+Tables
+
+Dialogs
+
+Cards
+
+Everything must remain consistent.
+
+---
+
+## Speed
+
+The application should minimize user interaction.
+
+Common actions should require minimum clicks.
+
+Keyboard shortcuts should be available for frequent operations.
+
+---
+
+## Readability
+
+Avoid overcrowded screens.
+
+Maintain proper spacing.
+
+Use meaningful labels.
+
+Display only relevant information.
+
+---
+
+## Future Scalability
+
+The UI should allow new modules to be added without redesigning the application.
+
+---
+
+# 3. Main Window Layout
+
+The application consists of five major sections.
+
+```
+----------------------------------------------------------
+ Header
+----------------------------------------------------------
+
+ Sidebar        |          Main Content Area
+                |
+                |
+                |
+                |
+                |
+                |
+
+----------------------------------------------------------
+ Status Bar
+----------------------------------------------------------
+```
+
+---
+
+# 4. Header
+
+The header remains fixed throughout the application.
+
+Contains:
+
+* SIMS Logo
+* Current Module Name
+* Universal Search
+* Notification Bell
+* Current User
+* Date & Time (optional)
+* Window Controls (Desktop)
+
+Header should never scroll.
+
+---
+
+# 5. Sidebar
+
+Sidebar is the primary navigation.
+
+Modules
+
+* Dashboard
+* Admissions
+* Students
+* Courses
+* Payments
+* Reports
+* Inquiry CRM
+* Settings
+
+Bottom Section
+
+* Dark/Light Toggle
+* Version Number
+* Logout
+
+Sidebar should support collapse mode.
+
+Collapsed mode displays icons only.
+
+Expanded mode displays icons and labels.
+
+Current module should always be highlighted.
+
+---
+
+# 6. Main Content Area
+
+Every module opens inside the content area.
+
+No new window should open unless necessary.
+
+The content area consists of:
+
+* Page Title
+* Toolbar
+* Filter Section (if required)
+* Data Area
+* Action Buttons
+
+---
+
+# 7. Status Bar
+
+Displays:
+
+* Current User
+* Database Status
+* Internet Status (Future)
+* Backup Status
+* Application Version
+
+Status bar remains minimal.
+
+---
+
+# 8. Dashboard Layout
+
+Dashboard consists of multiple widgets.
+
+Top Row
+
+* Total Students
+* Today's Admissions
+* Current Month Collection
+* Pending Fees
+
+Second Row
+
+* Today's Work
+* Recent Activities
+
+Third Row
+
+* Financial Summary
+* Course Summary
+
+Fourth Row
+
+* Recent Admissions
+* Recent Payments
+
+Bottom
+
+* Backup Status
+* Notification Summary
+
+Dashboard should never become crowded.
+
+Every card should be clickable.
+
+---
+
+# 9. Header Search
+
+Universal Search remains available globally.
+
+Supports:
+
+Student Name
+
+Admission ID
+
+Mobile Number
+
+Search opens popup results.
+
+Categories
+
+Students
+
+Admissions
+
+Payments
+
+Receipts
+
+Inquiry
+
+Clicking a result directly opens that record.
+
+---
+
+# 10. Notification System
+
+Top-right notification bell.
+
+Displays unread count.
+
+Categories
+
+* Information
+* Success
+* Warning
+* Error
+
+Notifications
+
+Admission Saved
+
+Payment Received
+
+Receipt Generated
+
+Backup Completed
+
+Backup Failed
+
+Birthday Reminder
+
+Duplicate Mobile Warning
+
+Draft Saved
+
+Inquiry Follow-up
+
+Notification History should remain searchable.
+
+---
+
+# 11. Floating Toast Notifications
+
+Small animated notifications appear on the top-right.
+
+Examples
+
+Admission Saved
+
+Receipt Generated
+
+Photo Uploaded
+
+Payment Successful
+
+Settings Saved
+
+Backup Completed
+
+Error Saving Student
+
+Duplicate Mobile Found
+
+These disappear automatically.
+
+Critical errors require manual dismissal.
+
+---
+
+# 12. Cards
+
+Cards display summary information.
+
+Examples
+
+Students
+
+Admissions
+
+Revenue
+
+Pending Fees
+
+Today's Work
+
+Cards should contain
+
+Icon
+
+Title
+
+Value
+
+Optional Trend
+
+Click Action
+
+---
+
+# 13. Tables
+
+Tables are the primary data display.
+
+All tables should support
+
+Sorting
+
+Searching
+
+Filtering
+
+Pagination
+
+Double Click
+
+Right Click
+
+Column Resize (Future)
+
+Row Highlight
+
+Selected Row
+
+Tables should remain responsive.
+
+---
+
+# 14. Forms
+
+Forms should remain consistent.
+
+Order
+
+Section Title
+
+Input Fields
+
+Validation
+
+Buttons
+
+Buttons remain bottom-right.
+
+Standard Buttons
+
+Save
+
+Update
+
+Reset
+
+Cancel
+
+Close
+
+No inconsistent layouts.
+
+---
+
+# 15. Validation
+
+Validation occurs
+
+While Typing
+
+On Save
+
+Critical validations before database update.
+
+Validation messages should be human readable.
+
+Never expose technical errors.
+
+---
+
+# 16. Dialog Boxes
+
+Used for
+
+Confirmation
+
+Delete
+
+Restore
+
+Warnings
+
+Information
+
+Dialogs should contain
+
+Title
+
+Description
+
+Primary Button
+
+Secondary Button
+
+Escape closes dialog.
+
+---
+
+# 17. Right Click Context Menu
+
+Student
+
+* Open
+* Payment
+* Receipt
+* WhatsApp
+* Edit
+* Delete (Admin PIN)
+* Export PDF
+* History
+
+Future modules may implement similar menus.
+
+---
+
+# 18. Double Click Behaviour
+
+Double-clicking a student opens Student Workspace.
+
+No editing starts automatically.
+
+Workspace contains tabs.
+
+Overview
+
+Payments
+
+Receipts
+
+Documents
+
+History
+
+Activity Logs
+
+---
+
+# 19. Student Workspace
+
+Header
+
+Student Photo
+
+Student Name
+
+Admission ID
+
+Course
+
+Status
+
+Tabs
+
+Overview
+
+Payments
+
+Receipts
+
+Documents
+
+History
+
+Activity Log
+
+Buttons
+
+Edit
+
+Receive Payment
+
+Generate Receipt
+
+Export PDF
+
+WhatsApp
+
+Close
+
+---
+
+# 20. Themes
+
+Built-in Themes
+
+Classic Blue
+
+Emerald Green
+
+Royal Purple
+
+Sunset Orange
+
+Theme affects
+
+Buttons
+
+Cards
+
+Header
+
+Sidebar
+
+Icons
+
+Graphs
+
+Charts
+
+Accent Colors
+
+---
+
+# 21. Dark / Light Mode
+
+Always visible.
+
+Located at bottom-left sidebar.
+
+Single click toggle.
+
+No restart required.
+
+Entire application updates instantly.
+
+---
+
+# 22. Color Language
+
+Green
+
+Completed
+
+Success
+
+Paid
+
+Blue
+
+Information
+
+Active
+
+Purple
+
+Inquiry
+
+Analytics
+
+Orange
+
+Pending
+
+Reminder
+
+Red
+
+Delete
+
+Overdue
+
+Critical
+
+Gray
+
+Inactive
+
+Archived
+
+Trash
+
+These colors remain consistent throughout the application.
+
+---
+
+# 23. Icons
+
+Each module uses one consistent icon.
+
+Icons should remain simple.
+
+Avoid decorative icons.
+
+---
+
+# 24. Buttons
+
+Primary
+
+Filled
+
+Secondary
+
+Outlined
+
+Danger
+
+Red
+
+Success
+
+Green
+
+Disabled
+
+Gray
+
+Button positions remain consistent.
+
+---
+
+# 25. Keyboard Navigation
+
+Users should complete most work without mouse.
+
+Examples
+
+Tab
+
+Shift + Tab
+
+Enter
+
+Escape
+
+Arrow Keys
+
+Global shortcuts remain active.
+
+---
+
+# 26. Loading States
+
+Never freeze UI.
+
+Display
+
+Loading Spinner
+
+Skeleton Cards
+
+Progress Indicators
+
+Long operations should show progress.
+
+---
+
+# 27. Empty States
+
+Instead of blank tables.
+
+Display
+
+Icon
+
+Message
+
+Primary Action
+
+Example
+
+"No Students Found"
+
+Button
+
+Add New Student
+
+---
+
+# 28. Error Handling UI
+
+Never show Python errors.
+
+Display user-friendly messages.
+
+Provide recovery action whenever possible.
+
+---
+
+# 29. Responsive Behaviour
+
+Although desktop-first,
+
+the application should adapt to
+
+1280×720
+
+1366×768
+
+1600×900
+
+1920×1080
+
+No overlapping UI.
+
+---
+
+# 30. Accessibility
+
+Readable fonts.
+
+Good contrast.
+
+Large clickable buttons.
+
+Keyboard accessibility.
+
+Consistent spacing.
+
+---
+
+# 31. Animation Rules
+
+Animations should remain subtle.
+
+Allowed
+
+Toast
+
+Dialogs
+
+Sidebar Collapse
+
+Card Hover
+
+Loading
+
+Not Allowed
+
+Fancy transitions
+
+Heavy animations
+
+Slow page loading
+
+---
+
+# 32. Global UX Rules
+
+Universal Search always available.
+
+Notifications always available.
+
+Sidebar always available.
+
+Dark Mode always accessible.
+
+Every important action should provide feedback.
+
+Undo should be available where possible.
+
+Critical actions require confirmation.
+
+---
+
+# 33. UI Consistency Checklist
+
+Every page must contain
+
+* Title
+* Toolbar
+* Content Area
+* Consistent Buttons
+* Proper Spacing
+* Validation
+* Notifications
+* Keyboard Support
+
+No module should violate these standards.
+
+---
+
+# End of Part 02
+# SIMS v2.1 - Official Project Blueprint
+
+# Part 03 - Authentication, Application Shell & Dashboard
+
+> This document defines the complete Authentication System, Application Shell, Dashboard Architecture, Navigation Flow, Global Widgets, Notification System, Today's Work Engine and Dashboard Business Rules.
+
+---
+
+# 1. Purpose
+
+The Dashboard is the control center of SIMS.
+
+After successful login, every user lands on the Dashboard.
+
+The dashboard should immediately answer:
+
+* What happened today?
+* What needs attention?
+* What requires action?
+* What is today's collection?
+* What work is pending?
+* Is the database safe?
+* Are backups up to date?
+
+The dashboard must never become a reports page.
+
+It is a decision-making screen.
+
+---
+
+# 2. Authentication Module
+
+## Purpose
+
+Secure access to the application.
+
+Only authorized users can access SIMS.
+
+---
+
+# 3. Login Screen
+
+Contains
+
+* SIMS Logo
+* Institute Name
+* Username
+* Password
+* Show Password
+* Login Button
+* Exit Button
+
+Optional
+
+* Remember Username
+
+---
+
+# 4. Login Rules
+
+Validate empty fields.
+
+Validate credentials.
+
+Store login session.
+
+Create login activity log.
+
+Load user permissions.
+
+Open Dashboard.
+
+---
+
+# 5. Invalid Login
+
+Display user-friendly message.
+
+Never expose database or system errors.
+
+After multiple failed attempts, log the event.
+
+---
+
+# 6. Logout
+
+Logout confirmation required.
+
+Unsaved work warning.
+
+Close session.
+
+Return to Login Screen.
+
+---
+
+# 7. User Roles
+
+Administrator
+
+Complete system access.
+
+Operator
+
+Daily operations only.
+
+Future
+
+Faculty
+
+Accountant
+
+Read Only
+
+---
+
+# 8. Application Shell
+
+The shell remains active throughout the application.
+
+Components
+
+Header
+
+Sidebar
+
+Content Area
+
+Status Bar
+
+Notification Layer
+
+Dialog Layer
+
+Toast Layer
+
+The shell never reloads while changing modules.
+
+Only the content area changes.
+
+---
+
+# 9. Header Layout
+
+Contains
+
+Application Logo
+
+Current Module Name
+
+Universal Search
+
+Notification Bell
+
+Current User
+
+Profile Menu
+
+Window Controls
+
+---
+
+# 10. Sidebar Navigation
+
+Modules
+
+Dashboard
+
+Admissions
+
+Students
+
+Courses
+
+Payments
+
+Reports
+
+Inquiry CRM
+
+Settings
+
+Bottom Area
+
+Dark / Light Toggle
+
+Version
+
+Logout
+
+---
+
+# 11. Dashboard Layout
+
+The Dashboard consists of multiple logical sections.
+
+Section 1
+
+Welcome Header
+
+Section 2
+
+Quick Statistics
+
+Section 3
+
+Today's Work
+
+Section 4
+
+Recent Activities
+
+Section 5
+
+Financial Summary
+
+Section 6
+
+Recent Admissions
+
+Section 7
+
+Recent Payments
+
+Section 8
+
+Notification Feed
+
+Section 9
+
+Backup Status
+
+---
+
+# 12. Welcome Header
+
+Displays
+
+Good Morning / Afternoon / Evening
+
+Current User
+
+Institute Name
+
+Current Date
+
+Quick motivational message (optional)
+
+---
+
+# 13. Quick Statistics
+
+Cards
+
+Total Students
+
+Total Admissions
+
+Current Month Admissions
+
+MS-CIT Admissions
+
+KLiC Admissions
+
+Today's Admissions
+
+Collected Amount
+
+Pending Amount
+
+Each card is clickable.
+
+Clicking opens the relevant module with filters applied.
+
+---
+
+# 14. Today's Work
+
+This widget displays actionable tasks.
+
+Items
+
+Pending Admissions
+
+Installments Due Today
+
+Confirmed Admissions Today
+
+Inquiry Follow-ups
+
+Pending Backups
+
+Pending Draft Admissions
+
+Upcoming Birthdays
+
+This widget should always remain near the top.
+
+---
+
+# 15. Financial Summary
+
+Displays
+
+Today's Collection
+
+Current Month Collection
+
+Pending Fees
+
+Completed Payments
+
+Collection Progress
+
+Course-wise Collection Summary
+
+Dashboard shows summary only.
+
+Detailed analytics remain inside Reports.
+
+---
+
+# 16. Recent Admissions
+
+Displays latest admissions.
+
+Columns
+
+Admission ID
+
+Student Name
+
+Course
+
+Admission Date
+
+Status
+
+Double-click opens Student Workspace.
+
+---
+
+# 17. Recent Payments
+
+Displays latest fee transactions.
+
+Columns
+
+Receipt Number
+
+Student
+
+Amount
+
+Payment Mode
+
+Time
+
+Double-click opens Receipt Details.
+
+---
+
+# 18. Notification Feed
+
+Dashboard displays latest notifications.
+
+Examples
+
+Admission Saved
+
+Payment Received
+
+Receipt Generated
+
+Draft Saved
+
+Backup Completed
+
+Birthday Reminder
+
+Inquiry Follow-up
+
+Only recent notifications are displayed.
+
+Complete history remains inside Notification Center.
+
+---
+
+# 19. Backup Status Widget
+
+Displays
+
+Last Backup Time
+
+Backup Health
+
+Status Colors
+
+Green
+
+Today's Backup Available
+
+Yellow
+
+Backup older than 2 days
+
+Red
+
+Backup older than 7 days
+
+Warning
+
+Backup older than 8 weeks
+
+Buttons
+
+Backup Now
+
+View Backup Logs
+
+---
+
+# 20. Recent Activity Widget
+
+Displays latest system activities.
+
+Examples
+
+Student Edited
+
+Fee Updated
+
+Course Changed
+
+Settings Updated
+
+Receipt Generated
+
+Only recent activities shown.
+
+Complete logs remain inside Activity Log.
+
+---
+
+# 21. Universal Search
+
+Always available in Header.
+
+Supports
+
+Student Name
+
+Admission ID
+
+Mobile Number
+
+Search Results
+
+Student
+
+Admission
+
+Payment
+
+Receipt
+
+Inquiry
+
+Selecting result directly opens related record.
+
+---
+
+# 22. Notification Bell
+
+Displays unread count.
+
+Notification Types
+
+Information
+
+Success
+
+Warning
+
+Error
+
+Birthday
+
+Backup
+
+Inquiry
+
+Payment
+
+Admission
+
+Click opens Notification Center.
+
+---
+
+# 23. Floating Toast Notifications
+
+Displayed at top-right.
+
+Examples
+
+Admission Saved Successfully
+
+Payment Received
+
+Receipt Generated
+
+Photo Uploaded
+
+Backup Completed
+
+Draft Saved
+
+Duplicate Mobile Detected
+
+Settings Updated
+
+Toast disappears automatically.
+
+Critical messages remain until dismissed.
+
+---
+
+# 24. Dashboard Business Rules
+
+Dashboard never edits data directly.
+
+Dashboard only displays summaries.
+
+Dashboard refreshes automatically after
+
+Admission
+
+Payment
+
+Receipt Generation
+
+Student Edit
+
+Inquiry Update
+
+Backup Completion
+
+Dashboard statistics should always represent the latest database state.
+
+---
+
+# 25. Quick Actions
+
+Quick buttons
+
+New Admission
+
+Receive Payment
+
+New Inquiry
+
+Search Student
+
+Generate Report
+
+Backup Now
+
+These actions open corresponding modules.
+
+---
+
+# 26. Birthday Notification
+
+Students having birthdays today appear in
+
+Today's Work
+
+Notification Center
+
+Dashboard Widget
+
+Notification remains active for the entire day.
+
+---
+
+# 27. Activity Updates
+
+Every important action updates Dashboard automatically.
+
+Examples
+
+Admission Created
+
+Student Edited
+
+Payment Added
+
+Receipt Generated
+
+Draft Saved
+
+Backup Completed
+
+Settings Updated
+
+---
+
+# 28. Performance Rules
+
+Dashboard should load first.
+
+Heavy reports should never execute during startup.
+
+Dashboard widgets should use optimized queries.
+
+No unnecessary database reads.
+
+---
+
+# 29. Error Handling
+
+If a widget fails
+
+Display
+
+Unable to load data.
+
+Retry.
+
+Do not crash the Dashboard.
+
+Other widgets continue working.
+
+---
+
+# 30. Future Dashboard Expansion
+
+Reserved widgets
+
+Attendance
+
+Certificate Status
+
+Faculty Tasks
+
+Batch Schedule
+
+Exam Schedule
+
+Announcements
+
+Multi-Center Summary
+
+Cloud Sync Status
+
+These sections remain disabled until implemented.
+
+---
+
+# 31. Module Entry Points
+
+Dashboard acts as the central navigation hub.
+
+Every major widget should provide one-click navigation to its detailed module.
+
+Cards → Reports
+
+Today's Work → Admissions
+
+Recent Payments → Payments
+
+Recent Admissions → Students
+
+Backup Status → Settings
+
+Notifications → Notification Center
+
+---
+
+# 32. Completion Criteria
+
+Authentication is complete when
+
+* User authentication succeeds.
+* Session is created.
+* Permissions are loaded.
+* Dashboard opens successfully.
+
+Dashboard is complete when
+
+* All widgets load correctly.
+* Statistics refresh automatically.
+* Notifications function correctly.
+* Today's Work updates dynamically.
+* Backup status is accurate.
+* Navigation from every widget works correctly.
+
+---
+
+# End of Part 03
+# SIMS v2.1 - Official Project Blueprint
+
+# Part 04 - Admission Management System
+
+> This document defines the complete Admission Module of SIMS v2.1. Admission is the heart of the ERP. Every student enters the system through this module. This document defines the complete workflow, business rules, validations, draft system, duplicate detection, payment integration and post-admission automation.
+
+---
+
+# 1. Module Purpose
+
+The Admission Module is responsible for converting an inquiry or walk-in student into an officially admitted student.
+
+The admission process must be:
+
+* Fast
+* Accurate
+* Paperless
+* Error-resistant
+* Easy for operators
+* Integrated with every other module
+
+This module automatically communicates with:
+
+* Student Management
+* Payments
+* Receipts
+* Reports
+* Dashboard
+* Notifications
+* Activity Logs
+* Backup
+* Search
+
+---
+
+# 2. Admission Workflow
+
+```
+Walk-in / Inquiry
+
+↓
+
+New Admission
+
+↓
+
+Fill Student Information
+
+↓
+
+Select Course
+
+↓
+
+Select Batch
+
+↓
+
+Capture Photo
+
+↓
+
+Capture Signature
+
+↓
+
+Fee Details
+
+↓
+
+Receive Payment (Optional)
+
+↓
+
+Generate Receipt
+
+↓
+
+Create Admission
+
+↓
+
+Dashboard Update
+
+↓
+
+Student Database Update
+
+↓
+
+Reports Update
+
+↓
+
+Activity Log
+
+↓
+
+Notification
+
+↓
+
+Ready
+```
+
+---
+
+# 3. Admission Screen Layout
+
+```
+--------------------------------------------------------
+
+Admission Header
+
+--------------------------------------------------------
+
+Personal Information
+
+Educational Information
+
+Course Details
+
+Admission Details
+
+Fee Details
+
+Photo & Signature
+
+Remarks
+
+--------------------------------------------------------
+
+Buttons
+
+Save Draft
+
+Reset
+
+Save Admission
+
+Cancel
+
+--------------------------------------------------------
+```
+
+---
+
+# 4. Admission Sections
+
+The admission form is divided into logical sections.
+
+## Personal Information
+
+* Full Name
+* Gender
+* Date of Birth
+* Mobile Number
+* Alternate Mobile
+* Email
+* Address
+* Village
+* Taluka
+* District
+* State
+* PIN Code
+* Aadhaar Number (Optional)
+* Parent / Guardian Name
+* Parent Mobile
+
+---
+
+## Educational Information
+
+* Qualification
+* School / College
+* Passing Year
+* Percentage (Optional)
+
+---
+
+## Course Information
+
+* Course
+* Course Category
+* Duration
+* Batch
+* Timing
+* Faculty (Future)
+* Admission Date
+
+---
+
+## Fee Information
+
+* Course Fees
+* Discount
+* Final Fees
+* Amount Received
+* Pending Amount
+* Installment Plan
+* Payment Mode
+
+---
+
+## Documents
+
+* Student Photo
+* Student Signature
+
+Future
+
+* Aadhaar
+* Marksheet
+* Leaving Certificate
+* Other Documents
+
+---
+
+## Additional Information
+
+* Remarks
+
+Internal Notes
+
+These notes remain visible only to administrators.
+
+---
+
+# 5. Admission Buttons
+
+Primary
+
+Save Admission
+
+Secondary
+
+Save Draft
+
+Reset Form
+
+Cancel
+
+Upload Photo
+
+Upload Signature
+
+Receive Payment
+
+Generate Receipt
+
+---
+
+# 6. Save Draft
+
+Draft admission stores incomplete forms.
+
+Purpose
+
+Prevent data loss.
+
+Operator may continue later.
+
+Draft stores
+
+Every completed field.
+
+Photo
+
+Signature
+
+Course
+
+Payment Information
+
+Drafts appear under
+
+Admissions → Drafts
+
+---
+
+# 7. Draft Workflow
+
+```
+New Admission
+
+↓
+
+Fill Form
+
+↓
+
+Save Draft
+
+↓
+
+Exit
+
+↓
+
+Reopen Draft
+
+↓
+
+Continue Editing
+
+↓
+
+Complete Admission
+
+↓
+
+Draft Deleted Automatically
+```
+
+---
+
+# 8. Duplicate Detection
+
+Validation checks
+
+Mobile Number
+
+Optional Future
+
+Aadhaar Number
+
+If duplicate exists
+
+Display warning
+
+```
+Student with this mobile number already exists.
+
+Open Existing Student
+
+Continue Anyway
+
+Cancel
+```
+
+Admission is NOT blocked automatically.
+
+Decision remains with the operator.
+
+---
+
+# 9. Validation Rules
+
+Required Fields
+
+Student Name
+
+Mobile Number
+
+Course
+
+Batch
+
+Admission Date
+
+Fee Structure
+
+Validation
+
+No blank required fields.
+
+Mobile number format.
+
+Fee validation.
+
+Negative values not allowed.
+
+Course must exist.
+
+Batch must exist.
+
+---
+
+# 10. Fee Calculation
+
+Final Fee
+
+=
+
+Course Fee
+
+*
+
+Discount
+
+Pending Fee
+
+=
+
+Final Fee
+
+*
+
+Received Amount
+
+Calculations happen automatically.
+
+---
+
+# 11. Payment Integration
+
+Admission supports
+
+No Payment
+
+Partial Payment
+
+Full Payment
+
+If payment is received
+
+↓
+
+Payment Entry Created
+
+↓
+
+Receipt Generated
+
+↓
+
+Dashboard Updated
+
+↓
+
+Reports Updated
+
+---
+
+# 12. Receipt Integration
+
+If payment exists
+
+Generate receipt automatically.
+
+Receipt Number generated automatically.
+
+Receipt becomes permanent.
+
+Receipt cannot be modified.
+
+Corrections require new transactions.
+
+---
+
+# 13. Student Creation
+
+Admission automatically creates
+
+Student Record
+
+Admission Record
+
+Payment Record (if payment received)
+
+Receipt (if payment received)
+
+Activity Log
+
+Dashboard Statistics
+
+Notification
+
+---
+
+# 14. Admission Status
+
+Possible Status
+
+Draft
+
+Pending Payment
+
+Partially Paid
+
+Completed
+
+Cancelled (Future)
+
+Transferred (Future)
+
+---
+
+# 15. Editing Admission
+
+Admissions remain editable.
+
+Editable
+
+Personal Information
+
+Address
+
+Parent Details
+
+Photo
+
+Signature
+
+Remarks
+
+Restricted
+
+Admission ID
+
+Receipt Number
+
+Completed Payments
+
+Critical financial changes require administrator permission.
+
+---
+
+# 16. Activity Log
+
+Every edit creates a history record.
+
+Example
+
+```
+Student Updated
+
+Field
+
+Mobile Number
+
+Old
+
+9876543210
+
+New
+
+9876543211
+
+Date
+
+Time
+
+Updated By
+```
+
+Nothing should be overwritten silently.
+
+---
+
+# 17. Notifications
+
+Admission Saved
+
+Draft Saved
+
+Duplicate Warning
+
+Receipt Generated
+
+Payment Received
+
+Student Updated
+
+Displayed as
+
+Toast Notification
+
+Notification Center
+
+Activity Log
+
+---
+
+# 18. Dashboard Impact
+
+Successful admission updates
+
+Today's Admissions
+
+Monthly Admissions
+
+Course Statistics
+
+Revenue
+
+Pending Fees
+
+Recent Admissions
+
+Today's Work
+
+---
+
+# 19. Search Integration
+
+Immediately after saving
+
+Student becomes searchable by
+
+Name
+
+Admission ID
+
+Mobile Number
+
+No indexing delay.
+
+---
+
+# 20. Reports Integration
+
+Admission updates
+
+Admission Report
+
+Course Report
+
+Revenue Report
+
+Student Report
+
+Monthly Statistics
+
+Yearly Statistics
+
+---
+
+# 21. Trash System
+
+Deleting an admission never permanently removes data.
+
+Workflow
+
+```
+Delete
+
+↓
+
+Admin PIN
+
+↓
+
+Move to Trash
+
+↓
+
+Restore
+
+OR
+
+Permanent Delete
+```
+
+Permanent deletion is logged.
+
+---
+
+# 22. Admin PIN Protection
+
+Required for
+
+Delete Admission
+
+Major Financial Changes
+
+Permanent Delete
+
+Restore Critical Records
+
+PIN attempts recorded.
+
+---
+
+# 23. Auto Save (Future)
+
+Optional feature.
+
+Application periodically stores
+
+Unsaved admission data.
+
+Recovery prompt appears after unexpected shutdown.
+
+---
+
+# 24. Business Rules
+
+Admission and Student are different entities.
+
+One student may have multiple admissions in future.
+
+Payments belong to admissions.
+
+Receipts belong to payments.
+
+Admission cannot create duplicate student records without warning.
+
+Drafts never appear in reports.
+
+Cancelled admissions remain in history.
+
+---
+
+# 25. Error Handling
+
+Photo upload fails
+
+Retry upload.
+
+Payment fails
+
+Admission continues.
+
+Receipt generation fails
+
+Admission remains saved.
+
+Retry receipt generation.
+
+Database error
+
+Rollback transaction.
+
+Display friendly error.
+
+---
+
+# 26. Future Enhancements
+
+* Online Admission Form
+* QR Code on Admission Form
+* Barcode Student ID
+* Digital Document Verification
+* Parent Notification
+* WhatsApp Admission Confirmation
+* Auto Batch Allocation
+* Digital Consent Form
+* Document Checklist
+
+---
+
+# 27. Completion Criteria
+
+Admission Module is complete when
+
+* New admission can be created.
+* Drafts function correctly.
+* Duplicate detection works.
+* Payment integrates successfully.
+* Receipts generate automatically.
+* Dashboard updates correctly.
+* Reports update correctly.
+* Search works immediately.
+* Activity logs record every change.
+* Trash system functions correctly.
+* All validations execute successfully.
+
+---
+
+# End of Part 04
+# SIMS v2.1 - Official Project Blueprint
+
+# Part 05 - Student Management System
+
+> This document defines the complete Student Management Module of SIMS v2.1. This module is the permanent repository of every admitted student. It manages student profiles, admission history, payments, documents, receipts, activity logs, PDF generation, search integration and future academic records.
+
+---
+
+# 1. Module Purpose
+
+The Student Module is the master database of every admitted student.
+
+Unlike the Admission Module, which is responsible for creating admissions, the Student Module is responsible for managing the complete lifecycle of a student.
+
+Every student should be accessible within seconds.
+
+This module must become the primary workspace for day-to-day office operations.
+
+---
+
+# 2. Core Business Rule
+
+**Student ≠ Admission**
+
+One Student
+
+↓
+
+Can Have
+
+↓
+
+Multiple Admissions
+
+Example
+
+```text
+Student
+Raj Patil
+
+Admission 1
+MS-CIT
+
+Admission 2
+KLiC Python
+
+Admission 3
+Advanced Excel
+```
+
+A student profile always remains unique.
+
+Admissions are linked to the student profile.
+
+---
+
+# 3. Module Responsibilities
+
+* View Student
+* Edit Student
+* Search Student
+* Open Student Workspace
+* View Payment History
+* View Receipt History
+* Export Student PDF
+* View Activity Logs
+* View Documents
+* WhatsApp Actions
+* Student Timeline
+* Birthday Notification
+* Future Certificate Tracking
+
+---
+
+# 4. Student List Layout
+
+```text
+---------------------------------------------------------
+
+Toolbar
+
+---------------------------------------------------------
+
+Search
+
+Filters
+
+Quick Actions
+
+---------------------------------------------------------
+
+Student Table
+
+---------------------------------------------------------
+
+Pagination
+
+---------------------------------------------------------
+```
+
+---
+
+# 5. Student Table Columns
+
+Admission ID
+
+Student Name
+
+Mobile Number
+
+Course
+
+Batch
+
+Admission Date
+
+Fee Status
+
+Pending Amount
+
+Status
+
+Actions (Optional)
+
+---
+
+# 6. Toolbar
+
+Contains
+
+Add Student (Future Manual Entry)
+
+Search
+
+Filters
+
+Export
+
+Refresh
+
+Bulk Actions (Future)
+
+---
+
+# 7. Filters
+
+Filter by
+
+Course
+
+Batch
+
+Admission Date
+
+Fee Status
+
+Gender
+
+Village
+
+Qualification
+
+Admission Year
+
+Birthday Month
+
+Status
+
+Multiple filters may be combined.
+
+---
+
+# 8. Universal Search Integration
+
+Search supports
+
+Student Name
+
+Admission ID
+
+Mobile Number
+
+Future
+
+Receipt Number
+
+Parent Name
+
+Search opens matching student immediately.
+
+---
+
+# 9. Student Workspace
+
+Double-clicking a student opens the Student Workspace.
+
+This is the primary working screen.
+
+Layout
+
+```text
+------------------------------------------------------
+
+Student Header
+
+------------------------------------------------------
+
+Photo
+
+Student Name
+
+Admission ID
+
+Current Course
+
+Status
+
+------------------------------------------------------
+
+Tabs
+
+Overview
+
+Admissions
+
+Payments
+
+Receipts
+
+Documents
+
+History
+
+Activity Logs
+
+------------------------------------------------------
+
+Action Buttons
+
+------------------------------------------------------
+```
+
+---
+
+# 10. Student Header
+
+Displays
+
+Student Photo
+
+Student Name
+
+Admission ID
+
+Current Course
+
+Current Batch
+
+Admission Status
+
+Fee Status
+
+Pending Amount
+
+Mobile Number
+
+Quick WhatsApp Button
+
+---
+
+# 11. Overview Tab
+
+Displays
+
+Complete Personal Information
+
+Parent Details
+
+Educational Details
+
+Address
+
+Course Details
+
+Admission Summary
+
+Current Status
+
+Internal Notes
+
+Photo
+
+Signature
+
+---
+
+# 12. Admissions Tab
+
+Displays every admission of the student.
+
+Columns
+
+Admission ID
+
+Course
+
+Batch
+
+Admission Date
+
+Completion Status
+
+Operator
+
+Double-click opens Admission Details.
+
+---
+
+# 13. Payments Tab
+
+Displays
+
+All Installments
+
+Payment Mode
+
+Payment Date
+
+Collected Amount
+
+Pending Amount
+
+Payment Status
+
+Buttons
+
+Receive Payment
+
+Print Receipt
+
+Open Receipt
+
+---
+
+# 14. Receipts Tab
+
+Displays
+
+Receipt Number
+
+Receipt Date
+
+Amount
+
+Payment Mode
+
+Generated By
+
+Buttons
+
+Open PDF
+
+Print
+
+Reprint
+
+Export
+
+Receipts remain immutable.
+
+---
+
+# 15. Documents Tab
+
+Current
+
+Photo
+
+Signature
+
+Future
+
+Aadhaar
+
+PAN
+
+Marksheet
+
+Leaving Certificate
+
+Certificates
+
+Other Documents
+
+Each document supports
+
+Preview
+
+Replace
+
+Download
+
+Delete (Admin)
+
+---
+
+# 16. History Tab
+
+Shows chronological events.
+
+Example
+
+```text
+Admission Created
+
+↓
+
+First Installment
+
+↓
+
+Receipt Generated
+
+↓
+
+Photo Updated
+
+↓
+
+Second Installment
+
+↓
+
+Course Completed
+
+↓
+
+Certificate Issued
+```
+
+History is read-only.
+
+---
+
+# 17. Activity Log Tab
+
+Every modification is recorded.
+
+Example
+
+```text
+Student Edited
+
+Field
+
+Address
+
+Old
+
+Old Address
+
+New
+
+New Address
+
+Date
+
+Time
+
+Updated By
+```
+
+Every financial edit also appears.
+
+Logs cannot be modified.
+
+---
+
+# 18. Edit Student
+
+Editable
+
+Name
+
+Address
+
+Email
+
+Parent Details
+
+Photo
+
+Signature
+
+Qualification
+
+Village
+
+School
+
+Internal Notes
+
+Restricted
+
+Admission ID
+
+Receipt Number
+
+Completed Payments
+
+Course Fee
+
+Critical edits require Admin PIN.
+
+---
+
+# 19. Student PDF
+
+Professional printable profile.
+
+Includes
+
+Institute Logo
+
+Student Photo
+
+Admission Details
+
+Personal Information
+
+Course Information
+
+Fee Summary
+
+Payment History
+
+Receipt Summary
+
+Generated Date
+
+Institute Footer
+
+Available Formats
+
+Print
+
+PDF
+
+---
+
+# 20. Right Click Context Menu
+
+Open
+
+Receive Payment
+
+Receipt History
+
+WhatsApp
+
+Edit
+
+Delete
+
+Export PDF
+
+View History
+
+Copy Mobile Number
+
+Copy Admission ID
+
+Delete requires Admin PIN.
+
+---
+
+# 21. WhatsApp Actions
+
+Future Integration
+
+Quick Actions
+
+Send Welcome Message
+
+Fee Reminder
+
+Payment Confirmation
+
+Certificate Ready
+
+Custom Message
+
+---
+
+# 22. Student Status
+
+Possible Status
+
+Active
+
+Completed
+
+Pending Fees
+
+Inactive
+
+Transferred
+
+Cancelled
+
+Archived
+
+Status updates automatically.
+
+---
+
+# 23. Birthday System
+
+Students having birthdays today appear
+
+Dashboard
+
+Notification Center
+
+Student Workspace
+
+Birthday icon visible throughout the day.
+
+Future
+
+Birthday WhatsApp Greeting.
+
+---
+
+# 24. Internal Notes
+
+Private notes visible only to administrators.
+
+Examples
+
+Shift evening batch.
+
+Scholarship student.
+
+Needs installment reminder.
+
+Interested in Python after MS-CIT.
+
+---
+
+# 25. Duplicate Protection
+
+Duplicate student profiles are avoided.
+
+Warnings based on
+
+Mobile Number
+
+Future
+
+Aadhaar Number
+
+Operator decides whether to continue.
+
+---
+
+# 26. Trash System
+
+Delete Student
+
+↓
+
+Admin PIN
+
+↓
+
+Move to Trash
+
+↓
+
+Restore
+
+OR
+
+Permanent Delete
+
+Permanent deletion creates Activity Log.
+
+---
+
+# 27. Notifications
+
+Student Updated
+
+Payment Added
+
+Receipt Generated
+
+Document Uploaded
+
+Birthday Reminder
+
+Course Changed
+
+Displayed as
+
+Toast
+
+Notification Center
+
+Activity Log
+
+---
+
+# 28. Dashboard Integration
+
+Student updates affect
+
+Student Count
+
+Course Statistics
+
+Revenue
+
+Recent Activities
+
+Today's Work
+
+Birthdays
+
+Pending Fees
+
+Dashboard refreshes automatically.
+
+---
+
+# 29. Reports Integration
+
+Student module updates
+
+Student Report
+
+Course Report
+
+Revenue Report
+
+Pending Fee Report
+
+Birthday Report (Future)
+
+---
+
+# 30. Performance Rules
+
+Student list should load quickly.
+
+Search should be instant.
+
+Workspace should load on demand.
+
+Documents should not slow table loading.
+
+Large datasets must support pagination.
+
+---
+
+# 31. Error Handling
+
+Missing Photo
+
+Display placeholder.
+
+Missing Document
+
+Display "Not Uploaded".
+
+Payment Error
+
+Display message without closing workspace.
+
+PDF Error
+
+Allow regeneration.
+
+Database Error
+
+Rollback safely.
+
+---
+
+# 32. Future Expansion
+
+Attendance
+
+Exam Records
+
+Assignments
+
+Certificates
+
+ID Card Printing
+
+Placement Records
+
+Alumni Status
+
+Cloud Sync
+
+Student Portal
+
+Mobile App
+
+---
+
+# 33. Completion Criteria
+
+Student Module is complete when
+
+* Student list loads correctly.
+* Universal Search opens the correct student.
+* Double-click opens Student Workspace.
+* Every tab functions correctly.
+* Payment history is accurate.
+* Receipt history is accurate.
+* PDF generation works.
+* Activity logs record every change.
+* Dashboard updates correctly.
+* Reports update correctly.
+* Trash system functions correctly.
+
+---
+
+# End of Part 05
+# SIMS v2.1 - Official Project Blueprint
+
+# Part 06 - Courses, Batches & Inquiry CRM
+
+> This document defines the complete Course Management System, Batch Management System and Inquiry CRM Module of SIMS v2.1. These modules work together to manage institute offerings, organize batches and convert inquiries into admissions.
+
+---
+
+# 1. Module Purpose
+
+The Course Module is responsible for managing all institute courses.
+
+The Batch Module organizes students into learning schedules.
+
+The Inquiry CRM manages prospective students from their first interaction until admission.
+
+These three modules are interconnected.
+
+```text
+Inquiry
+        ↓
+Admission
+        ↓
+Course
+        ↓
+Batch
+        ↓
+Student
+```
+
+---
+
+# 2. Course Management Objectives
+
+The Course Module should allow administrators to
+
+* View Courses
+* Add Courses
+* Edit Courses
+* Archive Courses
+* Manage Fees
+* View Course Details
+* View Related Admissions
+* View Revenue
+* View Student Count
+
+The Course Module acts as the master database for every available course.
+
+---
+
+# 3. Course Categories
+
+Initially Supported
+
+* MS-CIT
+* KLiC Courses
+
+Future Categories
+
+* Skill Development
+* Programming
+* Design
+* Finance
+* Office Productivity
+* Digital Marketing
+* AI & Data Science
+
+---
+
+# 4. Course List Page
+
+Layout
+
+```text
+------------------------------------------------------
+
+Toolbar
+
+------------------------------------------------------
+
+Search
+
+Filters
+
+Add Course
+
+Refresh
+
+------------------------------------------------------
+
+Course Cards / Table
+
+------------------------------------------------------
+```
+
+---
+
+# 5. Course Card
+
+Each course card displays
+
+Course Name
+
+Duration
+
+Course Fees
+
+Total Students
+
+Running Batches
+
+Status
+
+Quick View Button
+
+Clicking a card opens Course Details.
+
+---
+
+# 6. Course Details Page
+
+Every course has its own detail page.
+
+Displays
+
+Course Banner
+
+Course Name
+
+Duration
+
+Course Description
+
+Career Opportunities
+
+Course Benefits
+
+Eligibility
+
+Learning Outcomes
+
+Fee Structure
+
+Current Batches
+
+Student Count
+
+Revenue Summary
+
+Related Reports
+
+Syllabus
+
+Admission Button
+
+---
+
+# 7. Course Information
+
+Every course contains
+
+Course Name
+
+Course Code
+
+Duration
+
+Course Category
+
+Fees
+
+Description
+
+Status
+
+Created Date
+
+Last Updated
+
+---
+
+# 8. Course Fee Rules
+
+Each course maintains its own fee structure.
+
+Changing the fee affects only future admissions.
+
+Existing admissions retain their original fee structure.
+
+Historical financial data must never change.
+
+---
+
+# 9. Course Status
+
+Possible States
+
+Active
+
+Upcoming
+
+Archived
+
+Discontinued
+
+Only Active courses are available during admissions.
+
+---
+
+# 10. Batch Management Purpose
+
+Batch Management organizes students into training schedules.
+
+A course can have multiple batches.
+
+Example
+
+```text
+MS-CIT
+
+↓
+
+Morning
+
+Afternoon
+
+Evening
+
+Weekend
+```
+
+---
+
+# 11. Batch Information
+
+Each batch stores
+
+Batch Name
+
+Course
+
+Faculty (Future)
+
+Timing
+
+Days
+
+Maximum Capacity
+
+Current Strength
+
+Start Date
+
+End Date
+
+Status
+
+---
+
+# 12. Batch Status
+
+Open
+
+Full
+
+Completed
+
+Cancelled
+
+Archived
+
+Only Open batches are selectable during admission.
+
+---
+
+# 13. Batch Capacity
+
+Before admission
+
+System checks
+
+Current Students
+
+Maximum Capacity
+
+If batch is full
+
+Display warning.
+
+Admission is allowed only with administrator confirmation.
+
+---
+
+# 14. Batch Dashboard
+
+Displays
+
+Running Batches
+
+Students per Batch
+
+Available Seats
+
+Upcoming Batches
+
+Completed Batches
+
+---
+
+# 15. Batch Student List
+
+Displays
+
+Student Name
+
+Admission Date
+
+Payment Status
+
+Attendance (Future)
+
+Certificate Status (Future)
+
+---
+
+# 16. Batch Business Rules
+
+One batch belongs to one course.
+
+One course may have multiple batches.
+
+Students remain linked to their admission batch.
+
+Changing a batch creates an activity log.
+
+---
+
+# 17. Inquiry CRM Purpose
+
+The Inquiry Module manages potential students.
+
+Every inquiry should remain trackable until
+
+Admission
+
+OR
+
+Rejected
+
+OR
+
+Closed
+
+The objective is to maximize conversion.
+
+---
+
+# 18. Inquiry Workflow
+
+```text
+Walk-in
+
+↓
+
+Phone Call
+
+↓
+
+WhatsApp
+
+↓
+
+Website (Future)
+
+↓
+
+Create Inquiry
+
+↓
+
+Follow-up
+
+↓
+
+Interested
+
+↓
+
+Admission
+
+↓
+
+Student Created
+```
+
+---
+
+# 19. Inquiry Form
+
+Fields
+
+Student Name
+
+Mobile Number
+
+Alternate Number
+
+Course Interested
+
+Qualification
+
+Address
+
+Source
+
+Inquiry Date
+
+Expected Admission Date
+
+Remarks
+
+---
+
+# 20. Inquiry Sources
+
+Walk-in
+
+Phone
+
+WhatsApp
+
+Reference
+
+Social Media
+
+Website (Future)
+
+Other
+
+Source analytics should be available in reports.
+
+---
+
+# 21. Inquiry Status
+
+New
+
+Hot
+
+Warm
+
+Cold
+
+Follow-up Pending
+
+Converted
+
+Closed
+
+Rejected
+
+---
+
+# 22. Inquiry Priority
+
+High
+
+Medium
+
+Low
+
+Priority affects follow-up reminders.
+
+---
+
+# 23. Follow-up System
+
+Every inquiry supports unlimited follow-ups.
+
+Each follow-up contains
+
+Date
+
+Time
+
+Discussion
+
+Next Follow-up Date
+
+Operator
+
+---
+
+# 24. Today's Follow-ups
+
+Dashboard displays
+
+Today's Follow-ups
+
+Overdue Follow-ups
+
+Upcoming Follow-ups
+
+Operators should never miss follow-up calls.
+
+---
+
+# 25. Inquiry Conversion
+
+When a student takes admission
+
+Inquiry
+
+↓
+
+Convert to Admission
+
+↓
+
+Student Created
+
+↓
+
+Inquiry Status = Converted
+
+No duplicate data entry.
+
+---
+
+# 26. Inquiry Search
+
+Search by
+
+Name
+
+Mobile
+
+Course
+
+Status
+
+Source
+
+Date
+
+---
+
+# 27. Inquiry Filters
+
+Status
+
+Course
+
+Source
+
+Date Range
+
+Priority
+
+Operator
+
+---
+
+# 28. Inquiry Dashboard
+
+Displays
+
+Today's Inquiries
+
+Monthly Inquiries
+
+Conversion Rate
+
+Pending Follow-ups
+
+Top Sources
+
+Most Requested Courses
+
+---
+
+# 29. Right Click Menu (Inquiry)
+
+Open
+
+Edit
+
+Call
+
+WhatsApp
+
+Convert to Admission
+
+Delete
+
+History
+
+---
+
+# 30. Notifications
+
+New Inquiry
+
+Follow-up Reminder
+
+Inquiry Converted
+
+Inquiry Closed
+
+Displayed in
+
+Notification Center
+
+Toast Notifications
+
+Dashboard
+
+---
+
+# 31. Reports Integration
+
+Course Reports
+
+Course Revenue
+
+Batch Reports
+
+Batch Strength
+
+Inquiry Reports
+
+Conversion Reports
+
+Source Reports
+
+Monthly Inquiry Trends
+
+---
+
+# 32. Activity Logs
+
+Record
+
+Course Created
+
+Course Edited
+
+Batch Created
+
+Batch Updated
+
+Inquiry Added
+
+Inquiry Updated
+
+Inquiry Converted
+
+Follow-up Added
+
+Every log stores
+
+User
+
+Date
+
+Time
+
+Previous Value
+
+New Value
+
+---
+
+# 33. Dashboard Integration
+
+Dashboard updates
+
+Course Count
+
+Running Batches
+
+Inquiry Count
+
+Today's Follow-ups
+
+Course Revenue Summary
+
+Student Distribution
+
+---
+
+# 34. Business Rules
+
+A course cannot be deleted if students exist.
+
+Archived courses remain in reports.
+
+Batch capacity warnings never silently block admissions.
+
+One inquiry converts into one admission.
+
+Converted inquiries remain in CRM history.
+
+---
+
+# 35. Future Expansion
+
+Faculty Assignment
+
+Attendance
+
+Online Inquiry Form
+
+Lead Import
+
+Bulk WhatsApp
+
+SMS Integration
+
+Course Gallery
+
+Course Videos
+
+Placement Statistics
+
+Online Enrollment
+
+---
+
+# 36. Completion Criteria
+
+Course Module is complete when
+
+* Courses are manageable.
+* Fees are maintained correctly.
+* Course Details open successfully.
+* Batch management functions correctly.
+* Capacity checks work.
+* Inquiry CRM tracks leads correctly.
+* Follow-up system functions.
+* Inquiry converts directly to admission.
+* Reports update automatically.
+* Dashboard reflects live statistics.
+* Activity logs capture all major actions.
+
+---
+
+# End of Part 06
+# SIMS v2.1 - Official Project Blueprint
+
+# Part 07 - Fee Management, Payments & Receipt System
+
+> This document defines the complete Fee Management System, Payment Processing Engine, Installment Management, Receipt Generation, Financial Transactions and Revenue Business Rules of SIMS v2.1. Every financial transaction in the application must follow this blueprint.
+
+---
+
+# 1. Module Purpose
+
+The Payment Module manages every financial transaction performed inside the institute.
+
+Its objectives are to
+
+* Collect Fees
+* Track Pending Amounts
+* Generate Receipts
+* Maintain Financial History
+* Update Reports
+* Update Dashboard
+* Maintain Audit Trail
+
+Every payment must be accurate, traceable and permanent.
+
+---
+
+# 2. Financial Workflow
+
+```text
+Admission Created
+        │
+        ▼
+Fee Structure Assigned
+        │
+        ▼
+Receive Payment
+        │
+        ▼
+Generate Receipt
+        │
+        ▼
+Update Student Ledger
+        │
+        ▼
+Update Reports
+        │
+        ▼
+Update Dashboard
+        │
+        ▼
+Activity Log Created
+```
+
+---
+
+# 3. Payment Module Layout
+
+```text
+------------------------------------------------------
+
+Toolbar
+
+------------------------------------------------------
+
+Search
+
+Filters
+
+Receive Payment
+
+Export
+
+------------------------------------------------------
+
+Payment Table
+
+------------------------------------------------------
+
+Pagination
+
+------------------------------------------------------
+```
+
+---
+
+# 4. Toolbar
+
+Contains
+
+Receive Payment
+
+Search
+
+Refresh
+
+Export PDF
+
+Export Excel
+
+Print
+
+Advanced Filters
+
+---
+
+# 5. Payment Search
+
+Search By
+
+Student Name
+
+Admission ID
+
+Receipt Number
+
+Mobile Number
+
+Course
+
+Batch
+
+Payment Date
+
+Amount
+
+---
+
+# 6. Filters
+
+Date Range
+
+Course
+
+Batch
+
+Payment Status
+
+Payment Mode
+
+Operator
+
+Amount Range
+
+Admission Year
+
+---
+
+# 7. Payment Table
+
+Columns
+
+Receipt No.
+
+Admission ID
+
+Student Name
+
+Course
+
+Received Amount
+
+Pending Amount
+
+Payment Mode
+
+Collected By
+
+Payment Date
+
+Status
+
+---
+
+# 8. Student Ledger
+
+Every student maintains an individual ledger.
+
+Ledger contains
+
+Course Fee
+
+Discount
+
+Final Fee
+
+Amount Received
+
+Pending Amount
+
+Installments
+
+Receipt History
+
+Last Payment Date
+
+No transaction should overwrite previous entries.
+
+Ledger is append-only.
+
+---
+
+# 9. Receive Payment Window
+
+Displays
+
+Student Information
+
+Course
+
+Course Fee
+
+Discount
+
+Final Fee
+
+Collected Amount
+
+Pending Amount
+
+Installment History
+
+Remarks
+
+Buttons
+
+Receive Payment
+
+Generate Receipt
+
+Cancel
+
+---
+
+# 10. Payment Rules
+
+Allowed
+
+Full Payment
+
+Partial Payment
+
+Multiple Installments
+
+Zero Payment During Admission
+
+Not Allowed
+
+Negative Amount
+
+Amount Greater Than Pending
+
+Duplicate Receipt Number
+
+---
+
+# 11. Installment Management
+
+Every installment stores
+
+Installment Number
+
+Amount
+
+Payment Date
+
+Payment Mode
+
+Collected By
+
+Receipt Number
+
+Remarks
+
+Unlimited installments supported.
+
+---
+
+# 12. Payment Modes
+
+Cash
+
+UPI
+
+Bank Transfer
+
+Cheque
+
+Card (Future)
+
+Online Gateway (Future)
+
+Each payment mode appears separately in reports.
+
+---
+
+# 13. Discount Management
+
+Discount Types
+
+Flat Amount
+
+Percentage (Future)
+
+Scholarship (Future)
+
+Only authorized users may modify discounts after admission.
+
+Discount changes create Activity Logs.
+
+---
+
+# 14. Pending Fee Logic
+
+Pending Amount
+
+=
+
+Final Fee
+
+*
+
+Total Amount Received
+
+Updates automatically after every payment.
+
+Pending amount can never become negative.
+
+---
+
+# 15. Receipt Generation
+
+Receipt generated immediately after successful payment.
+
+Receipt contains
+
+Receipt Number
+
+Institute Details
+
+Student Details
+
+Admission ID
+
+Course
+
+Payment Date
+
+Payment Mode
+
+Amount Received
+
+Pending Amount
+
+Collected By
+
+Institute Signature Area
+
+Student Signature Area (Optional)
+
+---
+
+# 16. Receipt Number Rules
+
+Receipt Number generated automatically.
+
+Receipt Number must remain unique.
+
+Receipt Number can never be reused.
+
+Deleted receipts never free receipt numbers.
+
+---
+
+# 17. Receipt Actions
+
+Open
+
+Print
+
+Reprint
+
+Export PDF
+
+Share (Future)
+
+Receipt remains permanent.
+
+---
+
+# 18. Receipt Modification Rules
+
+Receipts cannot be edited.
+
+Incorrect payment requires
+
+Correction Entry
+
+Refund Entry (Future)
+
+Adjustment Entry (Future)
+
+Original receipt always remains in history.
+
+---
+
+# 19. Student Financial Summary
+
+Displays
+
+Course Fee
+
+Discount
+
+Final Fee
+
+Collected Amount
+
+Pending Amount
+
+Last Payment
+
+Installment Count
+
+Fee Status
+
+---
+
+# 20. Fee Status
+
+Not Started
+
+Partial
+
+Completed
+
+Overdue
+
+Cancelled
+
+Automatically updated after each transaction.
+
+---
+
+# 21. Payment Notifications
+
+Displayed when
+
+Payment Received
+
+Receipt Generated
+
+Pending Cleared
+
+Full Payment Completed
+
+Displayed as
+
+Toast Notification
+
+Notification Center
+
+Dashboard Feed
+
+Activity Log
+
+---
+
+# 22. Dashboard Integration
+
+Immediately updates
+
+Today's Collection
+
+Monthly Collection
+
+Pending Fees
+
+Recent Payments
+
+Today's Work
+
+Revenue Summary
+
+Financial Cards
+
+No manual refresh required.
+
+---
+
+# 23. Reports Integration
+
+Payment affects
+
+Daily Collection
+
+Monthly Collection
+
+Yearly Collection
+
+Pending Fees
+
+Course Revenue
+
+Batch Revenue
+
+Operator Collection
+
+Payment Mode Summary
+
+---
+
+# 24. Financial Analytics
+
+Available inside Reports
+
+Monthly Collection
+
+Today's Collection
+
+Average Collection
+
+Course-wise Revenue
+
+Top Revenue Course
+
+Pending Fee Trend
+
+Payment Mode Distribution
+
+Collection Growth
+
+Monthly Health Score
+
+Dashboard displays summary only.
+
+---
+
+# 25. Payment History
+
+Every payment remains permanently visible.
+
+History stores
+
+Receipt Number
+
+Amount
+
+Date
+
+Time
+
+Operator
+
+Payment Mode
+
+Remarks
+
+History cannot be modified.
+
+---
+
+# 26. Activity Logs
+
+Examples
+
+Payment Added
+
+Discount Changed
+
+Receipt Generated
+
+Payment Corrected
+
+Fee Updated
+
+Each log stores
+
+User
+
+Date
+
+Time
+
+Old Value
+
+New Value
+
+Reason (Future)
+
+---
+
+# 27. Refund System (Future)
+
+Workflow
+
+Payment
+
+↓
+
+Refund Request
+
+↓
+
+Admin Approval
+
+↓
+
+Refund Entry
+
+↓
+
+Ledger Updated
+
+↓
+
+Reports Updated
+
+Original payment remains untouched.
+
+---
+
+# 28. Financial Security
+
+Admin PIN required for
+
+Changing Fees
+
+Changing Discounts
+
+Deleting Payments
+
+Restoring Payments
+
+Refund Approval
+
+Every attempt recorded.
+
+---
+
+# 29. Business Rules
+
+Payments belong to Admissions.
+
+Receipts belong to Payments.
+
+Receipt numbers never change.
+
+Financial history is immutable.
+
+Pending amount updates automatically.
+
+Deleting payments is restricted.
+
+Financial integrity has highest priority.
+
+---
+
+# 30. Error Handling
+
+Duplicate Receipt
+
+Generate new receipt number.
+
+Database Failure
+
+Rollback transaction.
+
+Printer Failure
+
+Payment remains saved.
+
+Allow receipt reprint.
+
+PDF Failure
+
+Allow regeneration.
+
+Network failure ignored because application is offline.
+
+---
+
+# 31. Backup Integration
+
+Every completed financial transaction should be included in
+
+Automatic Backup
+
+Manual Backup
+
+Backup Verification
+
+Financial data should never be excluded from backups.
+
+---
+
+# 32. Future Enhancements
+
+Online Payments
+
+QR Code Payment
+
+UPI QR Generation
+
+SMS Receipt
+
+WhatsApp Receipt
+
+GST Support
+
+Invoice Module
+
+Expense Management
+
+Income vs Expense
+
+Balance Sheet
+
+Profit Analysis
+
+---
+
+# 33. Completion Criteria
+
+Fee Management Module is complete when
+
+* Student Ledger functions correctly.
+* Installments work correctly.
+* Pending calculations remain accurate.
+* Receipts generate automatically.
+* Receipt numbering is unique.
+* Dashboard updates automatically.
+* Reports reflect correct revenue.
+* Activity Logs capture all financial actions.
+* Admin PIN protects sensitive operations.
+* Financial history remains immutable.
+* Payment search and filters operate correctly.
+
+---
+
+# End of Part 07
+# SIMS v2.1 - Official Project Blueprint
+
+# Part 08 - Reports, Analytics & Export System
+
+> This document defines the complete Reporting Engine, Analytics Dashboard, Financial Reports, Student Reports, Course Reports, Export System and Business Intelligence layer of SIMS v2.1. Reports are read-only and must always reflect real-time data from the database.
+
+---
+
+# 1. Module Purpose
+
+The Reports Module transforms operational data into meaningful insights.
+
+This module enables administrators to
+
+* Monitor institute performance
+* Track admissions
+* Analyze revenue
+* Monitor pending fees
+* Measure inquiry conversion
+* Export professional reports
+* Make business decisions
+
+Reports are analytical only.
+
+No editing is allowed inside this module.
+
+---
+
+# 2. Report Categories
+
+The system contains the following report groups.
+
+* Dashboard Reports
+* Student Reports
+* Admission Reports
+* Payment Reports
+* Financial Analytics
+* Course Reports
+* Batch Reports
+* Inquiry CRM Reports
+* Activity Reports
+* Backup Reports
+* User Reports (Future)
+
+---
+
+# 3. Reports Home Screen
+
+```text
+---------------------------------------------------------
+
+Report Categories
+
+---------------------------------------------------------
+
+Quick Reports
+
+Recent Reports
+
+Favorite Reports (Future)
+
+---------------------------------------------------------
+
+Analytics Dashboard
+
+---------------------------------------------------------
+```
+
+---
+
+# 4. Global Report Features
+
+Every report supports
+
+* Search
+* Filters
+* Sorting
+* Print
+* Export PDF
+* Export Excel
+* Refresh
+* Full Screen (Future)
+
+Reports never modify data.
+
+---
+
+# 5. Global Filters
+
+Available filters
+
+Date Range
+
+Today
+
+Yesterday
+
+This Week
+
+This Month
+
+Last Month
+
+Current Year
+
+Custom Range
+
+Course
+
+Batch
+
+Operator
+
+Payment Status
+
+Admission Status
+
+Inquiry Status
+
+Gender
+
+Village
+
+Qualification
+
+Payment Mode
+
+---
+
+# 6. Student Reports
+
+Reports
+
+Complete Student List
+
+Active Students
+
+Completed Students
+
+Inactive Students
+
+Course-wise Students
+
+Batch-wise Students
+
+Village-wise Students
+
+Qualification-wise Students
+
+Birthday Report
+
+Admission Year Report
+
+Student Contact List
+
+---
+
+# 7. Admission Reports
+
+Reports
+
+Today's Admissions
+
+Weekly Admissions
+
+Monthly Admissions
+
+Yearly Admissions
+
+Course-wise Admissions
+
+Batch-wise Admissions
+
+Operator-wise Admissions
+
+Draft Admissions
+
+Cancelled Admissions (Future)
+
+Admission Trend Analysis
+
+---
+
+# 8. Payment Reports
+
+Reports
+
+Today's Collection
+
+Monthly Collection
+
+Yearly Collection
+
+Pending Fees
+
+Completed Payments
+
+Installment Report
+
+Payment Mode Report
+
+Operator Collection Report
+
+Receipt Register
+
+Fee Status Report
+
+---
+
+# 9. Financial Analytics
+
+Purpose
+
+Provide management-level financial overview.
+
+Analytics include
+
+Current Month Collection
+
+Yearly Collection
+
+Pending Fees
+
+Course-wise Revenue
+
+Batch Revenue
+
+Average Monthly Collection
+
+Average Admission Value
+
+Revenue Trend
+
+Collection Growth
+
+Revenue Distribution
+
+Monthly Health Score
+
+---
+
+# 10. Monthly Health Score
+
+Health Score is calculated using
+
+Collection Percentage
+
+Pending Fees
+
+Admissions
+
+Inquiry Conversion
+
+Backup Status
+
+Possible Ratings
+
+Excellent
+
+Good
+
+Average
+
+Needs Attention
+
+Critical
+
+Dashboard displays only summary.
+
+Detailed logic remains in Reports.
+
+---
+
+# 11. Course Reports
+
+Displays
+
+Student Count
+
+Revenue
+
+Batch Count
+
+Average Fee
+
+Course Popularity
+
+Completion Rate (Future)
+
+Monthly Admissions
+
+Yearly Admissions
+
+Top Performing Course
+
+Least Selected Course
+
+---
+
+# 12. Batch Reports
+
+Displays
+
+Running Batches
+
+Completed Batches
+
+Student Strength
+
+Available Seats
+
+Batch Occupancy
+
+Upcoming Batches
+
+Future
+
+Attendance
+
+Faculty Reports
+
+---
+
+# 13. Inquiry CRM Reports
+
+Reports
+
+Today's Inquiries
+
+Monthly Inquiries
+
+Course Interest
+
+Lead Source Analysis
+
+Inquiry Conversion Rate
+
+Pending Follow-ups
+
+Operator Performance
+
+Rejected Inquiries
+
+Closed Inquiries
+
+---
+
+# 14. Activity Reports
+
+Displays
+
+Student Updates
+
+Payment Updates
+
+Course Changes
+
+Admission Updates
+
+Settings Changes
+
+Backup Events
+
+Login History
+
+Delete History
+
+Restore History
+
+---
+
+# 15. Backup Reports
+
+Displays
+
+Last Backup
+
+Backup Frequency
+
+Backup Status
+
+Backup Size
+
+Backup History
+
+Failed Backups
+
+Verification Results
+
+---
+
+# 16. Dashboard Analytics
+
+Dashboard only displays
+
+Top 5 Statistics
+
+Today's Work
+
+Today's Collection
+
+Pending Fees
+
+Recent Admissions
+
+Recent Payments
+
+Notifications
+
+Backup Status
+
+All detailed analytics belong to Reports.
+
+---
+
+# 17. Charts
+
+Supported Charts
+
+Line Chart
+
+Bar Chart
+
+Pie Chart
+
+Area Chart (Future)
+
+Donut Chart (Future)
+
+Charts should remain clean and readable.
+
+No unnecessary visual effects.
+
+---
+
+# 18. KPI Cards
+
+Examples
+
+Total Students
+
+Today's Admissions
+
+Monthly Revenue
+
+Pending Fees
+
+Course Count
+
+Running Batches
+
+Today's Collection
+
+Inquiry Conversion
+
+Each KPI card supports click-through navigation.
+
+---
+
+# 19. Report Search
+
+Search supports
+
+Student Name
+
+Admission ID
+
+Receipt Number
+
+Course
+
+Batch
+
+Inquiry
+
+Mobile Number
+
+Operator
+
+---
+
+# 20. Export System
+
+Every report supports
+
+Export PDF
+
+Export Excel
+
+Print
+
+Future
+
+CSV
+
+Image
+
+Email
+
+Cloud Export
+
+---
+
+# 21. PDF Export Standards
+
+Every exported PDF contains
+
+Institute Logo
+
+Institute Name
+
+Report Title
+
+Applied Filters
+
+Generated Date
+
+Generated Time
+
+Generated By
+
+Page Numbers
+
+Footer
+
+Professional Formatting
+
+---
+
+# 22. Excel Export Standards
+
+Workbook contains
+
+Title
+
+Column Headers
+
+Data
+
+Totals
+
+Filters
+
+Generated Date
+
+Workbook should be compatible with
+
+Microsoft Excel
+
+LibreOffice Calc
+
+---
+
+# 23. Report Performance
+
+Large reports should load efficiently.
+
+Use
+
+Pagination
+
+Lazy Loading
+
+Optimized Queries
+
+Indexed Searches
+
+Avoid loading unnecessary records.
+
+---
+
+# 24. Report Permissions
+
+Administrator
+
+All Reports
+
+Operator
+
+Operational Reports
+
+Future
+
+Accountant
+
+Financial Reports
+
+Faculty
+
+Academic Reports
+
+Permissions managed through User Roles.
+
+---
+
+# 25. Report Refresh
+
+Reports always fetch live data.
+
+Manual Refresh available.
+
+Future
+
+Auto Refresh Interval
+
+No cached financial reports.
+
+---
+
+# 26. Scheduled Reports (Future)
+
+Automatic generation
+
+Daily
+
+Weekly
+
+Monthly
+
+Email delivery (Future)
+
+Cloud backup (Future)
+
+---
+
+# 27. Business Rules
+
+Reports never modify data.
+
+Exports never alter database.
+
+Filters affect only displayed results.
+
+Financial totals always match payment records.
+
+Deleted records appear only where applicable.
+
+Draft admissions excluded from official reports unless specifically selected.
+
+---
+
+# 28. Error Handling
+
+No Data
+
+Display
+
+"No records found."
+
+Export Failure
+
+Retry Export
+
+Database Error
+
+Display friendly message
+
+Chart Error
+
+Fallback to table view
+
+Application must never crash because of reports.
+
+---
+
+# 29. Future Business Intelligence
+
+Predictive Admissions
+
+Revenue Forecasting
+
+Course Demand Prediction
+
+Student Retention Analysis
+
+Inquiry Heat Map
+
+Seasonal Trends
+
+Admission Forecast
+
+AI Insights
+
+---
+
+# 30. Completion Criteria
+
+Reports Module is complete when
+
+* Every report displays accurate live data.
+* Global filters function correctly.
+* Search works across reports.
+* Charts display correct analytics.
+* PDF exports are professional.
+* Excel exports remain compatible.
+* Financial analytics remain accurate.
+* Dashboard summaries match reports.
+* Report permissions function correctly.
+* Large datasets remain responsive.
+
+---
+
+# End of Part 08
+# SIMS v2.1 - Official Project Blueprint
+
+# Part 09 - Settings, User Management, Backup & System Configuration
+
+> This document defines the complete Settings Module, User Management System, Theme Management, Backup & Restore Engine, Keyboard Shortcut Manager, Institute Configuration, Security Policies and System Preferences of SIMS v2.1.
+
+---
+
+# 1. Module Purpose
+
+The Settings Module is the administrative control center of SIMS.
+
+It manages
+
+* Institute Configuration
+* User Accounts
+* Roles & Permissions
+* Themes
+* Backup & Restore
+* Database Maintenance
+* Keyboard Shortcuts
+* Application Preferences
+* Security
+* Future Integrations
+
+Only authorized users can modify system settings.
+
+---
+
+# 2. Settings Navigation
+
+```text
+Settings
+
+├── Institute Profile
+├── User Management
+├── Roles & Permissions
+├── Theme Management
+├── Backup & Restore
+├── Backup Logs
+├── Database
+├── Keyboard Shortcuts
+├── Security
+├── Application Preferences
+├── About SIMS
+└── Future Integrations
+```
+
+---
+
+# 3. Institute Profile
+
+Stores institute information.
+
+Fields
+
+Institute Name
+
+Institute Logo
+
+Owner Name
+
+Address
+
+City
+
+District
+
+State
+
+PIN Code
+
+Mobile Number
+
+Alternate Number
+
+Email
+
+Website (Future)
+
+GST Number (Future)
+
+Registration Number (Future)
+
+Institute information automatically appears on
+
+Receipts
+
+PDF Reports
+
+Student Forms
+
+Certificates
+
+Print Documents
+
+---
+
+# 4. Institute Logo
+
+Supported Formats
+
+PNG
+
+JPG
+
+SVG (Future)
+
+Functions
+
+Upload
+
+Replace
+
+Remove
+
+Preview
+
+The logo is automatically used across the application.
+
+---
+
+# 5. User Management
+
+Purpose
+
+Manage application users.
+
+Operations
+
+Add User
+
+Edit User
+
+Disable User
+
+Reset Password
+
+Delete User
+
+View Activity
+
+---
+
+# 6. User Information
+
+Each user stores
+
+Full Name
+
+Username
+
+Password
+
+Role
+
+Mobile Number
+
+Email
+
+Status
+
+Created Date
+
+Last Login
+
+Created By
+
+---
+
+# 7. User Status
+
+Active
+
+Disabled
+
+Locked (Future)
+
+Deleted (Future)
+
+Disabled users cannot log in.
+
+---
+
+# 8. Roles & Permissions
+
+Default Roles
+
+Administrator
+
+Operator
+
+Future Roles
+
+Faculty
+
+Accountant
+
+Read Only
+
+Super Administrator
+
+---
+
+# 9. Permission Matrix
+
+Administrator
+
+Complete Access
+
+Operator
+
+Admissions
+
+Students
+
+Payments
+
+Reports
+
+Inquiry
+
+Restricted Settings
+
+Faculty (Future)
+
+Attendance
+
+Student Information
+
+Accountant (Future)
+
+Financial Reports
+
+Payments
+
+Receipts
+
+Read Only
+
+View Access Only
+
+---
+
+# 10. Theme Management
+
+Application provides four built-in themes.
+
+Theme selection updates
+
+Sidebar
+
+Header
+
+Buttons
+
+Cards
+
+Tables
+
+Charts
+
+Dialogs
+
+Accent Colors
+
+Themes remain available globally.
+
+---
+
+# 11. Dark / Light Mode
+
+Permanent switch available in sidebar.
+
+Switch updates entire application instantly.
+
+No restart required.
+
+Preference stored per user.
+
+---
+
+# 12. Application Preferences
+
+Settings include
+
+Default Dashboard
+
+Default Report Period
+
+Default Export Folder
+
+Default Printer (Future)
+
+Language (Future)
+
+Auto Refresh
+
+Date Format
+
+Time Format
+
+Currency Format
+
+---
+
+# 13. Backup System
+
+Backup is one of the most critical modules.
+
+Supports
+
+Manual Backup
+
+Automatic Backup
+
+Scheduled Backup
+
+Backup Verification
+
+Backup Logs
+
+Restore
+
+Backup Health
+
+---
+
+# 14. Manual Backup
+
+Workflow
+
+```text
+Backup Now
+
+↓
+
+Choose Location
+
+↓
+
+Generate Backup
+
+↓
+
+Verification
+
+↓
+
+Confirmation
+
+↓
+
+Activity Log
+```
+
+---
+
+# 15. Automatic Backup
+
+Automatic backup executes without user intervention.
+
+Administrator can configure
+
+Daily
+
+Weekly
+
+Monthly
+
+Backup Time
+
+Backup Folder
+
+Number of Backup Copies
+
+Old backups cleaned automatically based on retention policy.
+
+---
+
+# 16. Backup Status
+
+Dashboard displays
+
+Green
+
+Today's backup completed
+
+Yellow
+
+Last backup older than 2 days
+
+Red
+
+Last backup older than 7 days
+
+Warning
+
+More than 8 weeks
+
+Clicking Backup Status opens Backup Settings.
+
+---
+
+# 17. Backup Logs
+
+Every backup creates a permanent log.
+
+Log contains
+
+Backup Date
+
+Backup Time
+
+Backup Size
+
+Backup Type
+
+Backup Location
+
+Verification Result
+
+Created By
+
+Status
+
+---
+
+# 18. Restore System
+
+Restore Process
+
+```text
+Select Backup
+
+↓
+
+Verify Backup
+
+↓
+
+Confirmation
+
+↓
+
+Restore Database
+
+↓
+
+Restart Application
+
+↓
+
+Restore Complete
+```
+
+Only administrators may restore backups.
+
+---
+
+# 19. Backup Verification
+
+Every backup should be verified.
+
+Verification checks
+
+Database Integrity
+
+Backup Completeness
+
+Corrupted Files
+
+Checksum (Future)
+
+Verification result stored inside Backup Logs.
+
+---
+
+# 20. Database Settings
+
+Displays
+
+Database Location
+
+Database Size
+
+Database Version
+
+Record Counts
+
+Last Optimization
+
+Buttons
+
+Optimize Database
+
+Compact Database (Future)
+
+Repair Database (Future)
+
+Export Database (Admin)
+
+---
+
+# 21. Database Rules
+
+Users should never edit database manually.
+
+All modifications happen through SIMS.
+
+Database optimization never changes business data.
+
+---
+
+# 22. Keyboard Shortcuts
+
+Purpose
+
+Increase operator speed.
+
+Shortcut categories
+
+Navigation
+
+Admissions
+
+Students
+
+Payments
+
+Reports
+
+Search
+
+Backup
+
+Global
+
+Settings
+
+Every shortcut can be viewed inside this page.
+
+Future
+
+Custom shortcuts.
+
+---
+
+# 23. Security Settings
+
+Administrator PIN
+
+Password Change
+
+Session Timeout (Future)
+
+Login History
+
+Failed Login Attempts
+
+Device Authorization (Future)
+
+---
+
+# 24. Admin PIN
+
+Required for
+
+Delete Student
+
+Delete Admission
+
+Delete Payment
+
+Permanent Delete
+
+Restore Records
+
+Financial Modifications
+
+Sensitive Settings
+
+PIN attempts recorded.
+
+---
+
+# 25. Login History
+
+Displays
+
+Username
+
+Login Time
+
+Logout Time
+
+System Name (Future)
+
+Status
+
+Failed Logins
+
+History cannot be edited.
+
+---
+
+# 26. Application Logs
+
+Stores
+
+System Errors
+
+Database Errors
+
+Backup Events
+
+Settings Changes
+
+Critical Operations
+
+Visible only to administrators.
+
+---
+
+# 27. Notification Settings
+
+Administrator can configure
+
+Desktop Notifications
+
+Toast Notifications
+
+Birthday Notifications
+
+Backup Reminders
+
+Inquiry Reminders
+
+Future
+
+Email Notifications
+
+SMS Notifications
+
+---
+
+# 28. Trash Management
+
+Displays
+
+Deleted Students
+
+Deleted Admissions
+
+Deleted Courses
+
+Deleted Inquiries
+
+Deleted Users (Future)
+
+Operations
+
+Restore
+
+Permanent Delete
+
+Search
+
+Filters
+
+---
+
+# 29. About SIMS
+
+Displays
+
+Application Name
+
+Current Version
+
+Developer
+
+Client
+
+Database Version
+
+Python Version
+
+Framework
+
+License Information
+
+Future
+
+Release Notes
+
+---
+
+# 30. Future Integrations
+
+Reserved Settings
+
+Cloud Sync
+
+API Configuration
+
+SMS Gateway
+
+WhatsApp API
+
+Email Server
+
+Payment Gateway
+
+Biometric Devices
+
+RFID
+
+Barcode Scanner
+
+Cloud Storage
+
+---
+
+# 31. Activity Logs
+
+Every settings modification creates a log.
+
+Examples
+
+Theme Changed
+
+Backup Created
+
+Backup Restored
+
+User Added
+
+Password Reset
+
+Permission Updated
+
+Institute Profile Updated
+
+Database Optimized
+
+Every log contains
+
+User
+
+Date
+
+Time
+
+Old Value
+
+New Value
+
+---
+
+# 32. Business Rules
+
+Only administrators access critical settings.
+
+Backup is mandatory.
+
+Restore requires confirmation.
+
+Deleting backups requires administrator permission.
+
+Theme changes affect entire application.
+
+User permissions apply immediately after next login.
+
+Critical security changes are always logged.
+
+---
+
+# 33. Error Handling
+
+Backup Failure
+
+Display detailed reason.
+
+Retry available.
+
+Restore Failure
+
+Abort restore.
+
+Keep existing database safe.
+
+Database Error
+
+Prevent modification.
+
+Theme Error
+
+Fallback to previous theme.
+
+Permission Error
+
+Display
+
+"Access Denied"
+
+Never expose technical exceptions.
+
+---
+
+# 34. Completion Criteria
+
+Settings Module is complete when
+
+* Institute profile functions correctly.
+* User management operates successfully.
+* Role permissions are enforced.
+* Themes update instantly.
+* Dark/Light mode functions correctly.
+* Automatic backup works.
+* Backup logs remain accurate.
+* Restore process is verified.
+* Keyboard shortcuts are accessible.
+* Security settings protect sensitive operations.
+* Activity logs capture every administrative change.
+
+---
+
+# End of Part 09
+# SIMS v2.1 - Official Project Blueprint
+
+# Part 10 - Database Architecture, Data Model & Business Rules
+
+> This document defines the complete database architecture of SIMS v2.1. It specifies entity relationships, database design philosophy, naming conventions, constraints, indexing strategy, transaction rules, data integrity, storage standards and future scalability. SQLite is the primary database engine, but the architecture should remain compatible with future migration to PostgreSQL or MySQL.
+
+---
+
+# 1. Database Philosophy
+
+The database is the foundation of SIMS.
+
+Every table must represent one business entity.
+
+Database design should prioritize
+
+* Data Integrity
+* Normalization
+* Performance
+* Scalability
+* Maintainability
+* Backup Safety
+* Future Migration
+
+The database must never depend on UI logic.
+
+---
+
+# 2. Design Principles
+
+Single Source of Truth
+
+No Duplicate Data
+
+Normalized Structure
+
+Strong Relationships
+
+Soft Delete Preferred
+
+Immutable Financial Records
+
+Audit-Friendly Architecture
+
+Future Cloud Compatibility
+
+---
+
+# 3. Database Engine
+
+Current
+
+SQLite
+
+Future
+
+PostgreSQL
+
+MySQL
+
+The application architecture must isolate database-specific logic.
+
+---
+
+# 4. Database Naming Standards
+
+Tables
+
+Plural
+
+snake_case
+
+Examples
+
+students
+
+admissions
+
+payments
+
+receipts
+
+courses
+
+batches
+
+inquiries
+
+users
+
+activity_logs
+
+backup_logs
+
+Columns
+
+snake_case
+
+Primary Key
+
+id
+
+Foreign Keys
+
+student_id
+
+course_id
+
+batch_id
+
+payment_id
+
+---
+
+# 5. Common Columns
+
+Every major table should contain
+
+id
+
+created_at
+
+updated_at
+
+created_by
+
+updated_by
+
+is_deleted
+
+deleted_at
+
+status
+
+---
+
+# 6. Primary Tables
+
+Core Tables
+
+students
+
+admissions
+
+courses
+
+batches
+
+payments
+
+receipts
+
+inquiries
+
+users
+
+settings
+
+notifications
+
+activity_logs
+
+backup_logs
+
+draft_admissions
+
+trash
+
+themes
+
+Future Tables
+
+certificates
+
+attendance
+
+faculty
+
+expenses
+
+income
+
+plugins
+
+api_tokens
+
+sync_logs
+
+---
+
+# 7. Entity Relationship Overview
+
+```text
+Student
+    │
+    ├──────────────┐
+    │              │
+Admissions         Activity Logs
+    │
+    ├──────────────┐
+    │              │
+Payments       Course
+    │              │
+Receipts      Batch
+```
+
+---
+
+# 8. Students Table
+
+Purpose
+
+Stores permanent student information.
+
+Contains
+
+Student ID
+
+Personal Information
+
+Contact Information
+
+Address
+
+Qualification
+
+Photo Path
+
+Signature Path
+
+Status
+
+Created Date
+
+Updated Date
+
+Student profile remains unique.
+
+---
+
+# 9. Admissions Table
+
+Purpose
+
+Stores admission records.
+
+Relationships
+
+Student
+
+Course
+
+Batch
+
+Contains
+
+Admission ID
+
+Admission Date
+
+Fee Structure
+
+Discount
+
+Remarks
+
+Draft Status
+
+Admission Status
+
+One student may have multiple admissions.
+
+---
+
+# 10. Courses Table
+
+Stores
+
+Course Name
+
+Course Code
+
+Duration
+
+Fees
+
+Description
+
+Category
+
+Status
+
+Created Date
+
+Archived Date
+
+Courses should never be permanently removed if admissions exist.
+
+---
+
+# 11. Batch Table
+
+Stores
+
+Batch Name
+
+Course ID
+
+Timing
+
+Maximum Capacity
+
+Current Strength
+
+Status
+
+Start Date
+
+End Date
+
+---
+
+# 12. Payments Table
+
+Stores
+
+Admission ID
+
+Amount
+
+Payment Mode
+
+Installment Number
+
+Payment Date
+
+Collected By
+
+Remarks
+
+Payments never overwrite previous records.
+
+---
+
+# 13. Receipts Table
+
+Stores
+
+Receipt Number
+
+Payment ID
+
+Receipt Date
+
+Amount
+
+Generated By
+
+PDF Path
+
+Receipt records are immutable.
+
+---
+
+# 14. Inquiry Table
+
+Stores
+
+Student Name
+
+Mobile Number
+
+Interested Course
+
+Source
+
+Status
+
+Priority
+
+Remarks
+
+Next Follow-up
+
+Converted Admission ID
+
+---
+
+# 15. Users Table
+
+Stores
+
+Username
+
+Password Hash
+
+Role
+
+Status
+
+Mobile
+
+Email
+
+Last Login
+
+Passwords are never stored as plain text.
+
+---
+
+# 16. Activity Log Table
+
+Stores
+
+Module
+
+Record ID
+
+Action
+
+Field
+
+Old Value
+
+New Value
+
+Operator
+
+Date
+
+Time
+
+Every important modification creates a log.
+
+---
+
+# 17. Notification Table
+
+Stores
+
+Notification Type
+
+Title
+
+Description
+
+Priority
+
+Read Status
+
+Related Module
+
+Created Time
+
+Expiry Time (Optional)
+
+---
+
+# 18. Backup Logs Table
+
+Stores
+
+Backup Name
+
+Date
+
+Time
+
+Size
+
+Verification Status
+
+Location
+
+Backup Type
+
+Created By
+
+---
+
+# 19. Draft Admission Table
+
+Stores
+
+Temporary admission information.
+
+Contains
+
+Every field available in Admission Form.
+
+Draft deleted automatically after successful admission.
+
+---
+
+# 20. Trash Table
+
+Stores references to deleted records.
+
+Contains
+
+Original Table
+
+Original Record ID
+
+Deleted By
+
+Deleted Date
+
+Reason (Future)
+
+Restore Status
+
+---
+
+# 21. Settings Table
+
+Stores
+
+Institute Information
+
+Theme
+
+Preferences
+
+Backup Configuration
+
+Default Values
+
+Application Settings
+
+---
+
+# 22. Theme Table
+
+Stores
+
+Theme Name
+
+Accent Color
+
+Dark Mode
+
+User Preference
+
+Only one active theme per user.
+
+---
+
+# 23. Foreign Key Rules
+
+Student
+
+↓
+
+Admission
+
+↓
+
+Payment
+
+↓
+
+Receipt
+
+Deletion should never break relationships.
+
+Use soft delete wherever possible.
+
+---
+
+# 24. Soft Delete Policy
+
+Applicable Tables
+
+Students
+
+Admissions
+
+Courses
+
+Batches
+
+Inquiries
+
+Users
+
+Deleted records move to Trash.
+
+Financial records remain preserved.
+
+---
+
+# 25. Hard Delete Policy
+
+Allowed only for
+
+Administrator
+
+After confirmation
+
+After Admin PIN
+
+Creates Activity Log
+
+---
+
+# 26. Database Transactions
+
+The following operations must execute inside a transaction
+
+Admission Creation
+
+Payment
+
+Receipt Generation
+
+Backup Restore
+
+Student Merge (Future)
+
+Bulk Import (Future)
+
+Rollback on failure.
+
+---
+
+# 27. Constraints
+
+Student Mobile
+
+Not Null
+
+Course Name
+
+Unique
+
+Receipt Number
+
+Unique
+
+Username
+
+Unique
+
+Primary Keys
+
+Auto Increment
+
+Pending Amount
+
+Cannot become negative.
+
+---
+
+# 28. Indexing Strategy
+
+Indexes required on
+
+Student Name
+
+Mobile Number
+
+Admission ID
+
+Receipt Number
+
+Course ID
+
+Batch ID
+
+Payment Date
+
+Inquiry Status
+
+Activity Date
+
+Backup Date
+
+Search performance should remain fast even with large datasets.
+
+---
+
+# 29. Data Integrity Rules
+
+No orphan payments.
+
+No orphan receipts.
+
+No duplicate receipt numbers.
+
+No duplicate usernames.
+
+No admission without student.
+
+No payment without admission.
+
+No receipt without payment.
+
+---
+
+# 30. Search Optimization
+
+Universal Search uses indexed fields.
+
+Priority
+
+Mobile Number
+
+Admission ID
+
+Student Name
+
+Receipt Number
+
+Search should remain nearly instant.
+
+---
+
+# 31. File Storage
+
+Database stores only file paths.
+
+Actual files stored separately.
+
+Supported
+
+Student Photos
+
+Signatures
+
+PDF Receipts
+
+Student PDFs
+
+Future
+
+Certificates
+
+Documents
+
+Backups
+
+---
+
+# 32. Backup Rules
+
+Entire database included.
+
+Uploaded files included.
+
+PDFs included.
+
+Documents included.
+
+Settings included.
+
+Themes included.
+
+Backups should be self-contained.
+
+---
+
+# 33. Restore Rules
+
+Verify backup.
+
+Restore database.
+
+Restore files.
+
+Validate integrity.
+
+Restart application.
+
+Log restore event.
+
+---
+
+# 34. Performance Targets
+
+10,000+ Students
+
+Should remain responsive.
+
+50,000+ Payments
+
+Search under one second.
+
+Dashboard startup optimized.
+
+Reports use indexed queries.
+
+---
+
+# 35. Future Scalability
+
+Multi-center support.
+
+Cloud synchronization.
+
+REST API.
+
+Mobile App.
+
+Online Admissions.
+
+Plugin System.
+
+Role-based database partitioning.
+
+---
+
+# 36. Migration Strategy
+
+Current
+
+SQLite
+
+Future Migration
+
+PostgreSQL
+
+Migration should require minimal application changes.
+
+Repository layer should isolate database implementation.
+
+---
+
+# 37. Security Rules
+
+Parameterized queries only.
+
+No raw SQL concatenation.
+
+Password hashing mandatory.
+
+Database access through repository layer only.
+
+No UI file should directly execute SQL.
+
+---
+
+# 38. Completion Criteria
+
+Database Architecture is complete when
+
+* All entities are normalized.
+* Relationships are enforced.
+* Foreign keys remain valid.
+* Transactions protect critical operations.
+* Soft delete functions correctly.
+* Indexes optimize searches.
+* Financial records remain immutable.
+* Backup and restore preserve complete data.
+* Database supports future migration.
+* Business rules remain enforced at the data layer.
+
+---
+
+# End of Part 10
+# SIMS v2.1 - Official Project Blueprint
+
+# Part 11 - Software Architecture, Folder Structure & Development Standards
+
+> This document defines the internal software architecture of SIMS v2.1. It establishes the coding standards, project organization, dependency rules, UI architecture, service layer, repository pattern, component library, development workflow, testing strategy and packaging standards. Every future developer and AI must follow this architecture.
+
+---
+
+# 1. Architecture Philosophy
+
+SIMS v2.1 is **not** a script-based application.
+
+It is a production-grade desktop ERP.
+
+The architecture must provide
+
+* Maintainability
+* Scalability
+* Reusability
+* Testability
+* Readability
+* Separation of Concerns
+
+The application should remain easy to maintain even after years of development.
+
+---
+
+# 2. Architectural Goals
+
+* Clean Architecture
+* Modular Design
+* Component Reusability
+* Low Coupling
+* High Cohesion
+* Predictable Codebase
+* Easy Debugging
+* Future Cloud Compatibility
+
+---
+
+# 3. High Level Architecture
+
+```text
+Presentation Layer
+        │
+        ▼
+Controllers
+        │
+        ▼
+Business Services
+        │
+        ▼
+Repository Layer
+        │
+        ▼
+SQLite Database
+```
+
+Every layer has one responsibility.
+
+No layer should bypass another layer.
+
+---
+
+# 4. Project Folder Structure
+
+```text
+SIMS_V2.1/
+
+│
+├── assets/
+│   ├── icons/
+│   ├── logos/
+│   ├── images/
+│   ├── fonts/
+│   ├── themes/
+│   └── templates/
+│
+├── backups/
+│
+├── database/
+│   ├── schema/
+│   ├── migrations/
+│   ├── repositories/
+│   ├── database.py
+│   └── sqlite_manager.py
+│
+├── models/
+│
+├── services/
+│
+├── controllers/
+│
+├── ui/
+│   ├── pages/
+│   ├── dialogs/
+│   ├── layouts/
+│   ├── components/
+│   ├── widgets/
+│   └── themes/
+│
+├── utils/
+│
+├── exports/
+│
+├── logs/
+│
+├── tests/
+│
+├── config/
+│
+├── docs/
+│
+├── main.py
+│
+└── requirements.txt
+```
+
+---
+
+# 5. Folder Responsibilities
+
+## assets/
+
+Application resources.
+
+Icons
+
+Fonts
+
+Images
+
+Logos
+
+PDF Templates
+
+Receipt Templates
+
+---
+
+## database/
+
+Everything related to database.
+
+No UI code allowed.
+
+---
+
+## models/
+
+Application entities.
+
+Student
+
+Admission
+
+Course
+
+Batch
+
+Payment
+
+Receipt
+
+Inquiry
+
+Notification
+
+---
+
+## services/
+
+Business logic.
+
+Examples
+
+AdmissionService
+
+PaymentService
+
+StudentService
+
+ReportService
+
+BackupService
+
+---
+
+## controllers/
+
+Connect UI with services.
+
+Controllers never execute SQL directly.
+
+---
+
+## ui/
+
+Contains every visual component.
+
+No database logic.
+
+No business logic.
+
+Only presentation.
+
+---
+
+## utils/
+
+Helper utilities.
+
+Date formatter
+
+Validators
+
+PDF Generator
+
+File Manager
+
+Logger
+
+Common helpers
+
+---
+
+## exports/
+
+Generated files.
+
+PDF
+
+Excel
+
+Reports
+
+Receipts
+
+Student Forms
+
+---
+
+## logs/
+
+Application logs.
+
+Crash logs
+
+System logs
+
+Debug logs
+
+---
+
+## config/
+
+Application configuration.
+
+Paths
+
+Constants
+
+Settings
+
+Default values
+
+---
+
+## docs/
+
+Project documentation.
+
+Blueprint
+
+Release Notes
+
+Developer Notes
+
+---
+
+# 6. Layer Responsibilities
+
+## UI Layer
+
+Displays data.
+
+Collects user input.
+
+Calls controller.
+
+Nothing more.
+
+---
+
+## Controller Layer
+
+Validates request.
+
+Calls services.
+
+Returns response.
+
+Never executes SQL.
+
+---
+
+## Service Layer
+
+Contains business rules.
+
+Calculations.
+
+Validations.
+
+Transactions.
+
+Workflow.
+
+This is the heart of SIMS.
+
+---
+
+## Repository Layer
+
+Database communication.
+
+CRUD operations.
+
+Parameterized SQL.
+
+Returns models.
+
+---
+
+## Database Layer
+
+Stores data only.
+
+No business logic.
+
+---
+
+# 7. Dependency Rules
+
+Allowed
+
+UI
+
+↓
+
+Controller
+
+↓
+
+Service
+
+↓
+
+Repository
+
+↓
+
+Database
+
+Not Allowed
+
+UI → Database
+
+UI → SQL
+
+Controller → SQL
+
+Service → UI
+
+Repository → UI
+
+Circular dependencies are prohibited.
+
+---
+
+# 8. UI Component Library
+
+Reusable Components
+
+Primary Button
+
+Secondary Button
+
+Danger Button
+
+Search Bar
+
+Data Table
+
+Cards
+
+Dialogs
+
+Confirmation Dialog
+
+Input Field
+
+Dropdown
+
+Sidebar
+
+Header
+
+Status Bar
+
+Toast Notification
+
+Loading Indicator
+
+Empty State
+
+Pagination
+
+Date Picker
+
+File Picker
+
+Photo Viewer
+
+Signature Viewer
+
+Every module must reuse these components.
+
+---
+
+# 9. Naming Conventions
+
+Classes
+
+PascalCase
+
+StudentService
+
+AdmissionController
+
+ReceiptGenerator
+
+Variables
+
+snake_case
+
+Functions
+
+snake_case
+
+Constants
+
+UPPER_CASE
+
+Database Tables
+
+snake_case
+
+Files
+
+snake_case
+
+---
+
+# 10. Business Services
+
+Core Services
+
+AuthenticationService
+
+StudentService
+
+AdmissionService
+
+CourseService
+
+BatchService
+
+PaymentService
+
+ReceiptService
+
+ReportService
+
+InquiryService
+
+NotificationService
+
+BackupService
+
+ThemeService
+
+UserService
+
+ActivityLogService
+
+Each service manages only its own domain.
+
+---
+
+# 11. Repository Layer
+
+Repositories
+
+StudentRepository
+
+AdmissionRepository
+
+CourseRepository
+
+BatchRepository
+
+PaymentRepository
+
+ReceiptRepository
+
+InquiryRepository
+
+UserRepository
+
+BackupRepository
+
+Repositories contain only database operations.
+
+---
+
+# 12. Validation Strategy
+
+Validation Levels
+
+UI Validation
+
+Service Validation
+
+Database Constraint
+
+Business Rule Validation
+
+Critical operations validate on all levels.
+
+---
+
+# 13. Exception Handling
+
+Application uses centralized error handling.
+
+Every exception should
+
+Be Logged
+
+Be Displayed Nicely
+
+Not Crash Application
+
+Unexpected errors stored in logs.
+
+---
+
+# 14. Logging Strategy
+
+Log Categories
+
+Application
+
+Database
+
+Backup
+
+Authentication
+
+Payment
+
+Settings
+
+Errors
+
+Logs contain
+
+Timestamp
+
+Module
+
+User
+
+Severity
+
+Description
+
+---
+
+# 15. Configuration Management
+
+Configuration stored separately.
+
+Includes
+
+Database Path
+
+Backup Folder
+
+Theme
+
+Application Version
+
+Institute Settings
+
+No hardcoded values.
+
+---
+
+# 16. Constants
+
+Examples
+
+Application Name
+
+Version
+
+Supported File Types
+
+Receipt Prefix
+
+Default Theme
+
+Maximum Upload Size
+
+Store in constants module.
+
+---
+
+# 17. PDF Engine
+
+Responsible for
+
+Student Forms
+
+Receipts
+
+Reports
+
+Certificates (Future)
+
+Uses common template engine.
+
+No duplicate PDF layouts.
+
+---
+
+# 18. Excel Engine
+
+Exports
+
+Reports
+
+Students
+
+Payments
+
+Inquiries
+
+Common export utilities.
+
+---
+
+# 19. Notification Engine
+
+Central notification manager.
+
+Supports
+
+Toast
+
+Notification Center
+
+Dashboard Feed
+
+Future
+
+Email
+
+SMS
+
+WhatsApp
+
+---
+
+# 20. Backup Engine
+
+Responsible for
+
+Database Backup
+
+File Backup
+
+Verification
+
+Restore
+
+Scheduling
+
+Logging
+
+Single centralized implementation.
+
+---
+
+# 21. Theme Engine
+
+Responsible for
+
+Theme Loading
+
+Dark Mode
+
+Accent Colors
+
+Persistence
+
+Live Updates
+
+No duplicated styling code.
+
+---
+
+# 22. Testing Strategy
+
+Testing Levels
+
+Unit Testing
+
+Service Testing
+
+Repository Testing
+
+Integration Testing
+
+Manual UI Testing
+
+Regression Testing
+
+Acceptance Testing
+
+---
+
+# 23. Code Review Checklist
+
+No duplicate code.
+
+Proper naming.
+
+Type hints.
+
+Documentation.
+
+No SQL inside UI.
+
+No business logic inside UI.
+
+No raw queries.
+
+Meaningful comments only.
+
+---
+
+# 24. Git Workflow
+
+Main Branch
+
+Stable production.
+
+Development Branch
+
+Current development.
+
+Feature Branch
+
+One feature per branch.
+
+Commit messages should be meaningful.
+
+---
+
+# 25. Versioning
+
+Current
+
+v2.1
+
+Future
+
+v2.2
+
+v2.5
+
+v3.0
+
+Semantic versioning preferred.
+
+---
+
+# 26. Packaging
+
+Target Platforms
+
+Ubuntu
+
+Windows
+
+Future
+
+macOS
+
+Build outputs
+
+Executable
+
+Installer
+
+Portable Version (Future)
+
+---
+
+# 27. Performance Guidelines
+
+Lazy loading.
+
+Pagination.
+
+Indexed search.
+
+Efficient SQL.
+
+Avoid duplicate queries.
+
+Cache static configuration only.
+
+---
+
+# 28. Security Standards
+
+Parameterized SQL.
+
+Password hashing.
+
+Admin PIN validation.
+
+Role-based authorization.
+
+Input sanitization.
+
+Safe file uploads.
+
+Restricted file access.
+
+---
+
+# 29. AI Development Rules
+
+Any AI generating code must
+
+Follow this blueprint.
+
+Generate modular code.
+
+Never merge unrelated modules.
+
+Reuse existing services.
+
+Never bypass repository layer.
+
+Never modify business rules without approval.
+
+Never create duplicate UI components.
+
+Always document major architectural changes.
+
+---
+
+# 30. Future Architecture
+
+Reserved for
+
+REST API
+
+Cloud Sync
+
+Plugin System
+
+Mobile App
+
+Background Workers
+
+Real-time Notifications
+
+Multi-Center Architecture
+
+Offline Sync Engine
+
+---
+
+# 31. Completion Criteria
+
+Software Architecture is complete when
+
+* Folder structure is fully implemented.
+* Every module follows layered architecture.
+* UI contains no business logic.
+* Services contain all business rules.
+* Repository layer isolates database operations.
+* Shared components are reused throughout the application.
+* Logging is centralized.
+* Testing strategy is implemented.
+* Packaging supports production deployment.
+* Future expansion requires minimal architectural changes.
+
+---
+
+# End of Part 11
+# SIMS v2.1 - Official Project Blueprint
+
+# Part 12 - AI Development Constitution, UI/UX Standards & Long-Term Development Guidelines
+
+> This document is the official constitution of SIMS v2.1. Every developer, future maintainer and AI assistant working on this project must follow these standards. These rules define how SIMS should evolve while preserving stability, maintainability and business value.
+
+---
+
+# 1. Project Identity
+
+**Project Name**
+
+Sudharm Infotech Management System (SIMS)
+
+Version
+
+2.1
+
+Application Type
+
+Offline Desktop ERP
+
+Client
+
+Sudharm Infotech (MKCL Authorized Learning Center)
+
+Project Owner & Developer
+
+Raj Pagar
+
+Technology Stack
+
+Python
+
+Flet
+
+SQLite
+
+Git
+
+Ubuntu Linux
+
+Architecture
+
+Layered Architecture
+
+Repository Pattern
+
+Service Layer
+
+Component-Based UI
+
+---
+
+# 2. Project Vision
+
+SIMS is a real business application developed for the daily operations of Sudharm Infotech.
+
+This is **not** an engineering college project.
+
+Every feature must solve a real operational problem.
+
+The primary objectives are
+
+* Faster admissions
+* Organized student records
+* Accurate fee management
+* Reliable reporting
+* Secure data storage
+* Simple daily workflow
+* Professional user experience
+
+Features should always be practical rather than experimental.
+
+---
+
+# 3. Development Philosophy
+
+Development priorities
+
+Business Logic
+
+Reliability
+
+Maintainability
+
+Performance
+
+Security
+
+Scalability
+
+User Experience
+
+Documentation
+
+A module is considered complete only when
+
+* Business rules are implemented.
+* Database is finalized.
+* UI is complete.
+* Validations are added.
+* Error handling is implemented.
+* Activity logs work.
+* Documentation is updated.
+
+---
+
+# 4. AI Development Constitution
+
+Every AI assisting this project must follow these rules.
+
+Never
+
+* Skip business rules.
+* Guess missing functionality.
+* Replace approved workflows.
+* Generate duplicate components.
+* Mix UI and database logic.
+* Bypass the service layer.
+* Modify financial logic.
+* Remove existing features.
+* Rewrite architecture without approval.
+
+Always
+
+* Follow this blueprint.
+* Develop module by module.
+* Reuse existing components.
+* Explain architectural decisions before major changes.
+* Respect naming conventions.
+* Keep code production-ready.
+* Preserve backward compatibility wherever possible.
+
+---
+
+# 5. Coding Standards
+
+Every file should have a single responsibility.
+
+Use
+
+* Type hints
+* Meaningful names
+* Modular functions
+* Reusable classes
+* Clear folder organization
+
+Avoid
+
+* Duplicate code
+* Global variables
+* Hardcoded values
+* Long functions
+* Repeated SQL queries
+
+Readable code is preferred over clever code.
+
+---
+
+# 6. UI / UX Philosophy
+
+SIMS is used continuously during institute working hours.
+
+Therefore
+
+* Speed is more important than animations.
+* Simplicity is more important than visual effects.
+* Consistency is more important than decoration.
+* Information hierarchy is more important than colorful interfaces.
+
+The application should feel clean, professional and comfortable for long working sessions.
+
+---
+
+# 7. UI Design Principles
+
+* Consistent spacing throughout the application.
+* Uniform button styles.
+* Reusable cards.
+* Predictable navigation.
+* Minimal clicks for common tasks.
+* No unnecessary popup windows.
+* Important actions always visible.
+* Responsive layout for different desktop resolutions.
+
+---
+
+# 8. Typography Standards
+
+### Canela
+
+Used for
+
+* Welcome Screen
+* Dashboard Headings
+* Major Titles
+
+Purpose
+
+Premium visual identity.
+
+---
+
+### Helvetica Neue
+
+Used for
+
+* Sidebar
+* Forms
+* Tables
+* Dashboard
+* Buttons
+* Dialogs
+* Reports
+
+Purpose
+
+Fast readability during office work.
+
+---
+
+### Cormorant Garamond
+
+Used only in
+
+Course Details page
+
+Displays
+
+* Course Overview
+* Learning Outcomes
+* Career Opportunities
+* Course Description
+
+Purpose
+
+Elegant presentation for educational content.
+
+---
+
+# 9. Color Standards
+
+Colors communicate meaning.
+
+Green
+
+Success
+
+Blue
+
+Information
+
+Orange
+
+Warning
+
+Red
+
+Critical
+
+Gray
+
+Neutral
+
+Color should never be the only indicator.
+
+Icons and text must also explain status.
+
+---
+
+# 10. Navigation Standards
+
+Sidebar contains only primary modules.
+
+Header contains
+
+* Universal Search
+* Notifications
+* Current User
+* Quick Actions
+
+Dark / Light mode toggle remains permanently visible at the bottom-left corner.
+
+Navigation should remain consistent throughout the application.
+
+---
+
+# 11. Dashboard Philosophy
+
+The Dashboard should answer three questions immediately.
+
+* What happened today?
+* What needs attention?
+* What should I do next?
+
+The operator should understand today's workload within a few seconds.
+
+Dashboard must never become overcrowded.
+
+---
+
+# 12. Universal Search
+
+Search available globally.
+
+Supports
+
+* Student Name
+* Admission ID
+* Mobile Number
+
+Future expansion may include
+
+* Receipt Number
+* Parent Name
+
+Selecting a result opens the related student immediately.
+
+---
+
+# 13. Notification System
+
+Floating notifications appear at the top-right.
+
+Used for
+
+* Admission Saved
+* Payment Received
+* Receipt Generated
+* Student Updated
+* Backup Completed
+* Errors
+* Birthday Reminder
+
+All notifications are stored in Notification History.
+
+---
+
+# 14. Keyboard Productivity
+
+Application should support keyboard-first workflow.
+
+Important shortcuts
+
+* Universal Search
+* New Admission
+* Save
+* Print
+* Receive Payment
+* Reports
+* Settings
+
+Escape closes dialogs.
+
+Complete shortcut list available in Settings.
+
+---
+
+# 15. Performance Goals
+
+Application Startup
+
+Less than 3 seconds
+
+Student Search
+
+Less than 1 second
+
+Dashboard
+
+Fast loading
+
+Large databases should remain responsive.
+
+Performance should never be sacrificed for unnecessary visual effects.
+
+---
+
+# 16. Error Message Standards
+
+Messages should explain
+
+* What happened
+* Why it happened
+* What the operator should do next
+
+Avoid technical language whenever possible.
+
+Example
+
+Instead of
+
+Database Error
+
+Use
+
+Unable to save admission. Please try again.
+
+---
+
+# 17. Security Principles
+
+Passwords stored securely.
+
+Admin PIN required for sensitive actions.
+
+Financial history remains immutable.
+
+Role-based permissions enforced.
+
+Repository layer controls database access.
+
+Every important action is recorded in Activity Logs.
+
+---
+
+# 18. Accessibility Standards
+
+* Clear typography
+* Good color contrast
+* Large click targets
+* Keyboard navigation
+* Consistent layouts
+* Readable forms
+
+---
+
+# 19. Development Workflow
+
+```text
+Planning
+
+↓
+
+Documentation
+
+↓
+
+Database Design
+
+↓
+
+Business Logic
+
+↓
+
+UI Development
+
+↓
+
+Integration
+
+↓
+
+Testing
+
+↓
+
+Review
+
+↓
+
+Release
+```
+
+Every module follows this lifecycle.
+
+---
+
+# 20. Testing Checklist
+
+Before every release verify
+
+* Authentication
+* Dashboard
+* Admissions
+* Students
+* Courses
+* Payments
+* Receipts
+* Reports
+* Inquiry CRM
+* Search
+* Notifications
+* Activity Logs
+* Backup & Restore
+* Trash Recovery
+* Theme Switching
+* Keyboard Shortcuts
+
+No module should be released without testing.
+
+---
+
+# 21. Documentation Rules
+
+Every completed module should contain
+
+* Purpose
+* Workflow
+* Business Rules
+* Database Relations
+* Future Notes
+* Completion Criteria
+
+Documentation should always remain synchronized with the codebase.
+
+---
+
+# 22. Practical Future Improvements
+
+Future versions may include improvements only when required by actual institute operations.
+
+Possible enhancements
+
+* Better Reports
+* Additional Export Formats
+* Improved Analytics
+* Performance Optimizations
+* Enhanced Backup System
+* UI Refinements
+* Additional Search Filters
+* Workflow Improvements
+
+Large features should only be added after real business requirements arise.
+
+---
+
+# 23. What SIMS Is NOT
+
+SIMS is not
+
+* A Learning Management System (LMS)
+* An Online Examination Platform
+* A Multi-Center ERP
+* A Student Portal
+* A Parent Portal
+* A Teacher Management System
+* An Attendance System
+* A Cloud-Based ERP
+
+These are outside the scope of SIMS v2.1.
+
+---
+
+# 24. Project Success Criteria
+
+SIMS v2.1 is successful when
+
+* Daily institute work becomes faster.
+* Admissions are completed efficiently.
+* Student records remain organized.
+* Financial records remain accurate.
+* Reports assist business decisions.
+* Backups prevent data loss.
+* Operators require minimal training.
+* The application remains stable during long-term daily use.
+
+---
+
+# 25. Final Development Principles
+
+Every feature added to SIMS must satisfy at least one real business requirement.
+
+The application should always remain
+
+* Business-first
+* Fast
+* Reliable
+* Secure
+* Modular
+* Professional
+* Well Documented
+* Easy to Maintain
+* Future Ready
+
+No feature should be added simply because it is technically possible.
+
+Every line of code should contribute to solving a real institute problem.
+
+---
+
+# 26. Official Statement
+
+This 12-part blueprint is the official digital specification of **SIMS v2.1**.
+
+It represents the complete business vision, software architecture and development standards of the project.
+
+Any future implementation, enhancement or refactoring must follow this blueprint unless explicitly approved by the project owner.
+
+---
+
+# End of Part 12
+# SIMS v2.1 - Official Project Blueprint
+
+# Part 13 - About, Credits & Product Identity
+
+> This document defines the official identity, ownership, credits and product information of SIMS v2.1. It also specifies the "About SIMS" dialog available inside the application.
+
+---
+
+# 1. Product Identity
+
+Application Name
+
+Sudharm Infotech Management System
+
+Short Name
+
+SIMS
+
+Version
+
+2.1
+
+Application Type
+
+Offline Desktop ERP
+
+Developed For
+
+Sudharm Infotech
+
+MKCL Authorized Learning Center
+
+---
+
+# 2. Application Footer
+
+Every screen displays
+
+```text
+SIMS - Sudharm Infotech Management System
+Powered by ARP GROUP
+```
+
+"Powered by ARP GROUP" is clickable.
+
+---
+
+# 3. About SIMS Dialog
+
+Clicking **Powered by ARP GROUP** opens the About dialog.
+
+Layout
+
+```text
+--------------------------------------------------
+
+                SIMS v2.1
+
+Sudharm Infotech Management System
+
+Production Version
+
+--------------------------------------------------
+
+Powered By
+
+ARP Group of Technology,
+Research & Development
+
+Founder
+
+Prajwal "Raj" Pagar
+
+--------------------------------------------------
+
+Technology Stack
+
+Python
+
+Flet
+
+SQLite
+
+Git
+
+Ubuntu Linux
+
+--------------------------------------------------
+
+Contact
+
+Mobile
+
++91 9529474592
+
+Email
+
+rajpagar028@gmail.com
+
+--------------------------------------------------
+
+Developed with dedication for
+Sudharm Infotech.
+
+© ARP GROUP
+
+--------------------------------------------------
+```
+
+---
+
+# 4. Dialog Buttons
+
+Close
+
+Copy Contact Information
+
+Future
+
+Visit Website
+
+GitHub
+
+Portfolio
+
+LinkedIn
+
+---
+
+# 5. ARP GROUP Identity
+
+Official Name
+
+ARP Group of Technology, Research & Development
+
+Mission
+
+Building practical software solutions, automation tools and innovative technology products focused on solving real-world problems through quality engineering.
+
+---
+
+# 6. Version Information
+
+Display
+
+Application Version
+
+Database Version
+
+Build Number
+
+Release Date
+
+Python Version
+
+Operating System
+
+---
+
+# 7. Credits
+
+Client
+
+Hemant Mahale
+
+Project
+
+SIMS v2.1
+
+Architecture
+
+Raj Pagar
+
+Design
+
+Raj Pagar
+
+Development
+
+Raj Pagar
+
+---
+
+# 8. Future Expansion
+
+When ARP GROUP develops more software, this dialog may include
+
+Product Portfolio
+
+Official Website
+
+Documentation
+
+Release Notes
+
+Support Information
+
+---
+
+# 9. Business Rule
+
+The About dialog is informational only.
+
+It does not require authentication and never modifies application data.
+
+---
+
+# End of Part 13
+# SIMS v2.1 - Official Project Blueprint
+
+# Part 14 - Project Information, Client Configuration & AI Instructions
+
+> This document contains project-specific information required for developing SIMS v2.1. It provides the AI with real project data, branding information, client details and implementation instructions. Whenever information is missing, the AI must ask the project owner instead of making assumptions.
+
+---
+
+# 1. Project Information
+
+Project Name
+
+Sudharm Infotech Management System
+
+Short Name
+
+SIMS
+
+Current Version
+
+2.1
+
+Application Type
+
+Offline Desktop ERP
+
+Development Status
+
+Production Development
+
+---
+
+# 2. Client Information
+
+Client Name
+
+Hemant Mahale
+
+Organization
+
+Sudharm Infotech
+
+MKCL Authorized Learning Center
+
+Contact Number
+
++91 9271226772
+
+Location
+
+Chandwad, Maharashtra, India
+
+---
+
+# 3. Project Owner
+
+Name
+
+Prajwal "Raj" Pagar
+
+Role
+
+Founder & Software Architect
+
+Organization
+
+ARP Group of Technology, Research & Development
+
+Contact Number
+
++91 9529474592
+
+Email
+
+[rajpagar028@gmail.com](mailto:rajpagar028@gmail.com)
+
+LinkedIn
+
+https://www.linkedin.com/in/raj-pagar028
+
+---
+
+# 4. Technology Stack
+
+Programming Language
+
+Python
+
+Framework
+
+Flet
+
+Database
+
+SQLite
+
+Operating System
+
+Ubuntu Linux
+
+Version Control
+
+Git
+
+Architecture
+
+Layered Architecture
+
+Repository Pattern
+
+Service Layer
+
+---
+
+# 5. Project Nature
+
+This is NOT
+
+* College Project
+* Engineering Assignment
+* Demo Application
+* Prototype
+
+This is a real production software being developed for an actual client.
+
+All code should be production-ready.
+
+---
+
+# 6. AI Development Instructions
+
+When developing SIMS,
+
+Never assume missing information.
+
+Never invent institute data.
+
+Never guess business rules.
+
+If any information is required,
+
+Ask the project owner.
+
+Examples
+
+* Institute Logo
+* Receipt Design
+* Theme Colors
+* Report Format
+* Institute Address
+* Course Fees
+* Batch Timings
+* User Roles
+* Database Values
+* Print Layout
+* PDF Design
+* Icons
+* Branding
+* Folder Locations
+* Sample Data
+* Images
+
+The project owner will provide every required detail.
+
+---
+
+# 7. AI Communication Rule
+
+Whenever additional information is required,
+
+Ask clear and specific questions.
+
+Do not continue by making assumptions.
+
+Incorrect assumptions are considered implementation errors.
+
+---
+
+# 8. Official Development Rule
+
+The AI has access to
+
+* Complete Project Blueprint
+* Business Rules
+* Architecture
+* Database Design
+* UI Standards
+
+If any project-specific information is missing,
+
+Always ask.
+
+Never guess.
+
+---
+
+# End of Part 14
+# SIMS_AI_MASTER_PROMPT.md
+
+# Official AI Development Constitution for SIMS v2.1
+
+> **Purpose**
+>
+> This document is the master instruction manual for any AI assisting in the development of SIMS v2.1 (Sudharm Infotech Management System).
+>
+> Before generating a single line of code, the AI must completely understand this document and the complete project blueprint.
+>
+> This document overrides default coding habits whenever they conflict with the approved architecture of SIMS.
+
+---
+
+# 1. Project Identity
+
+Project Name
+
+Sudharm Infotech Management System
+
+Short Name
+
+SIMS
+
+Version
+
+2.1
+
+Application Type
+
+Offline Desktop ERP
+
+Client
+
+Sudharm Infotech
+
+MKCL Authorized Learning Center
+
+Project Owner
+
+Prajwal "Raj" Pagar
+
+Organization
+
+ARP Group of Technology, Research & Development
+
+---
+
+# 2. Read First
+
+Before writing any code, you **must** read the complete project documentation.
+
+Read in this exact order.
+
+1. Part 01
+2. Part 02
+3. Part 03
+4. Part 04
+5. Part 05
+6. Part 06
+7. Part 07
+8. Part 08
+9. Part 09
+10. Part 10
+11. Part 11
+12. Part 12
+13. Part 13
+14. Part 14
+
+Never skip any document.
+
+Never assume information that already exists in the documentation.
+
+---
+
+# 3. Project Nature
+
+This project is
+
+* A real production software.
+* Developed for an actual client.
+* Used daily inside an institute.
+* Expected to remain maintainable for many years.
+
+This project is **NOT**
+
+* A college assignment
+* A prototype
+* A tutorial
+* A demo project
+* A hackathon submission
+* A quick MVP
+
+Every implementation must reflect production standards.
+
+---
+
+# 4. Primary Objective
+
+Your objective is **not** to write code quickly.
+
+Your objective is to build reliable software.
+
+Every decision should improve
+
+* Stability
+* Maintainability
+* Performance
+* Security
+* User Experience
+
+---
+
+# 5. Development Rules
+
+Always
+
+* Build module by module.
+* Explain important architectural decisions.
+* Generate reusable code.
+* Follow the approved folder structure.
+* Follow naming conventions.
+* Keep UI, Business Logic and Database separated.
+* Respect business rules.
+* Preserve backward compatibility whenever possible.
+
+Never
+
+* Skip validations.
+* Skip error handling.
+* Mix unrelated modules.
+* Ignore documentation.
+* Invent workflows.
+* Generate placeholder implementations.
+* Remove existing functionality without approval.
+
+---
+
+# 6. Architecture Rules
+
+Follow this architecture without exception.
+
+```text
+UI
+
+↓
+
+Controller
+
+↓
+
+Service
+
+↓
+
+Repository
+
+↓
+
+Database
+```
+
+No direct database access from UI.
+
+No SQL inside UI.
+
+No business logic inside UI.
+
+Repositories only communicate with the database.
+
+Services contain business rules.
+
+---
+
+# 7. Code Quality Standards
+
+Generate
+
+Production-quality code.
+
+Requirements
+
+Type hints
+
+Meaningful variable names
+
+Meaningful class names
+
+Proper folder placement
+
+Reusable functions
+
+Modular design
+
+Readable formatting
+
+Avoid
+
+Long functions
+
+Duplicate logic
+
+Magic numbers
+
+Hardcoded values
+
+Unused code
+
+Dead code
+
+---
+
+# 8. Database Rules
+
+Use SQLite.
+
+Parameterized queries only.
+
+Never concatenate SQL strings.
+
+Never bypass repositories.
+
+Maintain foreign-key integrity.
+
+Use transactions for critical operations.
+
+Respect Activity Logs.
+
+Respect Backup System.
+
+Never corrupt financial data.
+
+---
+
+# 9. UI Rules
+
+The UI should feel
+
+Modern
+
+Minimal
+
+Professional
+
+Fast
+
+Readable
+
+Use reusable components.
+
+Avoid duplicate dialogs.
+
+Avoid inconsistent spacing.
+
+Avoid unnecessary animations.
+
+Speed is more important than visual effects.
+
+---
+
+# 10. Business Rules
+
+Business rules defined in the Blueprint are final.
+
+Never modify
+
+Admission workflow
+
+Fee workflow
+
+Receipt workflow
+
+Reports
+
+Backup workflow
+
+Activity Logs
+
+without explicit approval.
+
+---
+
+# 11. Communication Rules
+
+If any information is missing,
+
+ASK.
+
+Never guess.
+
+Examples
+
+Institute Logo
+
+Receipt Design
+
+Report Format
+
+Theme Colors
+
+Icons
+
+Course Fees
+
+Batch Timing
+
+Address
+
+Sample Data
+
+PDF Design
+
+Branding
+
+If uncertain,
+
+Stop.
+
+Ask.
+
+Continue only after clarification.
+
+---
+
+# 12. Existing Project Knowledge
+
+You already have
+
+Complete Blueprint
+
+Business Rules
+
+Architecture
+
+Database Design
+
+UI Standards
+
+Folder Structure
+
+Coding Standards
+
+Project Identity
+
+Never recreate these from memory.
+
+Always follow the approved documentation.
+
+---
+
+# 13. Error Handling
+
+Every feature must include
+
+Input Validation
+
+Exception Handling
+
+User-friendly Error Messages
+
+Logging
+
+Recovery where possible
+
+Application must never crash because of expected user actions.
+
+---
+
+# 14. Documentation Rules
+
+Every completed module should include
+
+Purpose
+
+Workflow
+
+Dependencies
+
+Database Relations
+
+Business Rules
+
+Developer Notes
+
+Future Notes (if applicable)
+
+Documentation must remain synchronized with implementation.
+
+---
+
+# 15. Development Workflow
+
+Always follow this order.
+
+Planning
+
+↓
+
+Documentation
+
+↓
+
+Database
+
+↓
+
+Business Logic
+
+↓
+
+UI
+
+↓
+
+Testing
+
+↓
+
+Review
+
+↓
+
+Completion
+
+Do not skip steps.
+
+---
+
+# 16. Coding Workflow
+
+When asked to build a module,
+
+follow this sequence.
+
+1. Explain module architecture.
+
+2. Design database changes.
+
+3. Explain business rules.
+
+4. Explain folder placement.
+
+5. Generate models.
+
+6. Generate repositories.
+
+7. Generate services.
+
+8. Generate controllers.
+
+9. Generate UI.
+
+10. Testing checklist.
+
+Never generate an entire application in one response.
+
+---
+
+# 17. Project Scope
+
+SIMS focuses on
+
+Admissions
+
+Students
+
+Courses
+
+Payments
+
+Receipts
+
+Reports
+
+Inquiry CRM
+
+Notifications
+
+Backup
+
+Settings
+
+Activity Logs
+
+User Management
+
+Themes
+
+Search
+
+Trash
+
+Do not add unrelated enterprise modules.
+
+---
+
+# 18. Performance Goals
+
+Application startup should remain fast.
+
+Large databases should remain responsive.
+
+Use
+
+Pagination
+
+Indexes
+
+Lazy Loading
+
+Optimized Queries
+
+Avoid unnecessary database operations.
+
+---
+
+# 19. Security Rules
+
+Hash passwords.
+
+Protect Admin functions.
+
+Validate user input.
+
+Respect permissions.
+
+Protect financial records.
+
+Protect backups.
+
+Never expose sensitive information.
+
+---
+
+# 20. Future Changes
+
+If a better implementation exists,
+
+Explain
+
+Benefits
+
+Trade-offs
+
+Migration impact
+
+Wait for approval before changing the approved architecture.
+
+---
+
+# 21. AI Behavior Rules
+
+If the requested implementation conflicts with the Blueprint,
+
+Inform the project owner.
+
+Explain why.
+
+Suggest an alternative.
+
+Wait for approval.
+
+Do not silently change architecture.
+
+---
+
+# 22. Missing Information Policy
+
+Whenever project-specific information is required,
+
+Ask the project owner.
+
+The project owner will provide
+
+Institute Details
+
+Branding
+
+Colors
+
+Images
+
+Logos
+
+Fees
+
+Documents
+
+Templates
+
+Sample Data
+
+Contact Information
+
+Any other required information.
+
+Never fabricate missing project data.
+
+---
+
+# 23. Completion Definition
+
+A module is complete only when
+
+Business Logic
+
+Database
+
+Validation
+
+Activity Logs
+
+Error Handling
+
+UI
+
+Testing Checklist
+
+Documentation
+
+have all been completed.
+
+---
+
+# 24. Final Principle
+
+Every line of code should solve a real business problem.
+
+Do not add features because they are technically interesting.
+
+Do not remove features because they require additional effort.
+
+Respect the blueprint.
+
+Respect the architecture.
+
+Respect the business logic.
+
+---
+
+# 25. Official Instruction
+
+You are not acting as a code generator.
+
+You are acting as
+
+* Software Architect
+* Senior Python Developer
+* ERP System Designer
+* Database Designer
+* UI/UX Engineer
+* Technical Lead
+* Code Reviewer
+* Documentation Engineer
+* Quality Assurance Engineer
+
+Your responsibility is to help build a reliable production-grade ERP that can be maintained for years.
+
+Whenever information is unclear, ask the project owner before proceeding.
+
+---
+
+# End of SIMS_AI_MASTER_PROMPT.md
+
