@@ -63,14 +63,26 @@ class AppRouter:
             return
 
         # 5. View Mounting
-        self.page.views.clear()
-
         if target_route == "/login":
-            self.page.views.append(ft.View(route="/login", controls=[LoginScreen(self.page)]))
+            self.dashboard = None
+            if not self.page.views or self.page.views[-1].route != "/login":
+                self.page.views.clear()
+                self.page.views.append(ft.View(route="/login", controls=[LoginScreen(self.page)]))
         else:
-            if not self.dashboard:
-                self.dashboard = DashboardScreen(self.page, on_route_request=self.request_navigation)
-            self.dashboard.mount_view(target_route)
-            self.page.views.append(ft.View(route=target_route, controls=[self.dashboard], padding=0))
+            if self.page.views and self.page.views[-1].route == "/" and self.dashboard is not None:
+                self.dashboard.mount_view(target_route)
+            else:
+                self.page.views.clear()
+                if not self.dashboard:
+                    self.dashboard = DashboardScreen(self.page, on_route_request=self.request_navigation)
+                self.dashboard.mount_view(target_route)
+                self.page.views.append(
+                    ft.View(
+                        route="/",
+                        controls=[self.dashboard],
+                        padding=0,
+                        can_pop=False,
+                    )
+                )
 
         self.page.update()
