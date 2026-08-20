@@ -73,7 +73,7 @@ class StudentFormModal(ft.AlertDialog):
         )
 
         self.mobile_input = ft.TextField(
-            label="Mobile Number (Optional)",
+            label="Mobile Number *",
             hint_text="10-digit mobile number",
             value=student.mobile_number or "" if student else "",
             keyboard_type=ft.KeyboardType.PHONE,
@@ -178,17 +178,24 @@ class StudentFormModal(ft.AlertDialog):
         """Processes form submission with double-click protection and clean dialog lifecycle."""
         self._clear_error()
 
-        # UI-level validation
-        first_name = (self.first_name_input.value or "").strip()
-        last_name = (self.last_name_input.value or "").strip()
+        # UI-level validation & formatting
+        raw_first = (self.first_name_input.value or "").strip()
+        raw_last = (self.last_name_input.value or "").strip()
         mobile = (self.mobile_input.value or "").strip()
         email = (self.email_input.value or "").strip()
+
+        # Auto-capitalize first letter of each word
+        first_name = " ".join(raw_first.split()).title() if raw_first else ""
+        last_name = " ".join(raw_last.split()).title() if raw_last else ""
 
         if not first_name:
             self._show_error("First name is required.")
             return
         if not last_name:
             self._show_error("Last name is required.")
+            return
+        if not mobile:
+            self._show_error("Mobile number is required.")
             return
 
         # Double-click lock: Set button state to saving
@@ -199,7 +206,7 @@ class StudentFormModal(ft.AlertDialog):
         payload = {
             "first_name": first_name,
             "last_name": last_name,
-            "mobile_number": mobile if mobile else None,
+            "mobile_number": mobile,
             "email": email if email else None,
         }
 

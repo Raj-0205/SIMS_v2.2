@@ -284,39 +284,81 @@ class StudentRepository(BaseRepository):
         # 3. Status Filter (DRAFT, REGISTERED, CONFIRMED, CANCELLED, COMPLETED)
         if status and status.strip() and status.strip().upper() != "ALL":
             clean_status = status.strip().upper()
-            clauses.append(f"""EXISTS (
-                SELECT 1 FROM admissions a_sf
-                WHERE a_sf.student_id = {table_alias}.id AND a_sf.status = ?
-            )""")
-            params.append(clean_status)
+            if clean_status == "REGISTERED":
+                clauses.append(f"""(
+                    EXISTS (
+                        SELECT 1 FROM admissions a_sf
+                        WHERE a_sf.student_id = {table_alias}.id AND a_sf.status = 'REGISTERED'
+                    )
+                    OR NOT EXISTS (
+                        SELECT 1 FROM admissions a_any
+                        WHERE a_any.student_id = {table_alias}.id
+                    )
+                )""")
+            else:
+                clauses.append(f"""EXISTS (
+                    SELECT 1 FROM admissions a_sf
+                    WHERE a_sf.student_id = {table_alias}.id AND a_sf.status = ?
+                )""")
+                params.append(clean_status)
 
-        # 4. Year Filter
-        if year is not None and int(year) > 0:
+        # 4. Year and Month Filters
+        # For admitted students: filters against admission dates / candidate year.
+        # For purely registered students (no admissions): filters against student registration date.
+        if year is not None and int(year) > 0 and month is not None and 1 <= int(month) <= 12:
             year_int = int(year)
-            clauses.append(f"""EXISTS (
-                SELECT 1 FROM admissions a_yf
-                WHERE a_yf.student_id = {table_alias}.id 
-                  AND (a_yf.candidate_year = ? OR CAST(strftime('%Y', a_yf.created_at) AS INTEGER) = ?)
-            )""")
-            params.extend([year_int, year_int])
-
-        # 5. Month Filter (1-12)
-        if month is not None and 1 <= int(month) <= 12:
             month_int = int(month)
-            clauses.append(f"""EXISTS (
-                SELECT 1 FROM admissions a_mf
-                WHERE a_mf.student_id = {table_alias}.id 
-                  AND CAST(strftime('%m', a_mf.created_at) AS INTEGER) = ?
+            clauses.append(f"""(
+                EXISTS (
+                    SELECT 1 FROM admissions a_ymf
+                    WHERE a_ymf.student_id = {table_alias}.id 
+                      AND (a_ymf.candidate_year = ? OR CAST(strftime('%Y', a_ymf.created_at) AS INTEGER) = ?)
+                      AND CAST(strftime('%m', a_ymf.created_at) AS INTEGER) = ?
+                )
+                OR (
+                    NOT EXISTS (SELECT 1 FROM admissions a_none WHERE a_none.student_id = {table_alias}.id)
+                    AND CAST(strftime('%Y', {table_alias}.created_at) AS INTEGER) = ?
+                    AND CAST(strftime('%m', {table_alias}.created_at) AS INTEGER) = ?
+                )
             )""")
-            params.append(month_int)
+            params.extend([year_int, year_int, month_int, year_int, month_int])
+        elif year is not None and int(year) > 0:
+            year_int = int(year)
+            clauses.append(f"""(
+                EXISTS (
+                    SELECT 1 FROM admissions a_yf
+                    WHERE a_yf.student_id = {table_alias}.id 
+                      AND (a_yf.candidate_year = ? OR CAST(strftime('%Y', a_yf.created_at) AS INTEGER) = ?)
+                )
+                OR (
+                    NOT EXISTS (SELECT 1 FROM admissions a_none WHERE a_none.student_id = {table_alias}.id)
+                    AND CAST(strftime('%Y', {table_alias}.created_at) AS INTEGER) = ?
+                )
+            )""")
+            params.extend([year_int, year_int, year_int])
+        elif month is not None and 1 <= int(month) <= 12:
+            month_int = int(month)
+            clauses.append(f"""(
+                EXISTS (
+                    SELECT 1 FROM admissions a_mf
+                    WHERE a_mf.student_id = {table_alias}.id 
+                      AND CAST(strftime('%m', a_mf.created_at) AS INTEGER) = ?
+                )
+                OR (
+                    NOT EXISTS (SELECT 1 FROM admissions a_none WHERE a_none.student_id = {table_alias}.id)
+                    AND CAST(strftime('%m', {table_alias}.created_at) AS INTEGER) = ?
+                )
+            )""")
+            params.extend([month_int, month_int])
 
         where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         return where_clause, params
 
     # Whitelist of allowed sort fields → SQL expression fragments.
-    # Direction placeholder is added at call time.
+    # Strictly valid sorting criteria. Year and Month are filters, not sorts.
     _SORT_FIELD_MAP: dict[str, str | list[str]] = {
         "id": "s.id",
+        "student_id": "s.id",
         "name": ["s.first_name", "s.last_name"],
         "student_name": ["s.first_name", "s.last_name"],
         "admission_id": ["latest_admission_year", "latest_admission_seq", "latest_admission_id"],
@@ -329,8 +371,6 @@ class StudentRepository(BaseRepository):
         "registration_date": "s.created_at",
         "status": "latest_admission_status",
         "fee": "latest_course_base_fee",
-        "year": "latest_admission_year",
-        "month": "CAST(strftime('%m', COALESCE(latest_admission_date, s.created_at)) AS INTEGER)",
     }
 
     @classmethod
@@ -342,16 +382,21 @@ class StudentRepository(BaseRepository):
     def _build_multi_order_by(cls, sort_keys: list[tuple[str, str]] | None = None) -> str:
         """
         Constructs database-level ORDER BY from one or more (field, direction) pairs.
-        Falls back to 's.id DESC' when sort_keys is empty or invalid.
         Every field is validated against the _SORT_FIELD_MAP whitelist.
+        Adds a final stable tie-breaker ', s.id ASC' unless ID is already sorted.
         """
         if not sort_keys:
             return "ORDER BY s.id DESC"
 
         clauses: list[str] = []
+        has_id_sort = False
+
         for field, direction in sort_keys:
             clean_field = str(field).lower().strip()
             dir_str = "ASC" if str(direction).lower() == "asc" else "DESC"
+
+            if clean_field in ("id", "student_id"):
+                has_id_sort = True
 
             mapping = cls._SORT_FIELD_MAP.get(clean_field)
             if mapping is None:
@@ -365,6 +410,10 @@ class StudentRepository(BaseRepository):
 
         if not clauses:
             return "ORDER BY s.id DESC"
+
+        # Add deterministic stable tie-breaker if not already present
+        if not has_id_sort:
+            clauses.append("s.id ASC")
 
         return f"ORDER BY {', '.join(clauses)}"
 

@@ -115,7 +115,7 @@ class StudentCreateDTO:
     """Contract for creating a new student record."""
     first_name: str
     last_name: str
-    mobile_number: Optional[str] = None
+    mobile_number: str
     email: Optional[str] = None
 
 
@@ -125,7 +125,7 @@ class StudentUpdateDTO:
     id: int
     first_name: str
     last_name: str
-    mobile_number: Optional[str] = None
+    mobile_number: str
     email: Optional[str] = None
 
 

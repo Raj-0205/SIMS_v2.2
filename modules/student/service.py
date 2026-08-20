@@ -42,9 +42,16 @@ class StudentService(BaseService):
     def _sanitize_string(self, value: Optional[str]) -> str:
         return str(value).strip() if value else ""
 
+    def _format_name_words(self, value: Optional[str]) -> str:
+        """Auto-capitalizes first letter of each word (e.g. 'john smith' -> 'John Smith')."""
+        if not value:
+            return ""
+        clean = " ".join(value.strip().split())
+        return clean.title()
+
     def _validate_names(self, first_name: str, last_name: str) -> tuple[str, str]:
-        clean_first = self._sanitize_string(first_name)
-        clean_last = self._sanitize_string(last_name)
+        clean_first = self._format_name_words(first_name)
+        clean_last = self._format_name_words(last_name)
 
         if not clean_first:
             raise ValidationError("First name is required and cannot be blank.")
@@ -57,13 +64,17 @@ class StudentService(BaseService):
 
         return clean_first, clean_last
 
-    def _validate_mobile(self, mobile_number: Optional[str]) -> Optional[str]:
+    def _validate_mobile(self, mobile_number: Optional[str]) -> str:
         clean_mobile = self._sanitize_string(mobile_number)
         if not clean_mobile:
-            return None
+            raise ValidationError("Mobile number is required and cannot be blank.")
 
         # Normalize by removing hyphens and spaces
         normalized = re.sub(r"[\s\-]", "", clean_mobile)
+        if normalized.startswith("+91"):
+            normalized = normalized[3:]
+        elif normalized.startswith("+"):
+            normalized = normalized[1:]
 
         if not self._MOBILE_REGEX.match(normalized):
             raise ValidationError("Invalid mobile number format. Must contain 10-15 digits.")
@@ -98,17 +109,16 @@ class StudentService(BaseService):
 
         # Atomic Unit of Work
         with self.unit_of_work():
-            # 1. Pre-check duplicate mobile number (HARD BLOCK if provided)
-            if mobile_number:
-                existing_mobile = self.repository.get_by_mobile(mobile_number)
-                if existing_mobile:
-                    LogService.warning(
-                        f"Student creation rejected: Duplicate mobile '{mobile_number}'.",
-                        context=self.__class__.__name__,
-                    )
-                    raise ConflictError(
-                        f"A student with mobile number '{mobile_number}' already exists."
-                    )
+            # 1. Pre-check duplicate mobile number (HARD BLOCK - required)
+            existing_mobile = self.repository.get_by_mobile(mobile_number)
+            if existing_mobile:
+                LogService.warning(
+                    f"Student creation rejected: Duplicate mobile '{mobile_number}'.",
+                    context=self.__class__.__name__,
+                )
+                raise ConflictError(
+                    f"A student with mobile number '{mobile_number}' already exists."
+                )
 
             # 2. Pre-check duplicate email (if provided)
             if email:
@@ -153,17 +163,16 @@ class StudentService(BaseService):
             if not existing_student:
                 raise ValidationError(f"Student with ID {dto.id} does not exist.")
 
-            # 2. Check duplicate mobile against OTHER students (if provided)
-            if mobile_number:
-                mobile_owner = self.repository.get_by_mobile(mobile_number)
-                if mobile_owner and int(mobile_owner["id"]) != int(dto.id):
-                    LogService.warning(
-                        f"Student update rejected: Mobile '{mobile_number}' is owned by student ID {mobile_owner['id']}.",
-                        context=self.__class__.__name__,
-                    )
-                    raise ConflictError(
-                        f"Mobile number '{mobile_number}' is already registered to another student."
-                    )
+            # 2. Check duplicate mobile against OTHER students (HARD BLOCK - required)
+            mobile_owner = self.repository.get_by_mobile(mobile_number)
+            if mobile_owner and int(mobile_owner["id"]) != int(dto.id):
+                LogService.warning(
+                    f"Student update rejected: Mobile '{mobile_number}' is owned by student ID {mobile_owner['id']}.",
+                    context=self.__class__.__name__,
+                )
+                raise ConflictError(
+                    f"Mobile number '{mobile_number}' is already registered to another student."
+                )
 
             # 3. Check duplicate email against OTHER students (if provided)
             if email:

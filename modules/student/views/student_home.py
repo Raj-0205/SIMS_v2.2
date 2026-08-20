@@ -38,8 +38,6 @@ _SORT_FIELD_LABELS: dict[str, str] = {
     "date": "Admission Date",
     "status": "Status",
     "fee": "Fee",
-    "year": "Year",
-    "month": "Month",
 }
 
 
@@ -47,9 +45,9 @@ class StudentHome(ft.Container):
     """
     Main Student Management Screen (Student Directory).
     Follows Part 05 of the SIMS Blueprint:
-    Provides full-width search bar, composable persistent filter chips,
+    Provides full-width centered search bar, composable persistent filter chips,
     independent multi-sort chips, database-level pagination,
-    Excel & PDF exports, real-time KPI badge,
+    Excel & PDF exports, real-time KPI total indicator,
     robust empty/error states, double-click workspace opening, and context actions.
     """
 
@@ -58,52 +56,43 @@ class StudentHome(ft.Container):
     def __init__(self) -> None:
         super().__init__(
             expand=True,
-            padding=AppTheme.PAD_LG,
+            padding=AppTheme.PAD_MD,
             bgcolor=AppTheme.BACKGROUND,
         )
 
         self.controller = StudentController()
         self.course_controller = CourseController()
 
-        # ── Filter State (independent, composable, persistent) ──
+        # ── State Model (Single Source of Truth) ──
         self.current_query: str = ""
         self.current_course_id: Optional[int] = None
         self.current_course_label: Optional[str] = None
         self.current_status: Optional[str] = None
         self.current_year: Optional[int] = None
         self.current_month: Optional[int] = None
-
-        # ── Sort State (independent, multi-column) ──
-        # List of (field, direction) tuples in priority order
         self.sort_keys: list[tuple[str, str]] = [("id", "desc")]
-
-        # ── Pagination State ──
         self.current_page: int = 0
         self.total_count: int = 0
         self.students: list[StudentDTO] = []
 
-        # ── Debounce State ──
+        # ── Internal Cache & Debounce ──
         self._search_generation: int = 0
-
-        # ── Course Options Cache ──
         self._course_options: dict[int, str] = {}
 
         # ── UI Components ──
         self.header = self._build_header()
-        self.search_bar = self._build_search_bar()
-        self.filter_controls = self._build_filter_controls()
-        self.filter_chips_row = ft.Row(controls=[], spacing=6, wrap=True)
-        self.sort_chips_row = ft.Row(controls=[], spacing=6, wrap=True)
-        self.active_state_bar = self._build_active_state_bar()
+        self.search_section = self._build_search_section()
+        self.filters_section = self._build_filters_section()
+        self.sort_section = self._build_sort_section()
         self.table_container = ft.Container(expand=True)
         self.pagination_bar = self._build_pagination_bar()
 
         self.content = ft.Column(
             controls=[
                 self.header,
-                self.search_bar,
-                self.filter_controls,
-                self.active_state_bar,
+                self.search_section,
+                self.filters_section,
+                self.sort_section,
                 self.table_container,
                 self.pagination_bar,
             ],
@@ -114,7 +103,7 @@ class StudentHome(ft.Container):
     def did_mount(self) -> None:
         """Called when the control is mounted to the page tree."""
         self._populate_course_filter()
-        self.load_data()
+        self._apply_current_state()
 
     def show_snackbar(self, message: str, is_error: bool = False) -> None:
         """Displays transient feedback snackbar to the user using Flet's show_dialog."""
@@ -127,20 +116,26 @@ class StudentHome(ft.Container):
             return
         bg_color = AppTheme.DANGER if is_error else AppTheme.SUCCESS
         snackbar = ft.SnackBar(
-            content=ft.Text(message, color=AppTheme.SURFACE),
+            content=ft.Text(message, color=AppTheme.SURFACE, size=AppTheme.SIZE_BODY),
             bgcolor=bg_color,
         )
         page.show_dialog(snackbar)
 
     # ══════════════════════════════════════════════════════════════════════
-    # HEADER — Title + Action Buttons
+    # 1. HEADER — Title, Subtitle, and Primary Action Buttons
     # ══════════════════════════════════════════════════════════════════════
     def _build_header(self) -> ft.Row:
+        self.subtitle_text = ft.Text(
+            "Manage student master records, registrations, and academic history • 0 total students",
+            size=AppTheme.SIZE_CAPTION,
+            color=AppTheme.TEXT_SECONDARY,
+        )
+
         return ft.Row(
             controls=[
                 ft.Row(
                     controls=[
-                        ft.Icon(ft.Icons.PEOPLE_ALT, size=28, color=AppTheme.PRIMARY),
+                        ft.Icon(ft.Icons.PEOPLE_ALT, size=24, color=AppTheme.PRIMARY),
                         ft.Column(
                             controls=[
                                 ft.Text(
@@ -149,11 +144,7 @@ class StudentHome(ft.Container):
                                     weight=ft.FontWeight.BOLD,
                                     color=AppTheme.TEXT_PRIMARY,
                                 ),
-                                ft.Text(
-                                    "Manage institute student master records, registrations, and academic history",
-                                    size=AppTheme.SIZE_CAPTION,
-                                    color=AppTheme.TEXT_SECONDARY,
-                                ),
+                                self.subtitle_text,
                             ],
                             spacing=2,
                         ),
@@ -163,7 +154,7 @@ class StudentHome(ft.Container):
                 ft.Row(
                     controls=[
                         ft.OutlinedButton(
-                            content=ft.Text("Export CSV"),
+                            content=ft.Text("Export CSV", size=AppTheme.SIZE_CAPTION),
                             icon=ft.Icons.TABLE_VIEW,
                             style=ft.ButtonStyle(
                                 shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
@@ -171,7 +162,7 @@ class StudentHome(ft.Container):
                             on_click=self.handle_export_csv,
                         ),
                         ft.OutlinedButton(
-                            content=ft.Text("Export PDF"),
+                            content=ft.Text("Export PDF", size=AppTheme.SIZE_CAPTION),
                             icon=ft.Icons.PICTURE_AS_PDF,
                             style=ft.ButtonStyle(
                                 shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
@@ -182,16 +173,17 @@ class StudentHome(ft.Container):
                             icon=ft.Icons.REFRESH,
                             tooltip="Refresh Directory",
                             icon_color=AppTheme.PRIMARY,
-                            on_click=lambda _: self.load_data(),
+                            icon_size=20,
+                            on_click=lambda _: self._apply_current_state(),
                         ),
                         ft.ElevatedButton(
-                            content=ft.Text("Register Student"),
+                            content=ft.Text("Register Student", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
                             icon=ft.Icons.PERSON_ADD,
                             style=ft.ButtonStyle(
                                 bgcolor=AppTheme.PRIMARY,
                                 color=AppTheme.SURFACE,
                                 shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
-                                padding=ft.Padding(left=16, top=12, right=16, bottom=12),
+                                padding=ft.Padding(left=14, top=10, right=14, bottom=10),
                             ),
                             on_click=self.handle_add_student,
                         ),
@@ -203,9 +195,9 @@ class StudentHome(ft.Container):
         )
 
     # ══════════════════════════════════════════════════════════════════════
-    # SEARCH BAR — Full-width, prominent, centered
+    # 2. SEARCH BAR — Full-width, prominent, centered
     # ══════════════════════════════════════════════════════════════════════
-    def _build_search_bar(self) -> ft.Container:
+    def _build_search_section(self) -> ft.Container:
         self.clear_search_btn = ft.IconButton(
             icon=ft.Icons.CLEAR,
             icon_size=18,
@@ -218,53 +210,32 @@ class StudentHome(ft.Container):
             hint_text="Search students by name, mobile, email, admission ID (YYYY-NNN), or student ID...",
             prefix_icon=ft.Icons.SEARCH,
             suffix=self.clear_search_btn,
-            border_radius=AppTheme.RADIUS_LG,
+            border_radius=AppTheme.RADIUS_MD,
             text_size=AppTheme.SIZE_BODY,
-            content_padding=ft.Padding(left=16, top=12, right=16, bottom=12),
+            content_padding=ft.Padding(left=14, top=12, right=14, bottom=12),
             expand=True,
             on_change=self.handle_search_change,
             on_submit=self.handle_search_submit,
         )
 
-        self.total_badge_text = ft.Text(
-            "Total: 0",
-            size=AppTheme.SIZE_BODY,
-            weight=ft.FontWeight.BOLD,
-            color=AppTheme.PRIMARY,
-        )
-
         return ft.Container(
             content=ft.Row(
-                controls=[
-                    ft.Container(
-                        content=ft.Row(
-                            controls=[
-                                ft.Icon(ft.Icons.DATA_ARRAY, size=18, color=AppTheme.PRIMARY),
-                                self.total_badge_text,
-                            ],
-                            spacing=6,
-                        ),
-                        bgcolor=AppTheme.PRIMARY_LIGHT,
-                        padding=ft.Padding(left=12, top=8, right=12, bottom=8),
-                        border_radius=AppTheme.RADIUS_SM,
-                    ),
-                    self.search_field,
-                ],
-                spacing=AppTheme.PAD_MD,
+                controls=[self.search_field],
+                alignment=ft.MainAxisAlignment.CENTER,
             ),
             bgcolor=AppTheme.SURFACE,
-            padding=AppTheme.PAD_MD,
+            padding=ft.Padding(left=AppTheme.PAD_MD, top=AppTheme.PAD_SM, right=AppTheme.PAD_MD, bottom=AppTheme.PAD_SM),
             border_radius=AppTheme.RADIUS_MD,
             border=ft.Border.all(1, AppTheme.BORDER),
         )
 
     # ══════════════════════════════════════════════════════════════════════
-    # FILTER CONTROLS — Dropdowns for Course, Status, Year, Month + Sort
+    # 3. FILTERS SECTION — Composable, Persistent Filter Dropdowns + Chips
     # ══════════════════════════════════════════════════════════════════════
-    def _build_filter_controls(self) -> ft.Container:
+    def _build_filters_section(self) -> ft.Container:
         self.course_dropdown = ft.Dropdown(
             label="Course",
-            width=200,
+            width=220,
             content_padding=ft.Padding(left=10, top=4, right=10, bottom=4),
             border_radius=AppTheme.RADIUS_MD,
             options=[ft.DropdownOption(key="ALL", text="All Courses")],
@@ -273,8 +244,8 @@ class StudentHome(ft.Container):
         )
 
         self.status_dropdown = ft.Dropdown(
-            label="Status",
-            width=150,
+            label="Admission Status",
+            width=160,
             content_padding=ft.Padding(left=10, top=4, right=10, bottom=4),
             border_radius=AppTheme.RADIUS_MD,
             options=[
@@ -296,7 +267,7 @@ class StudentHome(ft.Container):
 
         self.year_dropdown = ft.Dropdown(
             label="Year",
-            width=110,
+            width=120,
             content_padding=ft.Padding(left=10, top=4, right=10, bottom=4),
             border_radius=AppTheme.RADIUS_MD,
             options=year_options,
@@ -310,7 +281,7 @@ class StudentHome(ft.Container):
 
         self.month_dropdown = ft.Dropdown(
             label="Month",
-            width=130,
+            width=140,
             content_padding=ft.Padding(left=10, top=4, right=10, bottom=4),
             border_radius=AppTheme.RADIUS_MD,
             options=month_options,
@@ -318,41 +289,89 @@ class StudentHome(ft.Container):
             on_select=self.handle_month_filter_change,
         )
 
-        # Sort field + direction (adds to multi-sort)
+        self.clear_filters_btn = ft.TextButton(
+            content=ft.Text("Clear Filters", size=AppTheme.SIZE_CAPTION),
+            icon=ft.Icons.FILTER_ALT_OFF,
+            on_click=self.handle_clear_filters,
+        )
+
+        self.filter_chips_row = ft.Row(controls=[], spacing=6, wrap=True)
+        self.active_filters_container = ft.Container(
+            content=ft.Row(
+                controls=[
+                    ft.Text("Active Filters:", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_SECONDARY),
+                    self.filter_chips_row,
+                ],
+                spacing=AppTheme.PAD_SM,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                wrap=True,
+            ),
+            visible=False,
+            padding=ft.Padding(top=2, bottom=2, left=0, right=0),
+        )
+
+        return ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Row(
+                        controls=[
+                            ft.Text("Filters:", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
+                            self.course_dropdown,
+                            self.status_dropdown,
+                            self.year_dropdown,
+                            self.month_dropdown,
+                            self.clear_filters_btn,
+                        ],
+                        spacing=AppTheme.PAD_SM,
+                        wrap=True,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    self.active_filters_container,
+                ],
+                spacing=4,
+            ),
+            bgcolor=AppTheme.SURFACE,
+            padding=ft.Padding(left=AppTheme.PAD_MD, top=AppTheme.PAD_SM, right=AppTheme.PAD_MD, bottom=AppTheme.PAD_SM),
+            border_radius=AppTheme.RADIUS_MD,
+            border=ft.Border.all(1, AppTheme.BORDER),
+        )
+
+    # ══════════════════════════════════════════════════════════════════════
+    # 4. SORT SECTION — Multi-Column Sort Builder + Active Sort Chips
+    # ══════════════════════════════════════════════════════════════════════
+    def _build_sort_section(self) -> ft.Container:
         self.sort_field_dropdown = ft.Dropdown(
             label="Sort Field",
-            width=150,
+            width=160,
             content_padding=ft.Padding(left=10, top=4, right=10, bottom=4),
             border_radius=AppTheme.RADIUS_MD,
             options=[
+                ft.DropdownOption(key="name", text="Student Name"),
                 ft.DropdownOption(key="id", text="Student ID"),
-                ft.DropdownOption(key="name", text="Name"),
                 ft.DropdownOption(key="admission_id", text="Admission ID"),
-                ft.DropdownOption(key="mobile", text="Mobile"),
+                ft.DropdownOption(key="mobile", text="Mobile Number"),
                 ft.DropdownOption(key="course", text="Course"),
                 ft.DropdownOption(key="date", text="Admission Date"),
-                ft.DropdownOption(key="status", text="Status"),
-                ft.DropdownOption(key="fee", text="Fee"),
-                ft.DropdownOption(key="year", text="Year"),
-                ft.DropdownOption(key="month", text="Month"),
+                ft.DropdownOption(key="status", text="Admission Status"),
+                ft.DropdownOption(key="fee", text="Total Fee"),
             ],
-            value="id",
+            value="name",
         )
 
         self.sort_dir_dropdown = ft.Dropdown(
             label="Direction",
-            width=110,
+            width=130,
             content_padding=ft.Padding(left=10, top=4, right=10, bottom=4),
             border_radius=AppTheme.RADIUS_MD,
             options=[
-                ft.DropdownOption(key="asc", text="ASC ↑"),
-                ft.DropdownOption(key="desc", text="DESC ↓"),
+                ft.DropdownOption(key="asc", text="Ascending (ASC ↑)"),
+                ft.DropdownOption(key="desc", text="Descending (DESC ↓)"),
             ],
-            value="desc",
+            value="asc",
         )
 
         self.add_sort_btn = ft.ElevatedButton(
-            content=ft.Text("Add Sort"),
+            content=ft.Text("+ Add Sort", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD),
             icon=ft.Icons.SORT,
             style=ft.ButtonStyle(
                 shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
@@ -363,23 +382,45 @@ class StudentHome(ft.Container):
             on_click=self.handle_add_sort,
         )
 
-        return ft.Container(
+        self.clear_sorting_btn = ft.TextButton(
+            content=ft.Text("Clear Sort", size=AppTheme.SIZE_CAPTION),
+            icon=ft.Icons.SORT_BY_ALPHA,
+            on_click=self.handle_clear_sorting,
+        )
+
+        self.sort_chips_row = ft.Row(controls=[], spacing=6, wrap=True)
+        self.active_sorts_container = ft.Container(
             content=ft.Row(
                 controls=[
-                    ft.Text("Filters:", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
-                    self.course_dropdown,
-                    self.status_dropdown,
-                    self.year_dropdown,
-                    self.month_dropdown,
-                    ft.VerticalDivider(width=1, thickness=1, color=AppTheme.BORDER),
-                    ft.Text("Sort:", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
-                    self.sort_field_dropdown,
-                    self.sort_dir_dropdown,
-                    self.add_sort_btn,
+                    ft.Text("Active Sort:", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_SECONDARY),
+                    self.sort_chips_row,
                 ],
                 spacing=AppTheme.PAD_SM,
-                wrap=True,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                wrap=True,
+            ),
+            visible=False,
+            padding=ft.Padding(top=2, bottom=2, left=0, right=0),
+        )
+
+        return ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Row(
+                        controls=[
+                            ft.Text("Sort:", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
+                            self.sort_field_dropdown,
+                            self.sort_dir_dropdown,
+                            self.add_sort_btn,
+                            self.clear_sorting_btn,
+                        ],
+                        spacing=AppTheme.PAD_SM,
+                        wrap=True,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    self.active_sorts_container,
+                ],
+                spacing=4,
             ),
             bgcolor=AppTheme.SURFACE,
             padding=ft.Padding(left=AppTheme.PAD_MD, top=AppTheme.PAD_SM, right=AppTheme.PAD_MD, bottom=AppTheme.PAD_SM),
@@ -388,88 +429,40 @@ class StudentHome(ft.Container):
         )
 
     # ══════════════════════════════════════════════════════════════════════
-    # ACTIVE STATE BAR — Filter Chips + Sort Chips + Clear buttons
+    # 5. CHIP HELPERS & ACTIVE CHIPS REBUILD
     # ══════════════════════════════════════════════════════════════════════
-    def _build_active_state_bar(self) -> ft.Container:
-        self.clear_filters_btn = ft.TextButton(
-            content=ft.Text("Clear Filters", size=AppTheme.SIZE_CAPTION),
-            icon=ft.Icons.FILTER_ALT_OFF,
-            visible=False,
-            on_click=self.handle_clear_filters,
-        )
-
-        self.clear_sorting_btn = ft.TextButton(
-            content=ft.Text("Clear Sorting", size=AppTheme.SIZE_CAPTION),
-            icon=ft.Icons.SORT,
-            visible=False,
-            on_click=self.handle_clear_sorting,
-        )
-
-        return ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Row(
-                        controls=[
-                            ft.Text("Active Filters:", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_SECONDARY),
-                            self.filter_chips_row,
-                            self.clear_filters_btn,
-                        ],
-                        spacing=AppTheme.PAD_SM,
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                        wrap=True,
-                    ),
-                    ft.Row(
-                        controls=[
-                            ft.Text("Active Sort:", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_SECONDARY),
-                            self.sort_chips_row,
-                            self.clear_sorting_btn,
-                        ],
-                        spacing=AppTheme.PAD_SM,
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                        wrap=True,
-                    ),
-                ],
-                spacing=4,
-            ),
-            visible=False,  # Hidden until there's something to show
-        )
-
-    def _refresh_active_state_bar(self) -> None:
-        """Rebuilds the filter and sort chip rows based on current state."""
-        # ── Filter Chips ──
+    def _refresh_active_state_chips(self) -> None:
+        """Rebuilds the active filter and sort chip rows based on current state."""
+        # ── Active Filter Chips ──
         filter_chips = []
         if self.current_course_id is not None:
             label = self.current_course_label or f"Course #{self.current_course_id}"
-            filter_chips.append(self._make_chip(f"Course: {label}", self._remove_filter_course))
+            filter_chips.append(self._make_filter_chip(f"Course: {label}", self._remove_filter_course))
         if self.current_status:
-            filter_chips.append(self._make_chip(f"Status: {self.current_status}", self._remove_filter_status))
+            filter_chips.append(self._make_filter_chip(f"Status: {self.current_status}", self._remove_filter_status))
         if self.current_year is not None:
-            filter_chips.append(self._make_chip(f"Year: {self.current_year}", self._remove_filter_year))
+            filter_chips.append(self._make_filter_chip(f"Year: {self.current_year}", self._remove_filter_year))
         if self.current_month is not None:
             month_name = _MONTH_NAMES.get(self.current_month, str(self.current_month))
-            filter_chips.append(self._make_chip(f"Month: {month_name}", self._remove_filter_month))
+            filter_chips.append(self._make_filter_chip(f"Month: {month_name}", self._remove_filter_month))
 
         self.filter_chips_row.controls = filter_chips
-        has_filters = bool(filter_chips)
-        self.clear_filters_btn.visible = has_filters
+        self.active_filters_container.visible = bool(filter_chips)
 
-        # ── Sort Chips ──
+        # ── Active Sort Chips ──
         sort_chips = []
-        default_sort = [("id", "desc")]
-        is_default_sort = self.sort_keys == default_sort
         for idx, (field, direction) in enumerate(self.sort_keys):
             field_label = _SORT_FIELD_LABELS.get(field, field.title())
-            dir_label = "↑" if direction == "asc" else "↓"
-            chip_label = f"{field_label} {dir_label}"
+            dir_arrow = "↑" if direction == "asc" else "↓"
+            chip_label = f"{field_label} {dir_arrow}"
             sort_chips.append(self._make_sort_chip(chip_label, idx))
 
         self.sort_chips_row.controls = sort_chips
-        self.clear_sorting_btn.visible = not is_default_sort
+        # Show sort chips when custom sort is active
+        is_default_sort = self.sort_keys == [("id", "desc")]
+        self.active_sorts_container.visible = not is_default_sort or len(self.sort_keys) > 1
 
-        # Show/hide entire bar
-        self.active_state_bar.visible = has_filters or not is_default_sort
-
-    def _make_chip(self, label: str, on_remove) -> ft.Container:
+    def _make_filter_chip(self, label: str, on_remove) -> ft.Container:
         """Creates a removable filter chip."""
         return ft.Container(
             content=ft.Row(
@@ -481,15 +474,15 @@ class StudentHome(ft.Container):
                         icon_color=AppTheme.TEXT_SECONDARY,
                         on_click=on_remove,
                         tooltip=f"Remove {label}",
-                        width=22,
-                        height=22,
+                        width=20,
+                        height=20,
                     ),
                 ],
                 spacing=2,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
             bgcolor=AppTheme.PRIMARY_LIGHT,
-            padding=ft.Padding(left=10, top=4, right=4, bottom=4),
+            padding=ft.Padding(left=8, top=2, right=2, bottom=2),
             border_radius=AppTheme.RADIUS_PILL,
             border=ft.Border.all(1, AppTheme.BORDER),
         )
@@ -507,46 +500,240 @@ class StudentHome(ft.Container):
                         icon_color=AppTheme.TEXT_SECONDARY,
                         on_click=lambda _, i=index: self._remove_sort_key(i),
                         tooltip=f"Remove sort: {label}",
-                        width=22,
-                        height=22,
+                        width=20,
+                        height=20,
                     ),
                 ],
                 spacing=2,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
             bgcolor=AppTheme.SURFACE_VARIANT,
-            padding=ft.Padding(left=8, top=4, right=4, bottom=4),
+            padding=ft.Padding(left=8, top=2, right=2, bottom=2),
             border_radius=AppTheme.RADIUS_PILL,
             border=ft.Border.all(1, AppTheme.BORDER),
         )
 
     # ══════════════════════════════════════════════════════════════════════
-    # FILTER / SORT CHIP REMOVAL HANDLERS
+    # 6. CENTRAL STATE EXECUTION METHOD (Single Source of Truth)
     # ══════════════════════════════════════════════════════════════════════
+    def _apply_current_state(self) -> None:
+        """
+        Gathers complete state, queries controller, and renders table + pagination.
+        All filters, search, multi-sort, and pagination flow through this single method.
+        """
+        try:
+            offset = self.current_page * self.PAGE_SIZE
+            filters = {
+                "query": self.current_query or None,
+                "course_id": self.current_course_id,
+                "status": self.current_status,
+                "year": self.current_year,
+                "month": self.current_month,
+                "sort_keys": self.sort_keys,
+                "sort_by": self.sort_keys[0][0] if self.sort_keys else "id",
+                "sort_dir": self.sort_keys[0][1] if self.sort_keys else "desc",
+                "limit": self.PAGE_SIZE,
+                "offset": offset,
+            }
+            students, total = self.controller.filter_students(filters)
+
+            self.students = students
+            self.total_count = total
+
+            # Update subtitle total indicator
+            self.subtitle_text.value = f"Manage student master records, registrations, and academic history • {self.total_count} total students"
+            self.clear_search_btn.visible = bool(self.current_query)
+
+            # Refresh active state chips
+            self._refresh_active_state_chips()
+
+            # Update Table or Empty State
+            is_filtered = bool(
+                self.current_query
+                or self.current_course_id
+                or self.current_status
+                or self.current_year
+                or self.current_month
+            )
+            if not self.students:
+                self.table_container.content = self._build_empty_state(is_filtered=is_filtered)
+            else:
+                self.table_container.content = self._build_data_table()
+
+            # Update Pagination Bar
+            start_num = (self.current_page * self.PAGE_SIZE) + 1 if self.total_count > 0 else 0
+            end_num = min(start_num + len(self.students) - 1, self.total_count) if self.total_count > 0 else 0
+            self.pagination_info.value = f"Showing {start_num} to {end_num} of {self.total_count} students"
+            self.prev_btn.disabled = self.current_page == 0
+            self.next_btn.disabled = end_num >= self.total_count
+
+            try:
+                page = self.page
+            except RuntimeError:
+                page = None
+
+            if page:
+                self.update()
+
+        except Exception as ex:
+            LogService.error(f"Error loading student directory: {ex}", context=self.__class__.__name__)
+            self.table_container.content = self._build_error_state("An internal error occurred while fetching records.")
+            try:
+                page = self.page
+            except RuntimeError:
+                page = None
+            if page:
+                self.update()
+
+    def load_data(self) -> None:
+        """Public lifecycle alias for _apply_current_state."""
+        self._apply_current_state()
+
+    # ══════════════════════════════════════════════════════════════════════
+    # 7. SEARCH HANDLERS
+    # ══════════════════════════════════════════════════════════════════════
+    def handle_search_change(self, e: ft.ControlEvent) -> None:
+        """Flet-safe async debounced search input handling."""
+        query = (self.search_field.value or "").strip()
+        self._search_generation += 1
+        current_gen = self._search_generation
+
+        async def _debounced() -> None:
+            await asyncio.sleep(0.3)
+            if current_gen == self._search_generation:
+                self._apply_search(query)
+
+        try:
+            page = self.page
+        except RuntimeError:
+            page = None
+
+        if page:
+            page.run_task(_debounced)
+        else:
+            self._apply_search(query)
+
+    def handle_search_submit(self, e: ft.ControlEvent) -> None:
+        """Immediate search on Enter key."""
+        self._search_generation += 1
+        query = (self.search_field.value or "").strip()
+        self._apply_search(query)
+
+    def handle_clear_search(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Clears search query only. Preserves filters and sorting."""
+        self._search_generation += 1
+        self.search_field.value = ""
+        self.clear_search_btn.visible = False
+        self.current_query = ""
+        self.current_page = 0
+        self._apply_current_state()
+
+    def _apply_search(self, query: str) -> None:
+        """Applies search query. Does NOT reset filters or sorting."""
+        self.current_query = query
+        self.current_page = 0
+        self._apply_current_state()
+
+    # ══════════════════════════════════════════════════════════════════════
+    # 8. FILTER HANDLERS — Modifies ONLY targeted filter state
+    # ══════════════════════════════════════════════════════════════════════
+    def handle_course_filter_change(self, e: ft.ControlEvent) -> None:
+        val = self.course_dropdown.value
+        if val and val != "ALL":
+            self.current_course_id = int(val)
+            self.current_course_label = self._course_options.get(int(val), f"Course #{val}")
+        else:
+            self.current_course_id = None
+            self.current_course_label = None
+        self.current_page = 0
+        self._apply_current_state()
+
+    def handle_status_filter_change(self, e: ft.ControlEvent) -> None:
+        val = self.status_dropdown.value
+        self.current_status = val if val and val != "ALL" else None
+        self.current_page = 0
+        self._apply_current_state()
+
+    def handle_year_filter_change(self, e: ft.ControlEvent) -> None:
+        val = self.year_dropdown.value
+        self.current_year = int(val) if val and val != "ALL" else None
+        self.current_page = 0
+        self._apply_current_state()
+
+    def handle_month_filter_change(self, e: ft.ControlEvent) -> None:
+        val = self.month_dropdown.value
+        self.current_month = int(val) if val and val != "ALL" else None
+        self.current_page = 0
+        self._apply_current_state()
+
     def _remove_filter_course(self, e=None) -> None:
         self.current_course_id = None
         self.current_course_label = None
         self.course_dropdown.value = "ALL"
         self.current_page = 0
-        self.load_data()
+        self._apply_current_state()
 
     def _remove_filter_status(self, e=None) -> None:
         self.current_status = None
         self.status_dropdown.value = "ALL"
         self.current_page = 0
-        self.load_data()
+        self._apply_current_state()
 
     def _remove_filter_year(self, e=None) -> None:
         self.current_year = None
         self.year_dropdown.value = "ALL"
         self.current_page = 0
-        self.load_data()
+        self._apply_current_state()
 
     def _remove_filter_month(self, e=None) -> None:
         self.current_month = None
         self.month_dropdown.value = "ALL"
         self.current_page = 0
-        self.load_data()
+        self._apply_current_state()
+
+    def handle_clear_filters(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Clears all filters. Preserves search and sorting."""
+        self.current_course_id = None
+        self.current_course_label = None
+        self.course_dropdown.value = "ALL"
+        self.current_status = None
+        self.status_dropdown.value = "ALL"
+        self.current_year = None
+        self.year_dropdown.value = "ALL"
+        self.current_month = None
+        self.month_dropdown.value = "ALL"
+        self.current_page = 0
+        self._apply_current_state()
+
+    # ══════════════════════════════════════════════════════════════════════
+    # 9. SORT HANDLERS — Modifies ONLY sort state
+    # ══════════════════════════════════════════════════════════════════════
+    def handle_add_sort(self, e: ft.ControlEvent) -> None:
+        """
+        Adds or updates a sort key.
+        - If field already exists: updates its direction in-place.
+        - If sort_keys is default [("id", "desc")]: replaces default with the new sort.
+        - Otherwise: appends the new sort to the active list (preserving previous sorts).
+        """
+        field = self.sort_field_dropdown.value or "name"
+        direction = self.sort_dir_dropdown.value or "asc"
+
+        # Check if field already exists in active sorts -> update direction in-place
+        for idx, (existing_field, _) in enumerate(self.sort_keys):
+            if existing_field == field:
+                self.sort_keys[idx] = (field, direction)
+                self.current_page = 0
+                self._apply_current_state()
+                return
+
+        # If current sort is default [("id", "desc")] and new sort is not id, replace default
+        if self.sort_keys == [("id", "desc")] and field != "id":
+            self.sort_keys = [(field, direction)]
+        else:
+            self.sort_keys.append((field, direction))
+
+        self.current_page = 0
+        self._apply_current_state()
 
     def _remove_sort_key(self, index: int, e=None) -> None:
         """Removes a single sort key by index. If all removed, resets to default."""
@@ -555,10 +742,42 @@ class StudentHome(ft.Container):
         if not self.sort_keys:
             self.sort_keys = [("id", "desc")]
         self.current_page = 0
-        self.load_data()
+        self._apply_current_state()
+
+    def handle_clear_sorting(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Resets sorting to default [("id", "desc")]. Preserves search and filters."""
+        self.sort_keys = [("id", "desc")]
+        self.sort_field_dropdown.value = "name"
+        self.sort_dir_dropdown.value = "asc"
+        self.current_page = 0
+        self._apply_current_state()
+
+    def handle_reset_all(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Full reset of search, filters, and sorting."""
+        self.search_field.value = ""
+        self.clear_search_btn.visible = False
+        self.current_query = ""
+        self.current_course_id = None
+        self.current_course_label = None
+        self.course_dropdown.value = "ALL"
+        self.current_status = None
+        self.status_dropdown.value = "ALL"
+        self.current_year = None
+        self.year_dropdown.value = "ALL"
+        self.current_month = None
+        self.month_dropdown.value = "ALL"
+        self.sort_keys = [("id", "desc")]
+        self.sort_field_dropdown.value = "name"
+        self.sort_dir_dropdown.value = "asc"
+        self.current_page = 0
+        self._apply_current_state()
+
+    # Legacy alias for backward compatibility
+    def handle_reset_filters(self, e: Optional[ft.ControlEvent] = None) -> None:
+        self.handle_reset_all(e)
 
     # ══════════════════════════════════════════════════════════════════════
-    # COURSE FILTER POPULATION
+    # 10. COURSE FILTER POPULATION
     # ══════════════════════════════════════════════════════════════════════
     def _populate_course_filter(self) -> None:
         """Populates the course dropdown filter with available courses."""
@@ -575,127 +794,7 @@ class StudentHome(ft.Container):
             LogService.warning(f"Could not load course options for filter: {ex}", context=self.__class__.__name__)
 
     # ══════════════════════════════════════════════════════════════════════
-    # PAGINATION BAR
-    # ══════════════════════════════════════════════════════════════════════
-    def _build_pagination_bar(self) -> ft.Container:
-        self.pagination_info = ft.Text(
-            "Showing 0 of 0 students",
-            size=AppTheme.SIZE_CAPTION,
-            color=AppTheme.TEXT_SECONDARY,
-        )
-
-        self.prev_btn = ft.IconButton(
-            icon=ft.Icons.CHEVRON_LEFT,
-            icon_color=AppTheme.PRIMARY,
-            tooltip="Previous Page",
-            disabled=True,
-            on_click=self.handle_prev_page,
-        )
-
-        self.next_btn = ft.IconButton(
-            icon=ft.Icons.CHEVRON_RIGHT,
-            icon_color=AppTheme.PRIMARY,
-            tooltip="Next Page",
-            disabled=True,
-            on_click=self.handle_next_page,
-        )
-
-        return ft.Container(
-            content=ft.Row(
-                controls=[
-                    self.pagination_info,
-                    ft.Row(controls=[self.prev_btn, self.next_btn], spacing=4),
-                ],
-                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-            ),
-            padding=ft.Padding(left=AppTheme.PAD_MD, top=4, right=AppTheme.PAD_MD, bottom=4),
-        )
-
-    # ══════════════════════════════════════════════════════════════════════
-    # EMPTY / ERROR STATES
-    # ══════════════════════════════════════════════════════════════════════
-    def _build_empty_state(self, is_filtered: bool = False) -> ft.Container:
-        if is_filtered:
-            icon = ft.Icons.SEARCH_OFF
-            title = "No matching students found"
-            subtitle = "No student records matched the current filter/search criteria."
-            action_btn = ft.ElevatedButton(
-                content=ft.Text("Reset Filters"),
-                icon=ft.Icons.CLEAR,
-                style=ft.ButtonStyle(
-                    bgcolor=AppTheme.SURFACE_VARIANT,
-                    color=AppTheme.TEXT_PRIMARY,
-                    shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
-                ),
-                on_click=self.handle_reset_all,
-            )
-        else:
-            icon = ft.Icons.PEOPLE_OUTLINE
-            title = "No students registered yet"
-            subtitle = "Click 'Register Student' above to add your first student record."
-            action_btn = ft.ElevatedButton(
-                content=ft.Text("Register Student"),
-                icon=ft.Icons.PERSON_ADD,
-                style=ft.ButtonStyle(
-                    bgcolor=AppTheme.PRIMARY,
-                    color=AppTheme.SURFACE,
-                    shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
-                ),
-                on_click=self.handle_add_student,
-            )
-
-        return ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Icon(icon, size=64, color=AppTheme.TEXT_MUTED),
-                    ft.Text(title, size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
-                    ft.Text(subtitle, size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_SECONDARY, text_align=ft.TextAlign.CENTER),
-                    action_btn,
-                ],
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                spacing=AppTheme.PAD_MD,
-                alignment=ft.MainAxisAlignment.CENTER,
-            ),
-            alignment=ft.Alignment.CENTER,
-            expand=True,
-            bgcolor=AppTheme.SURFACE,
-            border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
-            padding=AppTheme.PAD_XL,
-        )
-
-    def _build_error_state(self, error_message: str) -> ft.Container:
-        return ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Icon(ft.Icons.ERROR_OUTLINE, size=64, color=AppTheme.DANGER),
-                    ft.Text("Unable to load student directory", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
-                    ft.Text(error_message, size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_SECONDARY, text_align=ft.TextAlign.CENTER),
-                    ft.ElevatedButton(
-                        content=ft.Text("Retry"),
-                        icon=ft.Icons.REFRESH,
-                        style=ft.ButtonStyle(
-                            bgcolor=AppTheme.PRIMARY,
-                            color=AppTheme.SURFACE,
-                            shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
-                        ),
-                        on_click=lambda _: self.load_data(),
-                    ),
-                ],
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                spacing=AppTheme.PAD_MD,
-                alignment=ft.MainAxisAlignment.CENTER,
-            ),
-            alignment=ft.Alignment.CENTER,
-            expand=True,
-            bgcolor=AppTheme.SURFACE,
-            border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
-            padding=AppTheme.PAD_XL,
-        )
-
-    # ══════════════════════════════════════════════════════════════════════
-    # DATA TABLE
+    # 11. DATA TABLE
     # ══════════════════════════════════════════════════════════════════════
     def _build_data_table(self) -> ft.Container:
         rows = []
@@ -722,14 +821,14 @@ class StudentHome(ft.Container):
                         ft.DataCell(
                             ft.Row(
                                 controls=[
-                                    ft.Icon(ft.Icons.ACCOUNT_CIRCLE, size=20, color=AppTheme.PRIMARY),
-                                    ft.Text(student.display_name, weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY),
+                                    ft.Icon(ft.Icons.ACCOUNT_CIRCLE, size=18, color=AppTheme.PRIMARY),
+                                    ft.Text(student.display_name, weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_PRIMARY),
                                 ],
                                 spacing=6,
                             ),
                             on_double_tap=lambda e, s=student: self.handle_open_workspace(s.id),
                         ),
-                        ft.DataCell(ft.Text(student.mobile_number or "—", size=AppTheme.SIZE_BODY)),
+                        ft.DataCell(ft.Text(student.mobile_number or "—", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_PRIMARY)),
                         ft.DataCell(
                             ft.Text(
                                 student.current_course or "Not Enrolled",
@@ -796,21 +895,21 @@ class StudentHome(ft.Container):
 
         table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("Admission ID", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Student Name", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Mobile Number", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Course", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Admission Date", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Status", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Total Fee", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Actions", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Admission ID", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY)),
+                ft.DataColumn(ft.Text("Student Name", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY)),
+                ft.DataColumn(ft.Text("Mobile Number", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY)),
+                ft.DataColumn(ft.Text("Course", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY)),
+                ft.DataColumn(ft.Text("Admission Date", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY)),
+                ft.DataColumn(ft.Text("Status", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY)),
+                ft.DataColumn(ft.Text("Total Fee", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY)),
+                ft.DataColumn(ft.Text("Actions", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY)),
             ],
             rows=rows,
             heading_row_color=AppTheme.SURFACE_VARIANT,
-            data_row_min_height=48,
-            data_row_max_height=56,
-            column_spacing=20,
-            horizontal_margin=16,
+            data_row_min_height=44,
+            data_row_max_height=52,
+            column_spacing=18,
+            horizontal_margin=14,
         )
 
         return ft.Container(
@@ -825,238 +924,141 @@ class StudentHome(ft.Container):
         )
 
     # ══════════════════════════════════════════════════════════════════════
-    # DATA LOADING — Central query builder from current state
+    # 12. PAGINATION BAR
     # ══════════════════════════════════════════════════════════════════════
-    def _get_active_filters(self) -> dict[str, object]:
-        """Constructs filter map for controller calls from independent state."""
-        offset = self.current_page * self.PAGE_SIZE
-        return {
-            "query": self.current_query or None,
-            "course_id": self.current_course_id,
-            "status": self.current_status,
-            "year": self.current_year,
-            "month": self.current_month,
-            "sort_keys": self.sort_keys,
-            "sort_by": self.sort_keys[0][0] if self.sort_keys else "id",
-            "sort_dir": self.sort_keys[0][1] if self.sort_keys else "desc",
-            "limit": self.PAGE_SIZE,
-            "offset": offset,
-        }
+    def _build_pagination_bar(self) -> ft.Container:
+        self.pagination_info = ft.Text(
+            "Showing 0 of 0 students",
+            size=AppTheme.SIZE_CAPTION,
+            color=AppTheme.TEXT_SECONDARY,
+        )
 
-    def load_data(self) -> None:
-        """Fetches filtered, paginated data from controller and updates UI view."""
-        try:
-            filters = self._get_active_filters()
-            students, total = self.controller.filter_students(filters)
+        self.prev_btn = ft.IconButton(
+            icon=ft.Icons.CHEVRON_LEFT,
+            icon_color=AppTheme.PRIMARY,
+            tooltip="Previous Page",
+            disabled=True,
+            on_click=self.handle_prev_page,
+        )
 
-            self.students = students
-            self.total_count = total
+        self.next_btn = ft.IconButton(
+            icon=ft.Icons.CHEVRON_RIGHT,
+            icon_color=AppTheme.PRIMARY,
+            tooltip="Next Page",
+            disabled=True,
+            on_click=self.handle_next_page,
+        )
 
-            # Update badge
-            self.total_badge_text.value = f"Total: {self.total_count}"
-            self.clear_search_btn.visible = bool(self.current_query)
+        return ft.Container(
+            content=ft.Row(
+                controls=[
+                    self.pagination_info,
+                    ft.Row(controls=[self.prev_btn, self.next_btn], spacing=4),
+                ],
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            ),
+            padding=ft.Padding(left=AppTheme.PAD_MD, top=2, right=AppTheme.PAD_MD, bottom=2),
+        )
 
-            # Refresh active state chips
-            self._refresh_active_state_bar()
-
-            # Update Table or Empty State
-            is_filtered = bool(
-                self.current_query
-                or self.current_course_id
-                or self.current_status
-                or self.current_year
-                or self.current_month
+    # ══════════════════════════════════════════════════════════════════════
+    # 13. EMPTY / ERROR STATES
+    # ══════════════════════════════════════════════════════════════════════
+    def _build_empty_state(self, is_filtered: bool = False) -> ft.Container:
+        if is_filtered:
+            icon = ft.Icons.SEARCH_OFF
+            title = "No matching students found"
+            subtitle = "No student records matched the current filter/search criteria."
+            action_btn = ft.ElevatedButton(
+                content=ft.Text("Reset Filters", size=AppTheme.SIZE_BODY),
+                icon=ft.Icons.CLEAR,
+                style=ft.ButtonStyle(
+                    bgcolor=AppTheme.SURFACE_VARIANT,
+                    color=AppTheme.TEXT_PRIMARY,
+                    shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+                ),
+                on_click=self.handle_reset_all,
             )
-            if not self.students:
-                self.table_container.content = self._build_empty_state(is_filtered=is_filtered)
-            else:
-                self.table_container.content = self._build_data_table()
-
-            # Update Pagination Bar
-            start_num = (self.current_page * self.PAGE_SIZE) + 1 if self.total_count > 0 else 0
-            end_num = min(start_num + len(self.students) - 1, self.total_count) if self.total_count > 0 else 0
-            self.pagination_info.value = f"Showing {start_num} to {end_num} of {self.total_count} students"
-            self.prev_btn.disabled = self.current_page == 0
-            self.next_btn.disabled = end_num >= self.total_count
-
-            try:
-                page = self.page
-            except RuntimeError:
-                page = None
-
-            if page:
-                self.update()
-
-        except Exception as ex:
-            LogService.error(f"Error loading student directory: {ex}", context=self.__class__.__name__)
-            self.table_container.content = self._build_error_state("An internal error occurred while fetching records.")
-            try:
-                page = self.page
-            except RuntimeError:
-                page = None
-            if page:
-                self.update()
-
-    # ══════════════════════════════════════════════════════════════════════
-    # SEARCH HANDLERS
-    # ══════════════════════════════════════════════════════════════════════
-    def handle_search_change(self, e: ft.ControlEvent) -> None:
-        """Flet-safe async debounced search input handling."""
-        query = (self.search_field.value or "").strip()
-        self._search_generation += 1
-        current_gen = self._search_generation
-
-        async def _debounced() -> None:
-            await asyncio.sleep(0.3)
-            # Guard against stale search query execution
-            if current_gen == self._search_generation:
-                self._apply_search(query)
-
-        try:
-            page = self.page
-        except RuntimeError:
-            page = None
-
-        if page:
-            page.run_task(_debounced)
         else:
-            self._apply_search(query)
+            icon = ft.Icons.PEOPLE_OUTLINE
+            title = "No students registered yet"
+            subtitle = "Click 'Register Student' above to add your first student record."
+            action_btn = ft.ElevatedButton(
+                content=ft.Text("Register Student", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                icon=ft.Icons.PERSON_ADD,
+                style=ft.ButtonStyle(
+                    bgcolor=AppTheme.PRIMARY,
+                    color=AppTheme.SURFACE,
+                    shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+                ),
+                on_click=self.handle_add_student,
+            )
 
-    def handle_search_submit(self, e: ft.ControlEvent) -> None:
-        """Immediate search on Enter key."""
-        self._search_generation += 1
-        query = (self.search_field.value or "").strip()
-        self._apply_search(query)
+        return ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Icon(icon, size=48, color=AppTheme.TEXT_MUTED),
+                    ft.Text(title, size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
+                    ft.Text(subtitle, size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_SECONDARY, text_align=ft.TextAlign.CENTER),
+                    action_btn,
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=AppTheme.PAD_SM,
+                alignment=ft.MainAxisAlignment.CENTER,
+            ),
+            alignment=ft.Alignment.CENTER,
+            expand=True,
+            bgcolor=AppTheme.SURFACE,
+            border_radius=AppTheme.RADIUS_MD,
+            border=ft.Border.all(1, AppTheme.BORDER),
+            padding=AppTheme.PAD_LG,
+        )
 
-    def handle_clear_search(self, e: Optional[ft.ControlEvent] = None) -> None:
-        """Clears search query only. Preserves filters and sorting."""
-        self._search_generation += 1
-        self.search_field.value = ""
-        self.clear_search_btn.visible = False
-        self.current_query = ""
-        self.current_page = 0
-        self.load_data()
-
-    def _apply_search(self, query: str) -> None:
-        """Applies search query. Does NOT reset filters or sorting."""
-        self.current_query = query
-        self.current_page = 0
-        self.load_data()
-
-    # ══════════════════════════════════════════════════════════════════════
-    # FILTER HANDLERS — Each modifies ONLY its own state
-    # ══════════════════════════════════════════════════════════════════════
-    def handle_course_filter_change(self, e: ft.ControlEvent) -> None:
-        val = self.course_dropdown.value
-        if val and val != "ALL":
-            self.current_course_id = int(val)
-            self.current_course_label = self._course_options.get(int(val), f"Course #{val}")
-        else:
-            self.current_course_id = None
-            self.current_course_label = None
-        self.current_page = 0
-        self.load_data()
-
-    def handle_status_filter_change(self, e: ft.ControlEvent) -> None:
-        val = self.status_dropdown.value
-        self.current_status = val if val and val != "ALL" else None
-        self.current_page = 0
-        self.load_data()
-
-    def handle_year_filter_change(self, e: ft.ControlEvent) -> None:
-        val = self.year_dropdown.value
-        self.current_year = int(val) if val and val != "ALL" else None
-        self.current_page = 0
-        self.load_data()
-
-    def handle_month_filter_change(self, e: ft.ControlEvent) -> None:
-        val = self.month_dropdown.value
-        self.current_month = int(val) if val and val != "ALL" else None
-        self.current_page = 0
-        self.load_data()
-
-    # ══════════════════════════════════════════════════════════════════════
-    # SORT HANDLERS — Independent from filters
-    # ══════════════════════════════════════════════════════════════════════
-    def handle_add_sort(self, e: ft.ControlEvent) -> None:
-        """Adds or replaces a sort key. If the field already exists, updates its direction."""
-        field = self.sort_field_dropdown.value or "id"
-        direction = self.sort_dir_dropdown.value or "desc"
-
-        # Check if field already exists -> update direction
-        for idx, (existing_field, _) in enumerate(self.sort_keys):
-            if existing_field == field:
-                self.sort_keys[idx] = (field, direction)
-                self.current_page = 0
-                self.load_data()
-                return
-
-        # New sort key
-        # If current sort is just default [("id", "desc")], replace it
-        if self.sort_keys == [("id", "desc")] and field != "id":
-            self.sort_keys = [(field, direction)]
-        else:
-            self.sort_keys.append((field, direction))
-
-        self.current_page = 0
-        self.load_data()
-
-    def handle_clear_sorting(self, e: Optional[ft.ControlEvent] = None) -> None:
-        """Resets sorting to default. Does NOT modify filters or search."""
-        self.sort_keys = [("id", "desc")]
-        self.sort_field_dropdown.value = "id"
-        self.sort_dir_dropdown.value = "desc"
-        self.current_page = 0
-        self.load_data()
+    def _build_error_state(self, error_message: str) -> ft.Container:
+        return ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Icon(ft.Icons.ERROR_OUTLINE, size=48, color=AppTheme.DANGER),
+                    ft.Text("Unable to load student directory", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
+                    ft.Text(error_message, size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_SECONDARY, text_align=ft.TextAlign.CENTER),
+                    ft.ElevatedButton(
+                        content=ft.Text("Retry", size=AppTheme.SIZE_BODY),
+                        icon=ft.Icons.REFRESH,
+                        style=ft.ButtonStyle(
+                            bgcolor=AppTheme.PRIMARY,
+                            color=AppTheme.SURFACE,
+                            shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+                        ),
+                        on_click=lambda _: self._apply_current_state(),
+                    ),
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=AppTheme.PAD_SM,
+                alignment=ft.MainAxisAlignment.CENTER,
+            ),
+            alignment=ft.Alignment.CENTER,
+            expand=True,
+            bgcolor=AppTheme.SURFACE,
+            border_radius=AppTheme.RADIUS_MD,
+            border=ft.Border.all(1, AppTheme.BORDER),
+            padding=AppTheme.PAD_LG,
+        )
 
     # ══════════════════════════════════════════════════════════════════════
-    # CLEAR HANDLERS — Each clears ONLY its domain
-    # ══════════════════════════════════════════════════════════════════════
-    def handle_clear_filters(self, e: Optional[ft.ControlEvent] = None) -> None:
-        """Clears all filters. Preserves search and sorting."""
-        self.current_course_id = None
-        self.current_course_label = None
-        self.course_dropdown.value = "ALL"
-        self.current_status = None
-        self.status_dropdown.value = "ALL"
-        self.current_year = None
-        self.year_dropdown.value = "ALL"
-        self.current_month = None
-        self.month_dropdown.value = "ALL"
-        self.current_page = 0
-        self.load_data()
-
-    def handle_reset_all(self, e: Optional[ft.ControlEvent] = None) -> None:
-        """Full reset of search, filters, and sorting."""
-        self.search_field.value = ""
-        self.clear_search_btn.visible = False
-        self.current_query = ""
-        self.current_course_id = None
-        self.current_course_label = None
-        self.course_dropdown.value = "ALL"
-        self.current_status = None
-        self.status_dropdown.value = "ALL"
-        self.current_year = None
-        self.year_dropdown.value = "ALL"
-        self.current_month = None
-        self.month_dropdown.value = "ALL"
-        self.sort_keys = [("id", "desc")]
-        self.sort_field_dropdown.value = "id"
-        self.sort_dir_dropdown.value = "desc"
-        self.current_page = 0
-        self.load_data()
-
-    # Legacy alias for backward compatibility with empty state button
-    def handle_reset_filters(self, e: Optional[ft.ControlEvent] = None) -> None:
-        self.handle_reset_all(e)
-
-    # ══════════════════════════════════════════════════════════════════════
-    # EXPORT HANDLERS
+    # 14. EXPORT HANDLERS
     # ══════════════════════════════════════════════════════════════════════
     def handle_export_csv(self, e: ft.ControlEvent) -> None:
-        """Exports currently filtered student dataset to Excel CSV format."""
+        """Exports currently filtered and sorted student dataset to Excel CSV format."""
         try:
-            filters = self._get_active_filters()
+            filters = {
+                "query": self.current_query or None,
+                "course_id": self.current_course_id,
+                "status": self.current_status,
+                "year": self.current_year,
+                "month": self.current_month,
+                "sort_keys": self.sort_keys,
+                "sort_by": self.sort_keys[0][0] if self.sort_keys else "id",
+                "sort_dir": self.sort_keys[0][1] if self.sort_keys else "desc",
+            }
             path = self.controller.export_students_csv(filters)
             self.show_snackbar(f"Student data exported to CSV: {path}")
         except Exception as ex:
@@ -1064,9 +1066,18 @@ class StudentHome(ft.Container):
             self.show_snackbar("Failed to export student CSV data.", is_error=True)
 
     def handle_export_pdf(self, e: ft.ControlEvent) -> None:
-        """Exports currently filtered student dataset to PDF report format."""
+        """Exports currently filtered and sorted student dataset to PDF report format."""
         try:
-            filters = self._get_active_filters()
+            filters = {
+                "query": self.current_query or None,
+                "course_id": self.current_course_id,
+                "status": self.current_status,
+                "year": self.current_year,
+                "month": self.current_month,
+                "sort_keys": self.sort_keys,
+                "sort_by": self.sort_keys[0][0] if self.sort_keys else "id",
+                "sort_dir": self.sort_keys[0][1] if self.sort_keys else "desc",
+            }
             path = self.controller.export_students_pdf(filters)
             self.show_snackbar(f"Student data exported to PDF: {path}")
         except Exception as ex:
@@ -1074,24 +1085,24 @@ class StudentHome(ft.Container):
             self.show_snackbar("Failed to export student PDF report.", is_error=True)
 
     # ══════════════════════════════════════════════════════════════════════
-    # PAGINATION HANDLERS
+    # 15. PAGINATION HANDLERS
     # ══════════════════════════════════════════════════════════════════════
     def handle_prev_page(self, e: ft.ControlEvent) -> None:
         if self.current_page > 0:
             self.current_page -= 1
-            self.load_data()
+            self._apply_current_state()
 
     def handle_next_page(self, e: ft.ControlEvent) -> None:
         if (self.current_page + 1) * self.PAGE_SIZE < self.total_count:
             self.current_page += 1
-            self.load_data()
+            self._apply_current_state()
 
     # ══════════════════════════════════════════════════════════════════════
-    # STUDENT CRUD / WORKSPACE HANDLERS
+    # 16. MODAL & DIALOG HANDLERS
     # ══════════════════════════════════════════════════════════════════════
     def _on_student_saved(self, message: str) -> None:
         """Callback invoked AFTER modal has closed to refresh table and display snackbar."""
-        self.load_data()
+        self._apply_current_state()
         self.show_snackbar(message)
 
     def handle_add_student(self, e: ft.ControlEvent) -> None:
@@ -1116,7 +1127,7 @@ class StudentHome(ft.Container):
         workspace = StudentWorkspaceDialog(
             controller=self.controller,
             student_id=student_id,
-            on_refresh_required=self.load_data,
+            on_refresh_required=self._apply_current_state,
         )
         self._open_dialog(workspace)
 
@@ -1147,7 +1158,7 @@ class StudentHome(ft.Container):
                 if msg:
                     self.show_snackbar(msg, is_error=err)
                 if not err:
-                    self.load_data()
+                    self._apply_current_state()
 
         def cancel_delete(e):
             try:
@@ -1160,7 +1171,7 @@ class StudentHome(ft.Container):
             modal=True,
             title=ft.Row(
                 controls=[
-                    ft.Icon(ft.Icons.WARNING_AMBER, color=AppTheme.DANGER, size=24),
+                    ft.Icon(ft.Icons.WARNING_AMBER, color=AppTheme.DANGER, size=22),
                     ft.Text("Confirm Student Deletion", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
                 ],
                 spacing=AppTheme.PAD_SM,
@@ -1185,9 +1196,9 @@ class StudentHome(ft.Container):
                 ),
             ),
             actions=[
-                ft.TextButton(content=ft.Text("Cancel"), on_click=cancel_delete),
+                ft.TextButton(content=ft.Text("Cancel", size=AppTheme.SIZE_BODY), on_click=cancel_delete),
                 ft.ElevatedButton(
-                    content=ft.Text("Delete Record"),
+                    content=ft.Text("Delete Record", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
                     style=ft.ButtonStyle(bgcolor=AppTheme.DANGER, color=AppTheme.SURFACE),
                     on_click=confirm_delete,
                 ),

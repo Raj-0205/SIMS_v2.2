@@ -33,7 +33,7 @@ class StudentController:
         dto = StudentCreateDTO(
             first_name=str(raw_data.get("first_name") or "").strip(),
             last_name=str(raw_data.get("last_name") or "").strip(),
-            mobile_number=str(raw_data.get("mobile_number") or "").strip() or None,
+            mobile_number=str(raw_data.get("mobile_number") or "").strip(),
             email=str(raw_data.get("email") or "").strip() or None,
         )
         return self.service.create_student(dto)
@@ -44,7 +44,7 @@ class StudentController:
             id=student_id,
             first_name=str(raw_data.get("first_name") or "").strip(),
             last_name=str(raw_data.get("last_name") or "").strip(),
-            mobile_number=str(raw_data.get("mobile_number") or "").strip() or None,
+            mobile_number=str(raw_data.get("mobile_number") or "").strip(),
             email=str(raw_data.get("email") or "").strip() or None,
         )
         self.service.update_student(dto)

@@ -1,0 +1,8 @@
+﻿# Module: SIMS v2.2 Admission Management System
+# Export Timestamp: 2026-08-20 20:15:01
+# Total Records: 2
+# Status Filter: CONFIRMED
+
+Admission ID,Candidate No,Student Name,Mobile,Course,Batch,Date,Status,Total Fee,Discount,Paid,Pending
+217,2026-006,Deepak Wagh,9812000008,KLiC Python Test Course,Unassigned,2026-08-20,CONFIRMED,"Rs. 5,000.00",Rs. 0.00,"Rs. 2,500.00","Rs. 2,500.00"
+216,2026-005,Vikas Gore,9812000007,KLiC Python Test Course,Unassigned,2026-08-20,CONFIRMED,"Rs. 5,000.00",Rs. 0.00,Rs. 500.00,"Rs. 4,500.00"

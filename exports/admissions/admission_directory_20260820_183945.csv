@@ -1,0 +1,8 @@
+﻿# Module: SIMS v2.2 Admission Management
+# Export Timestamp: 2026-08-20 18:39:45
+# Total Records: 2
+# Status Filter: All
+
+ID,Candidate No,Student Name,Mobile,Email,Course,Batch,Status,Agreed Fee,Discount,Date,Remarks
+144,2026-002,Divya Rani Deshmukh,9855500002,divya.d@example.com,Full Stack React,—,REGISTERED,"₹22,000.00",₹0.00,2026-08-20,Direct inline registration
+143,2026-001,Anand Kulkarni,9855500001,anand@example.com,Python Mastery,Morning Batch A,CONFIRMED,"₹15,000.00","₹3,000.00",2026-08-20,Updated concession to 3000

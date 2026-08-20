@@ -1,0 +1,19 @@
+﻿# Module: SIMS v2.2 Student Management System
+# Export Timestamp: 2026-08-20 18:08:00
+# Total Records: 12
+# Search Query: None
+# Status Filter: All
+
+ID,Admission No,Student Name,Mobile Number,Email,Current Course,Admission Date,Status,Base Fee,Paid Amount,Pending Amount
+226,2026-001,Aarav Sharma,9811000001,aarav.sharma@example.com,Python Data Science,2026-08-15,REGISTERED,"₹12,000.00",Pending Finance,Pending Finance
+98,—,Akash Sharad Aher,5566332211,—,—,2026-08-20,REGISTERED,—,Pending Finance,Pending Finance
+110,—,Anuj Raj Pagar,8010120768,—,—,2026-08-20,REGISTERED,—,Pending Finance,Pending Finance
+227,2026-002,Bhavna Patel,9811000002,bhavna.patel@example.com,Full Stack Web Development,2026-08-20,CONFIRMED,"₹15,000.00",Pending Finance,Pending Finance
+231,—,Farhan Akhtar,9811000006,farhan.akhtar@example.com,—,2026-08-20,REGISTERED,—,Pending Finance,Pending Finance
+184,—,Hardik Himanshu Pandya,9933121255,—,—,2026-08-20,REGISTERED,—,Pending Finance,Pending Finance
+73,—,Pranav Ravindra Sharma,4646465648,—,—,2026-08-20,REGISTERED,—,Pending Finance,Pending Finance
+96,—,Pratik Popat Shinde,8877445566,—,—,2026-08-20,REGISTERED,—,Pending Finance,Pending Finance
+71,—,Rahul Shanaram Jadhav,9876543211,studnet@gmailc.om,—,2026-08-20,REGISTERED,—,Pending Finance,Pending Finance
+97,—,Ram Ravindra Aher,9988774455,—,—,2026-08-20,REGISTERED,—,Pending Finance,Pending Finance
+65,—,Resham Kabhunana Thakare,9876543210,studnet@gmail.com,—,2026-08-20,REGISTERED,—,Pending Finance,Pending Finance
+72,—,Shan Sandip Aher,8521456321,—,—,2026-08-20,REGISTERED,—,Pending Finance,Pending Finance
