@@ -267,7 +267,7 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                     info_row("Total Admissions", str(student.admissions_count), ft.Icons.SCHOOL),
                     info_row("Current Course", student.current_course or "Not Enrolled", ft.Icons.MENU_BOOK),
                     info_row("Admission Status", student.admission_status or "REGISTERED", ft.Icons.CHECK_CIRCLE_OUTLINE),
-                    info_row("Latest Admission ID", f"#{student.latest_admission_id}" if student.latest_admission_id else "None", ft.Icons.BADGE),
+                    info_row("Latest Admission No.", student.latest_admission_number or (f"#{student.latest_admission_id}" if student.latest_admission_id else "None"), ft.Icons.BADGE),
                     info_row("Enrolled Date", student.latest_admission_date or "N/A", ft.Icons.EVENT),
                 ],
                 spacing=AppTheme.PAD_SM,
@@ -340,10 +340,11 @@ class StudentWorkspaceDialog(ft.AlertDialog):
         rows = []
         for adm in admissions:
             status_color = AppTheme.SUCCESS if adm.status in ("CONFIRMED", "REGISTERED") else AppTheme.PRIMARY
+            adm_display = adm.admission_number if getattr(adm, "admission_number", None) else f"#{adm.admission_id}"
             rows.append(
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(ft.Text(f"#{adm.admission_id}", weight=ft.FontWeight.BOLD)),
+                        ft.DataCell(ft.Text(adm_display, weight=ft.FontWeight.BOLD)),
                         ft.DataCell(ft.Text(adm.course_name or "General Admission")),
                         ft.DataCell(ft.Text(adm.course_code or "—")),
                         ft.DataCell(ft.Text(adm.admission_date[:10] if len(adm.admission_date) >= 10 else adm.admission_date)),
@@ -361,7 +362,7 @@ class StudentWorkspaceDialog(ft.AlertDialog):
 
         table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("Admission ID", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Admission No.", weight=ft.FontWeight.BOLD)),
                 ft.DataColumn(ft.Text("Course Name", weight=ft.FontWeight.BOLD)),
                 ft.DataColumn(ft.Text("Code", weight=ft.FontWeight.BOLD)),
                 ft.DataColumn(ft.Text("Admission Date", weight=ft.FontWeight.BOLD)),
@@ -646,7 +647,6 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             on_saved=on_saved_refresh,
             student=student,
         )
-        modal.open = True
         try:
             if self.page:
                 self.page.show_dialog(modal)
@@ -654,8 +654,7 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             pass
 
     def close_workspace(self, e: Optional[ft.ControlEvent] = None) -> None:
-        """Closes the workspace modal safely."""
-        self.open = False
+        """Closes the workspace modal safely using Flet's pop_dialog."""
         try:
             if self.page:
                 self.page.pop_dialog()

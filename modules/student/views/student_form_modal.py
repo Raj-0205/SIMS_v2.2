@@ -17,7 +17,7 @@ class StudentFormModal(ft.AlertDialog):
     """
     Unified Add/Edit Modal Dialog for Student entity.
     Supports form-level validations, live feedback, double-click protection,
-    and clean conflict error handling without modal closure.
+    clean conflict error handling without modal closure, and strict Flet 0.85.3 dialog lifecycle.
     """
 
     def __init__(
@@ -158,7 +158,8 @@ class StudentFormModal(ft.AlertDialog):
     def _safe_update(self) -> None:
         """Safely updates control if mounted on page tree."""
         try:
-            self.update()
+            if self.page:
+                self.update()
         except RuntimeError:
             pass
 
@@ -174,7 +175,7 @@ class StudentFormModal(ft.AlertDialog):
         self.error_container.visible = False
 
     def handle_submit(self, e: ft.ControlEvent) -> None:
-        """Processes form submission with double-click protection and error handling."""
+        """Processes form submission with double-click protection and clean dialog lifecycle."""
         self._clear_error()
 
         # UI-level validation
@@ -208,9 +209,11 @@ class StudentFormModal(ft.AlertDialog):
             else:
                 self.controller.create_student(payload)
 
-            # Success: Trigger parent refresh and close modal
-            self.on_saved()
+            # 1. Close modal FIRST so it is cleanly popped from dialog stack
             self.close_modal()
+
+            # 2. Trigger parent refresh & success feedback AFTER modal is popped
+            self.on_saved()
 
         except (ValidationError, ConflictError, ServiceError) as ex:
             # Business / Validation Conflict (e.g. Duplicate Mobile HARD BLOCK)
@@ -223,8 +226,7 @@ class StudentFormModal(ft.AlertDialog):
             self._show_error("An unexpected error occurred. Please try again.")
 
     def close_modal(self, e: Optional[ft.ControlEvent] = None) -> None:
-        """Closes the dialog safely."""
-        self.open = False
+        """Closes the dialog safely using Flet's pop_dialog without mutating open flag directly."""
         try:
             if self.page:
                 self.page.pop_dialog()

@@ -68,8 +68,7 @@ class StudentSearchDialog(ft.AlertDialog):
         self.close_dialog()
 
     def close_dialog(self, e: Optional[ft.ControlEvent] = None) -> None:
-        """Closes the modal."""
-        self.open = False
+        """Closes the modal safely using Flet's pop_dialog."""
         try:
             if self.page:
                 self.page.pop_dialog()

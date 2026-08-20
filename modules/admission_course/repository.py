@@ -10,7 +10,6 @@ __all__ = ["AdmissionCourseRepository", "AdmissionCourseRow"]
 class AdmissionCourseRow(TypedDict):
     admission_id: int
     course_id: int
-    created_at: str
 
 
 class AdmissionCourseRepository(BaseRepository):
@@ -21,12 +20,12 @@ class AdmissionCourseRepository(BaseRepository):
         sql = "INSERT INTO admission_courses (admission_id, course_id) VALUES (?, ?);"
         self.execute_insert(sql, (admission_id, course_id))
 
-    def unlink_course(self, admission_id: int, course_id: int) -> None:
+    def unlink_course(self, admission_id: int, course_id: int) -> int:
         """Removes a course from an admission."""
         sql = "DELETE FROM admission_courses WHERE admission_id = ? AND course_id = ?;"
-        self.execute_update(sql, (admission_id, course_id))
+        return self.execute(sql, (admission_id, course_id))
 
     def get_courses_for_admission(self, admission_id: int) -> list[AdmissionCourseRow]:
         """Fetches all courses attached to an admission."""
-        sql = "SELECT admission_id, course_id, created_at FROM admission_courses WHERE admission_id = ?;"
+        sql = "SELECT admission_id, course_id FROM admission_courses WHERE admission_id = ?;"
         return cast(list[AdmissionCourseRow], self.execute_fetchall(sql, (admission_id,)))

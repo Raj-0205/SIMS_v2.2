@@ -245,10 +245,11 @@ class StudentService(BaseService):
             # Admission Events
             for adm in admissions:
                 course_text = f"Course: {adm.course_name} ({adm.course_code})" if adm.course_name else "Course Assignment Pending"
+                adm_display = adm.admission_number if getattr(adm, "admission_number", None) else f"#{adm.admission_id}"
                 timeline.append(
                     StudentTimelineItemDTO(
                         timestamp=adm.admission_date or "N/A",
-                        title=f"Admission #{adm.admission_id} - {adm.status}",
+                        title=f"Admission {adm_display} - {adm.status}",
                         description=f"Enrolled in {course_text}. Status: {adm.status}.",
                         event_type="ADMISSION",
                     )

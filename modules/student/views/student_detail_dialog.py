@@ -85,8 +85,7 @@ class StudentDetailDialog(ft.AlertDialog):
         self.actions_alignment = ft.MainAxisAlignment.END
 
     def close_dialog(self, e: Optional[ft.ControlEvent] = None) -> None:
-        """Closes the dialog."""
-        self.open = False
+        """Closes the dialog safely using Flet's pop_dialog."""
         try:
             if self.page:
                 self.page.pop_dialog()

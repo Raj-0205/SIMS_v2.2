@@ -1,6 +1,7 @@
 # modules/student/repository.py
 
 from __future__ import annotations
+import re
 from typing import Any, Optional, TypedDict, cast
 
 from core.database.repository import BaseRepository
@@ -58,6 +59,20 @@ class StudentRepository(BaseRepository):
                 LIMIT 1
             ) AS latest_admission_id,
             (
+                SELECT a.candidate_year
+                FROM admissions a
+                WHERE a.student_id = s.id
+                ORDER BY a.id DESC
+                LIMIT 1
+            ) AS latest_admission_year,
+            (
+                SELECT a.candidate_sequence
+                FROM admissions a
+                WHERE a.student_id = s.id
+                ORDER BY a.id DESC
+                LIMIT 1
+            ) AS latest_admission_seq,
+            (
                 SELECT a.status
                 FROM admissions a
                 WHERE a.student_id = s.id
@@ -73,6 +88,73 @@ class StudentRepository(BaseRepository):
             ) AS latest_admission_date
         FROM students s
     """
+
+    @staticmethod
+    def _build_search_conditions(query: str, table_alias: str = "s") -> tuple[str, list[Any]]:
+        """
+        Builds robust tokenized search conditions across multiple fields:
+        - First Name, Last Name, Full Name (first_name || ' ' || last_name)
+        - Student ID
+        - Mobile Number (including normalized digits & international formats)
+        - Email Address
+        """
+        clean = query.strip()
+        if not clean:
+            return "", []
+
+        prefix = f"{table_alias}." if table_alias else ""
+
+        # Check if entire query is primarily a phone candidate (digits and phone formatting chars)
+        clean_no_phone_chars = re.sub(r"[\s\+\-\(\)]", "", clean)
+        if clean_no_phone_chars.isdigit() and len(clean_no_phone_chars) >= 4:
+            phone_digits = clean_no_phone_chars
+            # Normalize Indian country code (+91 / 91)
+            if phone_digits.startswith("91") and len(phone_digits) == 12:
+                phone_digits = phone_digits[2:]
+
+            pattern = f"%{phone_digits}%"
+            where = f"""(
+                REPLACE(REPLACE(REPLACE({prefix}mobile_number, ' ', ''), '-', ''), '+', '') LIKE ? OR
+                CAST({prefix}id AS TEXT) LIKE ?
+            )"""
+            return where, [pattern, pattern]
+
+        # Multi-token matching
+        tokens = clean.split()
+        token_clauses = []
+        params: list[Any] = []
+
+        for token in tokens:
+            token_pattern = f"%{token}%"
+            token_digits = re.sub(r"\D", "", token)
+            has_token_digits = len(token_digits) >= 4
+
+            clause = f"""(
+                CAST({prefix}id AS TEXT) LIKE ? OR
+                {prefix}first_name LIKE ? OR
+                {prefix}last_name LIKE ? OR
+                ({prefix}first_name || ' ' || {prefix}last_name) LIKE ? OR
+                {prefix}mobile_number LIKE ? OR
+                {prefix}email LIKE ?
+            """
+            token_params = [
+                token_pattern,
+                token_pattern,
+                token_pattern,
+                token_pattern,
+                token_pattern,
+                token_pattern,
+            ]
+            if has_token_digits:
+                clause += f" OR REPLACE(REPLACE(REPLACE({prefix}mobile_number, ' ', ''), '-', ''), '+', '') LIKE ?"
+                token_params.append(f"%{token_digits}%")
+
+            clause += ")"
+            token_clauses.append(clause)
+            params.extend(token_params)
+
+        where_clause = " AND ".join(token_clauses)
+        return where_clause, params
 
     def insert(self, data: dict[str, Any]) -> int:
         """Inserts a new student record and returns the generated ID."""
@@ -133,52 +215,33 @@ class StudentRepository(BaseRepository):
 
     def search_paged(self, query: str, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
         """
-        Searches students across ID, first name, last name, mobile, and email with pagination.
+        Universal tokenized search across ID, first name, last name, full name, mobile, and email with pagination.
         """
-        search_pattern = f"%{query}%"
+        where_clause, params = self._build_search_conditions(query, table_alias="s")
+        if not where_clause:
+            return self.get_all_paged(limit, offset)
+
         sql = f"""
             {self._STUDENT_SELECT_BASE}
-            WHERE
-                CAST(s.id AS TEXT) LIKE ? OR
-                s.first_name LIKE ? OR
-                s.last_name LIKE ? OR
-                s.mobile_number LIKE ? OR
-                s.email LIKE ?
+            WHERE {where_clause}
             ORDER BY s.id DESC
             LIMIT ? OFFSET ?;
         """
-        params = (
-            search_pattern,
-            search_pattern,
-            search_pattern,
-            search_pattern,
-            search_pattern,
-            limit,
-            offset,
-        )
-        return self.execute_fetchall(sql, params)
+        params.extend([limit, offset])
+        return self.execute_fetchall(sql, tuple(params))
 
     def count_search(self, query: str) -> int:
-        """Counts total matching records for a given search query."""
-        search_pattern = f"%{query}%"
-        sql = """
+        """Counts total matching records for a given universal search query."""
+        where_clause, params = self._build_search_conditions(query, table_alias="")
+        if not where_clause:
+            return self.count_all()
+
+        sql = f"""
             SELECT COUNT(*) as count
             FROM students
-            WHERE
-                CAST(id AS TEXT) LIKE ? OR
-                first_name LIKE ? OR
-                last_name LIKE ? OR
-                mobile_number LIKE ? OR
-                email LIKE ?;
+            WHERE {where_clause};
         """
-        params = (
-            search_pattern,
-            search_pattern,
-            search_pattern,
-            search_pattern,
-            search_pattern,
-        )
-        row = self.execute_fetchone(sql, params)
+        row = self.execute_fetchone(sql, tuple(params))
         return int(row["count"]) if row else 0
 
     def update(self, student_id: int, data: dict[str, Any]) -> int:
@@ -209,7 +272,7 @@ class StudentRepository(BaseRepository):
 
     def get_student_admissions(self, student_id: int) -> list[dict[str, Any]]:
         """
-        Fetches all admissions linked to a student with course details.
+        Fetches all admissions linked to a student with course details and candidate sequence numbers.
         Demonstrates the Student != Admission rule (1 student, many admissions).
         """
         sql = """
@@ -218,6 +281,8 @@ class StudentRepository(BaseRepository):
                 a.student_id,
                 a.status,
                 a.created_at AS admission_date,
+                a.candidate_year,
+                a.candidate_sequence,
                 c.id AS course_id,
                 c.code AS course_code,
                 c.name AS course_name
@@ -231,30 +296,24 @@ class StudentRepository(BaseRepository):
 
     def search(self, query: str, limit: int = 25) -> list[StudentSearchRow]:
         """
-        Legacy/search-helper query method for backward compatibility.
-        Case-insensitive partial match.
+        Universal search helper query method for backward compatibility.
         """
-        search_pattern = f"%{query}%"
-        sql = """
-            SELECT
-                id,
-                first_name,
-                last_name,
-                mobile_number
+        where_clause, params = self._build_search_conditions(query, table_alias="")
+        if not where_clause:
+            sql = """
+                SELECT id, first_name, last_name, mobile_number
+                FROM students
+                ORDER BY first_name ASC, last_name ASC
+                LIMIT ?;
+            """
+            return cast(list[StudentSearchRow], self.execute_fetchall(sql, (limit,)))
+
+        sql = f"""
+            SELECT id, first_name, last_name, mobile_number
             FROM students
-            WHERE
-                CAST(id AS TEXT) LIKE ? OR
-                first_name LIKE ? OR
-                last_name LIKE ? OR
-                mobile_number LIKE ?
+            WHERE {where_clause}
             ORDER BY first_name ASC, last_name ASC
             LIMIT ?;
         """
-        params = (
-            search_pattern,
-            search_pattern,
-            search_pattern,
-            search_pattern,
-            limit,
-        )
-        return cast(list[StudentSearchRow], self.execute_fetchall(sql, params))
+        params.append(limit)
+        return cast(list[StudentSearchRow], self.execute_fetchall(sql, tuple(params)))

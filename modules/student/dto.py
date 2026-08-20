@@ -27,6 +27,8 @@ class StudentDTO:
     admissions_count: int = 0
     current_course: Optional[str] = None
     latest_admission_id: Optional[int] = None
+    latest_admission_year: Optional[int] = None
+    latest_admission_seq: Optional[int] = None
     admission_status: Optional[str] = None
     latest_admission_date: Optional[str] = None
 
@@ -34,6 +36,15 @@ class StudentDTO:
     def display_name(self) -> str:
         """Helper for UI to display the full name cleanly."""
         return f"{self.first_name} {self.last_name}".strip()
+
+    @property
+    def latest_admission_number(self) -> Optional[str]:
+        """Formatted yearly candidate profile number (YYYY-NNN)."""
+        if self.latest_admission_year and self.latest_admission_seq:
+            return f"{self.latest_admission_year}-{self.latest_admission_seq:03d}"
+        if self.latest_admission_id:
+            return f"#{self.latest_admission_id}"
+        return None
 
     @property
     def status_label(self) -> str:
@@ -85,9 +96,18 @@ class StudentAdmissionDTO:
     student_id: int
     status: str
     admission_date: str
+    candidate_year: Optional[int] = None
+    candidate_sequence: Optional[int] = None
     course_id: Optional[int] = None
     course_code: Optional[str] = None
     course_name: Optional[str] = None
+
+    @property
+    def admission_number(self) -> str:
+        """Formatted yearly candidate profile number (YYYY-NNN)."""
+        if self.candidate_year and self.candidate_sequence:
+            return f"{self.candidate_year}-{self.candidate_sequence:03d}"
+        return f"#{self.admission_id}"
 
 
 @dataclass(frozen=True)

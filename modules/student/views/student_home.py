@@ -1,7 +1,7 @@
 # modules/student/views/student_home.py
 
 from __future__ import annotations
-import threading
+import asyncio
 from typing import Optional
 import flet as ft
 
@@ -40,7 +40,7 @@ class StudentHome(ft.Container):
         self.current_query: str = ""
         self.total_count: int = 0
         self.students: list[StudentDTO] = []
-        self._search_timer: Optional[threading.Timer] = None
+        self._search_generation: int = 0
 
         # UI Components
         self.header = self._build_header()
@@ -64,7 +64,7 @@ class StudentHome(ft.Container):
         self.load_data()
 
     def show_snackbar(self, message: str, is_error: bool = False) -> None:
-        """Displays transient feedback snackbar to the user."""
+        """Displays transient feedback snackbar to the user using Flet's show_dialog."""
         try:
             page = self.page
         except RuntimeError:
@@ -77,7 +77,6 @@ class StudentHome(ft.Container):
             content=ft.Text(message, color=AppTheme.SURFACE),
             bgcolor=bg_color,
         )
-        snackbar.open = True
         page.show_dialog(snackbar)
 
     def _build_header(self) -> ft.Row:
@@ -139,13 +138,22 @@ class StudentHome(ft.Container):
             color=AppTheme.PRIMARY,
         )
 
+        self.clear_btn = ft.IconButton(
+            icon=ft.Icons.CLEAR,
+            icon_size=16,
+            tooltip="Clear search",
+            visible=False,
+            on_click=self.handle_clear_search,
+        )
+
         self.search_field = ft.TextField(
             hint_text="Search by name, mobile, email, or ID...",
             prefix_icon=ft.Icons.SEARCH,
+            suffix=self.clear_btn,
             border_radius=AppTheme.RADIUS_MD,
             text_size=AppTheme.SIZE_BODY,
             content_padding=ft.Padding(left=12, top=8, right=12, bottom=8),
-            width=380,
+            width=400,
             on_change=self.handle_search_change,
             on_submit=self.handle_search_submit,
         )
@@ -416,6 +424,7 @@ class StudentHome(ft.Container):
 
             # Update badge
             self.total_badge_text.value = f"Total Students: {self.total_count}"
+            self.clear_btn.visible = bool(self.current_query)
 
             # Update Table or Empty State
             if not self.students:
@@ -449,26 +458,38 @@ class StudentHome(ft.Container):
                 self.update()
 
     def handle_search_change(self, e: ft.ControlEvent) -> None:
-        """Debounced search input handling (300ms delay)."""
+        """Flet-safe async debounced search input handling."""
         query = (self.search_field.value or "").strip()
-        if self._search_timer:
-            self._search_timer.cancel()
+        self._search_generation += 1
+        current_gen = self._search_generation
 
-        self._search_timer = threading.Timer(0.3, self._apply_search, args=[query])
-        self._search_timer.start()
+        async def _debounced() -> None:
+            await asyncio.sleep(0.3)
+            # Guard against stale search query execution
+            if current_gen == self._search_generation:
+                self._apply_search(query)
+
+        try:
+            page = self.page
+        except RuntimeError:
+            page = None
+
+        if page:
+            page.run_task(_debounced)
+        else:
+            self._apply_search(query)
 
     def handle_search_submit(self, e: ft.ControlEvent) -> None:
         """Immediate search on Enter key."""
-        if self._search_timer:
-            self._search_timer.cancel()
+        self._search_generation += 1
         query = (self.search_field.value or "").strip()
         self._apply_search(query)
 
     def handle_clear_search(self, e: Optional[ft.ControlEvent] = None) -> None:
         """Clears search filter and reloads normal student directory."""
-        if self._search_timer:
-            self._search_timer.cancel()
+        self._search_generation += 1
         self.search_field.value = ""
+        self.clear_btn.visible = False
         self.current_query = ""
         self.current_page = 0
         self.load_data()
@@ -489,7 +510,7 @@ class StudentHome(ft.Container):
             self.load_data()
 
     def _on_student_saved(self, message: str) -> None:
-        """Callback invoked when student is successfully added or updated."""
+        """Callback invoked AFTER modal has closed to refresh table and display snackbar."""
         self.load_data()
         self.show_snackbar(message)
 
@@ -499,7 +520,6 @@ class StudentHome(ft.Container):
             controller=self.controller,
             on_saved=lambda: self._on_student_saved("Student registered successfully!"),
         )
-        modal.open = True
         self._open_dialog(modal)
 
     def handle_edit_student(self, student: StudentDTO) -> None:
@@ -509,7 +529,6 @@ class StudentHome(ft.Container):
             on_saved=lambda: self._on_student_saved("Student profile updated successfully!"),
             student=student,
         )
-        modal.open = True
         self._open_dialog(modal)
 
     def handle_open_workspace(self, student_id: int) -> None:
@@ -519,31 +538,38 @@ class StudentHome(ft.Container):
             student_id=student_id,
             on_refresh_required=self.load_data,
         )
-        workspace.open = True
         self._open_dialog(workspace)
 
     def handle_delete_student(self, student: StudentDTO) -> None:
         """Opens Delete Confirmation Dialog with ERP foreign key & audit rules."""
         def confirm_delete(e):
+            msg = ""
+            err = False
             try:
                 self.controller.delete_student(student.id)
-                self.show_snackbar(f"Student '{student.display_name}' deleted successfully.")
-                self.load_data()
+                msg = f"Student '{student.display_name}' deleted successfully."
             except (ValidationError, ConflictError, ServiceError) as ex:
-                self.show_snackbar(str(ex), is_error=True)
+                msg = str(ex)
+                err = True
             except Exception as ex:
                 LogService.error(f"Error during student deletion: {ex}", context="StudentDelete")
-                self.show_snackbar("An unexpected error occurred during deletion.", is_error=True)
+                msg = "An unexpected error occurred during deletion."
+                err = True
             finally:
-                dialog.open = False
+                # Pop confirmation dialog FIRST
                 try:
                     if self.page:
                         self.page.pop_dialog()
                 except RuntimeError:
                     pass
 
+                # Then show snackbar and refresh table
+                if msg:
+                    self.show_snackbar(msg, is_error=err)
+                if not err:
+                    self.load_data()
+
         def cancel_delete(e):
-            dialog.open = False
             try:
                 if self.page:
                     self.page.pop_dialog()
@@ -588,7 +614,6 @@ class StudentHome(ft.Container):
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        dialog.open = True
         self._open_dialog(dialog)
 
     def _open_dialog(self, dialog: ft.AlertDialog) -> None:
@@ -598,5 +623,4 @@ class StudentHome(ft.Container):
             page = None
         if not page:
             return
-        dialog.open = True
         page.show_dialog(dialog)

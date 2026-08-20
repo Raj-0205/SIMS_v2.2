@@ -73,12 +73,12 @@ class AdmissionForm(ft.Column):
         self.horizontal_alignment = ft.CrossAxisAlignment.START
 
     def open_student_dialog(self, e: ft.ControlEvent) -> None:
-        self.student_search_dialog.open = True
-        self.page.show_dialog(self.student_search_dialog)
+        if self.page:
+            self.page.show_dialog(self.student_search_dialog)
 
     def open_course_dialog(self, e: ft.ControlEvent) -> None:
-        self.course_search_dialog.open = True
-        self.page.show_dialog(self.course_search_dialog)
+        if self.page:
+            self.page.show_dialog(self.course_search_dialog)
 
     def on_student_selected(self, student: StudentSearchResultDTO) -> None:
         self.selected_student_id = student.id
@@ -108,7 +108,6 @@ class AdmissionForm(ft.Column):
         if not self.page: return
         color = ft.Colors.ERROR if is_error else ft.Colors.GREEN
         snackbar = ft.SnackBar(content=ft.Text(message, color=ft.Colors.WHITE), bgcolor=color)
-        snackbar.open = True
         self.page.show_dialog(snackbar)
 
     def handle_register(self, e: ft.ControlEvent) -> None:
@@ -119,7 +118,8 @@ class AdmissionForm(ft.Column):
 
         try:
             admission_id = self.admission_controller.create_admission(raw_data)
-            self.show_message(f"Admission and Course linked successfully! (Admission ID: {admission_id})")
+            admission = self.admission_controller.get_admission(admission_id)
+            self.show_message(f"Admission registered successfully! (Candidate No: {admission.admission_number})")
             
             # Reset UI
             self.selected_student_id = None
