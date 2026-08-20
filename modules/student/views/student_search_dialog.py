@@ -37,7 +37,7 @@ class StudentSearchDialog(ft.AlertDialog):
         self.results_list = ft.ListView(expand=1, spacing=5, height=350, width=500)
         
         self.content = ft.Column(controls=[self.search_input, self.results_list], tight=True)
-        self.actions = [ft.TextButton("Cancel", on_click=self.close_dialog)]
+        self.actions = [ft.TextButton(content=ft.Text("Cancel"), on_click=self.close_dialog)]
 
     def handle_search(self, e: ft.ControlEvent) -> None:
         """Fetches results from the Controller when user submits."""

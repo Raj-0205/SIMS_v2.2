@@ -5,6 +5,7 @@ from typing import Callable
 
 from ui.layout.navigation import NavigationMenu
 from ui.layout.content_host import ContentHost
+from modules.student.views.student_home import StudentHome
 
 __all__ = ["DashboardScreen"]
 
@@ -51,8 +52,13 @@ class DashboardScreen(ft.Row):
 
     def mount_view(self, route: str):
         self.nav_menu.set_route(route)
-        view = self.route_map.get(
-            route,
-            self.placeholder_view,
-        )
+        if route == "/students":
+            view = StudentHome()
+        else:
+            view = self.route_map.get(
+                route,
+                self.placeholder_view,
+            )
         self.content_host.mount(view)
+        if hasattr(view, "load_data"):
+            view.load_data()
