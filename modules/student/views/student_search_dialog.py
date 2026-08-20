@@ -69,6 +69,9 @@ class StudentSearchDialog(ft.AlertDialog):
 
     def close_dialog(self, e: Optional[ft.ControlEvent] = None) -> None:
         """Closes the modal."""
-        # TODO (Commit Production Hardening): Standardize dialog closing via self.page.close(dialog)
         self.open = False
-        self.update()
+        try:
+            if self.page:
+                self.page.pop_dialog()
+        except RuntimeError:
+            pass

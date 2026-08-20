@@ -14,8 +14,8 @@ class CourseHome(ft.Column):
             ft.Text("Course Master", size=24, weight=ft.FontWeight.BOLD),
             ft.Divider(),
             ft.Row([
-                ft.ElevatedButton("Add New Course", icon=ft.icons.ADD_BOX, disabled=True),
-                ft.ElevatedButton("Manage Existing", icon=ft.icons.SETTINGS, disabled=True),
+                ft.ElevatedButton(content=ft.Text("Add New Course"), icon=ft.Icons.ADD_BOX, disabled=True),
+                ft.ElevatedButton(content=ft.Text("Manage Existing"), icon=ft.Icons.SETTINGS, disabled=True),
             ]),
-            ft.Text("Course management coming in next sprint.", color=ft.colors.GREY_500, italic=True)
+            ft.Text("Course management coming in next sprint.", color=ft.Colors.GREY_500, italic=True)
         ]

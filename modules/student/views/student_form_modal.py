@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Callable, Optional
 import flet as ft
 
-from core.exceptions import ValidationError, ConflictError
+from core.exceptions import ValidationError, ConflictError, ServiceError
 from core.logger.service import LogService
 from modules.student.controller import StudentController
 from modules.student.dto import StudentDTO
@@ -73,9 +73,9 @@ class StudentFormModal(ft.AlertDialog):
         )
 
         self.mobile_input = ft.TextField(
-            label="Mobile Number *",
+            label="Mobile Number (Optional)",
             hint_text="10-digit mobile number",
-            value=student.mobile_number if student else "",
+            value=student.mobile_number or "" if student else "",
             keyboard_type=ft.KeyboardType.PHONE,
             border_radius=AppTheme.RADIUS_MD,
             text_size=AppTheme.SIZE_BODY,
@@ -86,7 +86,7 @@ class StudentFormModal(ft.AlertDialog):
             label="Email Address (Optional)",
             hint_text="e.g. student@example.com",
             value=student.email or "" if student else "",
-            keyboard_type=ft.KeyboardType.EMAIL_ADDRESS,
+            keyboard_type=ft.KeyboardType.EMAIL,
             border_radius=AppTheme.RADIUS_MD,
             text_size=AppTheme.SIZE_BODY,
             prefix_icon=ft.Icons.EMAIL,
@@ -155,12 +155,19 @@ class StudentFormModal(ft.AlertDialog):
         self.actions = [self.cancel_btn, self.submit_btn]
         self.actions_alignment = ft.MainAxisAlignment.END
 
+    def _safe_update(self) -> None:
+        """Safely updates control if mounted on page tree."""
+        try:
+            self.update()
+        except RuntimeError:
+            pass
+
     def _show_error(self, message: str) -> None:
         self.error_text.value = message
         self.error_container.visible = True
         self.submit_btn.disabled = False
         self.submit_btn_text.value = "Update Student" if self.is_edit_mode else "Save Student"
-        self.update()
+        self._safe_update()
 
     def _clear_error(self) -> None:
         self.error_text.value = ""
@@ -182,20 +189,17 @@ class StudentFormModal(ft.AlertDialog):
         if not last_name:
             self._show_error("Last name is required.")
             return
-        if not mobile:
-            self._show_error("Mobile number is required.")
-            return
 
         # Double-click lock: Set button state to saving
         self.submit_btn.disabled = True
         self.submit_btn_text.value = "Saving..."
-        self.update()
+        self._safe_update()
 
         payload = {
             "first_name": first_name,
             "last_name": last_name,
-            "mobile_number": mobile,
-            "email": email or None,
+            "mobile_number": mobile if mobile else None,
+            "email": email if email else None,
         }
 
         try:
@@ -208,7 +212,7 @@ class StudentFormModal(ft.AlertDialog):
             self.on_saved()
             self.close_modal()
 
-        except (ValidationError, ConflictError) as ex:
+        except (ValidationError, ConflictError, ServiceError) as ex:
             # Business / Validation Conflict (e.g. Duplicate Mobile HARD BLOCK)
             self._show_error(str(ex))
         except Exception as ex:
@@ -221,7 +225,8 @@ class StudentFormModal(ft.AlertDialog):
     def close_modal(self, e: Optional[ft.ControlEvent] = None) -> None:
         """Closes the dialog safely."""
         self.open = False
-        if self.page:
-            self.page.update()
-        else:
-            self.update()
+        try:
+            if self.page:
+                self.page.pop_dialog()
+        except RuntimeError:
+            pass

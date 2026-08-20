@@ -28,12 +28,12 @@ class CourseSearchDialog(ft.AlertDialog):
             hint_text="Type and press Enter...",
             autofocus=True,
             on_submit=self.handle_search,
-            prefix_icon=ft.icons.SEARCH
+            prefix_icon=ft.Icons.SEARCH
         )
         
         self.results_list = ft.ListView(expand=1, spacing=5, height=350, width=500)
         self.content = ft.Column(controls=[self.search_input, self.results_list], tight=True)
-        self.actions = [ft.TextButton("Cancel", on_click=self.close_dialog)]
+        self.actions = [ft.TextButton(content=ft.Text("Cancel"), on_click=self.close_dialog)]
 
     def handle_search(self, e: ft.ControlEvent) -> None:
         query = self.search_input.value or ""
@@ -42,7 +42,7 @@ class CourseSearchDialog(ft.AlertDialog):
         
         if not results and len(query.strip()) >= 2:
             self.results_list.controls.append(
-                ft.Container(content=ft.Text("No courses found.", color=ft.colors.GREY_500), padding=20)
+                ft.Container(content=ft.Text("No courses found.", color=ft.Colors.GREY_500), padding=20)
             )
             
         for course in results:
@@ -50,7 +50,7 @@ class CourseSearchDialog(ft.AlertDialog):
                 ft.ListTile(
                     title=ft.Text(course.display_name, weight=ft.FontWeight.W_500),
                     subtitle=ft.Text(f"Status: {course.status.value}"),
-                    leading=ft.Icon(ft.icons.BOOK),
+                    leading=ft.Icon(ft.Icons.BOOK),
                     on_click=lambda e, c=course: self.select_and_close(c)
                 )
             )
@@ -64,4 +64,8 @@ class CourseSearchDialog(ft.AlertDialog):
 
     def close_dialog(self, e: Optional[ft.ControlEvent] = None) -> None:
         self.open = False
-        self.update()
+        try:
+            if self.page:
+                self.page.pop_dialog()
+        except RuntimeError:
+            pass

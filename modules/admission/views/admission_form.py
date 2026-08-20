@@ -44,19 +44,19 @@ class AdmissionForm(ft.Column):
         
         # --- Student Section ---
         self.student_btn = ft.ElevatedButton(
-            text="1. Select Student", icon=ft.icons.PERSON_SEARCH, on_click=self.open_student_dialog
+            content=ft.Text("1. Select Student"), icon=ft.Icons.PERSON_SEARCH, on_click=self.open_student_dialog
         )
-        self.student_display = ft.Text("No student selected.", italic=True, color=ft.colors.GREY_700)
+        self.student_display = ft.Text("No student selected.", italic=True, color=ft.Colors.GREY_700)
         
         # --- Course Section ---
         self.course_btn = ft.ElevatedButton(
-            text="2. Select Course", icon=ft.icons.MENU_BOOK, on_click=self.open_course_dialog, disabled=True
+            content=ft.Text("2. Select Course"), icon=ft.Icons.MENU_BOOK, on_click=self.open_course_dialog, disabled=True
         )
-        self.course_display = ft.Text("No course selected.", italic=True, color=ft.colors.GREY_700)
+        self.course_display = ft.Text("No course selected.", italic=True, color=ft.Colors.GREY_700)
         
         # --- Submission ---
         self.register_btn = ft.ElevatedButton(
-            text="3. Complete Registration", icon=ft.icons.APP_REGISTRATION, 
+            content=ft.Text("3. Complete Registration"), icon=ft.Icons.APP_REGISTRATION,
             on_click=self.handle_register, disabled=True
         )
 
@@ -73,19 +73,17 @@ class AdmissionForm(ft.Column):
         self.horizontal_alignment = ft.CrossAxisAlignment.START
 
     def open_student_dialog(self, e: ft.ControlEvent) -> None:
-        self.page.dialog = self.student_search_dialog
         self.student_search_dialog.open = True
-        self.page.update()
+        self.page.show_dialog(self.student_search_dialog)
 
     def open_course_dialog(self, e: ft.ControlEvent) -> None:
-        self.page.dialog = self.course_search_dialog
         self.course_search_dialog.open = True
-        self.page.update()
+        self.page.show_dialog(self.course_search_dialog)
 
     def on_student_selected(self, student: StudentSearchResultDTO) -> None:
         self.selected_student_id = student.id
         self.student_display.value = f"✅ Student: {student.display_name} (ID: {student.id})"
-        self.student_display.color = ft.colors.GREEN_700
+        self.student_display.color = ft.Colors.GREEN_700
         self.student_display.italic = False
         
         # Unlock next step
@@ -96,7 +94,7 @@ class AdmissionForm(ft.Column):
     def on_course_selected(self, course: CourseSearchResultDTO) -> None:
         self.selected_course_id = course.id
         self.course_display.value = f"✅ Course: {course.display_name} (ID: {course.id})"
-        self.course_display.color = ft.colors.GREEN_700
+        self.course_display.color = ft.Colors.GREEN_700
         self.course_display.italic = False
         
         self.check_form_ready()
@@ -108,10 +106,10 @@ class AdmissionForm(ft.Column):
 
     def show_message(self, message: str, is_error: bool = False) -> None:
         if not self.page: return
-        color = ft.colors.ERROR if is_error else ft.colors.GREEN
-        self.page.snack_bar = ft.SnackBar(content=ft.Text(message, color=ft.colors.WHITE), bgcolor=color)
-        self.page.snack_bar.open = True
-        self.page.update()
+        color = ft.Colors.ERROR if is_error else ft.Colors.GREEN
+        snackbar = ft.SnackBar(content=ft.Text(message, color=ft.Colors.WHITE), bgcolor=color)
+        snackbar.open = True
+        self.page.show_dialog(snackbar)
 
     def handle_register(self, e: ft.ControlEvent) -> None:
         raw_data = {
@@ -128,7 +126,7 @@ class AdmissionForm(ft.Column):
             self.selected_course_id = None
             self.student_display.value = "No student selected."
             self.course_display.value = "No course selected."
-            self.student_display.color, self.course_display.color = ft.colors.GREY_700, ft.colors.GREY_700
+            self.student_display.color, self.course_display.color = ft.Colors.GREY_700, ft.Colors.GREY_700
             self.student_display.italic, self.course_display.italic = True, True
             self.course_btn.disabled, self.register_btn.disabled = True, True
             self.update()

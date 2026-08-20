@@ -14,6 +14,9 @@ from modules.student.dto import (
     StudentCreateDTO,
     StudentUpdateDTO,
     StudentSearchResultDTO,
+    StudentAdmissionDTO,
+    StudentTimelineItemDTO,
+    StudentWorkspaceDTO,
 )
 
 __all__ = ["StudentService", "StudentSearchService"]
@@ -22,7 +25,7 @@ __all__ = ["StudentService", "StudentSearchService"]
 class StudentService(BaseService):
     """
     Business Logic Layer for Student operations.
-    Enforces business validation, mobile number uniqueness, and transaction boundaries.
+    Enforces business validation, mobile uniqueness, workspace aggregations, and transaction boundaries.
     """
 
     _EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -49,13 +52,14 @@ class StudentService(BaseService):
 
         return clean_first, clean_last
 
-    def _validate_mobile(self, mobile_number: str) -> str:
+    def _validate_mobile(self, mobile_number: Optional[str]) -> Optional[str]:
         clean_mobile = self._sanitize_string(mobile_number)
+        if not clean_mobile:
+            return None
+
         # Normalize by removing hyphens and spaces
         normalized = re.sub(r"[\s\-]", "", clean_mobile)
 
-        if not normalized:
-            raise ValidationError("Mobile number is required.")
         if not self._MOBILE_REGEX.match(normalized):
             raise ValidationError("Invalid mobile number format. Must contain 10-15 digits.")
 
@@ -89,16 +93,17 @@ class StudentService(BaseService):
 
         # Atomic Unit of Work
         with self.unit_of_work():
-            # 1. Pre-check duplicate mobile number (HARD BLOCK)
-            existing_mobile = self.repository.get_by_mobile(mobile_number)
-            if existing_mobile:
-                LogService.warning(
-                    f"Student creation rejected: Duplicate mobile '{mobile_number}'.",
-                    context=self.__class__.__name__,
-                )
-                raise ConflictError(
-                    f"A student with mobile number '{mobile_number}' already exists."
-                )
+            # 1. Pre-check duplicate mobile number (HARD BLOCK if provided)
+            if mobile_number:
+                existing_mobile = self.repository.get_by_mobile(mobile_number)
+                if existing_mobile:
+                    LogService.warning(
+                        f"Student creation rejected: Duplicate mobile '{mobile_number}'.",
+                        context=self.__class__.__name__,
+                    )
+                    raise ConflictError(
+                        f"A student with mobile number '{mobile_number}' already exists."
+                    )
 
             # 2. Pre-check duplicate email (if provided)
             if email:
@@ -143,18 +148,19 @@ class StudentService(BaseService):
             if not existing_student:
                 raise ValidationError(f"Student with ID {dto.id} does not exist.")
 
-            # 2. Check duplicate mobile against OTHER students
-            mobile_owner = self.repository.get_by_mobile(mobile_number)
-            if mobile_owner and int(mobile_owner["id"]) != int(dto.id):
-                LogService.warning(
-                    f"Student update rejected: Mobile '{mobile_number}' is owned by student ID {mobile_owner['id']}.",
-                    context=self.__class__.__name__,
-                )
-                raise ConflictError(
-                    f"Mobile number '{mobile_number}' is already registered to another student."
-                )
+            # 2. Check duplicate mobile against OTHER students (if provided)
+            if mobile_number:
+                mobile_owner = self.repository.get_by_mobile(mobile_number)
+                if mobile_owner and int(mobile_owner["id"]) != int(dto.id):
+                    LogService.warning(
+                        f"Student update rejected: Mobile '{mobile_number}' is owned by student ID {mobile_owner['id']}.",
+                        context=self.__class__.__name__,
+                    )
+                    raise ConflictError(
+                        f"Mobile number '{mobile_number}' is already registered to another student."
+                    )
 
-            # 3. Check duplicate email against OTHER students
+            # 3. Check duplicate email against OTHER students (if provided)
             if email:
                 email_owner = self.repository.get_by_email(email)
                 if email_owner and int(email_owner["id"]) != int(dto.id):
@@ -172,6 +178,31 @@ class StudentService(BaseService):
                 context=self.__class__.__name__,
             )
 
+    def delete_student(self, student_id: int) -> None:
+        """
+        Deletes a student profile.
+        ERP Business Rule: Restrict deletion if student has active or historical admissions.
+        """
+        if not student_id or student_id <= 0:
+            raise ValidationError("A valid student ID is required for deletion.")
+
+        with self.unit_of_work():
+            existing = self.repository.get_by_id(student_id)
+            if not existing:
+                raise ValidationError(f"Student ID {student_id} not found.")
+
+            if self.repository.has_admissions(student_id):
+                raise ConflictError(
+                    "Cannot delete student profile with linked admission records. "
+                    "ERP audit policy preserves historical admission data."
+                )
+
+            self.repository.delete(student_id)
+            LogService.info(
+                f"Student ID {student_id} deleted successfully.",
+                context=self.__class__.__name__,
+            )
+
     def get_student(self, student_id: int) -> StudentDTO:
         """Retrieves full student details by ID."""
         if not student_id or student_id <= 0:
@@ -182,6 +213,55 @@ class StudentService(BaseService):
             if not row:
                 raise ValidationError(f"Student with ID {student_id} not found.")
             return StudentMapper.to_dto(row)
+
+    def get_student_workspace(self, student_id: int) -> StudentWorkspaceDTO:
+        """
+        Aggregates complete Student Workspace data:
+        - Master Student profile
+        - All linked admissions (Student != Admission)
+        - Chronological history timeline
+        """
+        student = self.get_student(student_id)
+
+        with self.unit_of_work():
+            # 1. Fetch Admissions
+            admission_rows = self.repository.get_student_admissions(student_id)
+            admissions = [StudentMapper.to_admission_dto(r) for r in admission_rows]
+
+            # 2. Build Chronological Timeline Events
+            timeline: list[StudentTimelineItemDTO] = []
+
+            # Registration Event
+            if student.created_at:
+                timeline.append(
+                    StudentTimelineItemDTO(
+                        timestamp=student.created_at,
+                        title="Student Profile Registered",
+                        description=f"Student record created for {student.display_name}.",
+                        event_type="REGISTRATION",
+                    )
+                )
+
+            # Admission Events
+            for adm in admissions:
+                course_text = f"Course: {adm.course_name} ({adm.course_code})" if adm.course_name else "Course Assignment Pending"
+                timeline.append(
+                    StudentTimelineItemDTO(
+                        timestamp=adm.admission_date or "N/A",
+                        title=f"Admission #{adm.admission_id} - {adm.status}",
+                        description=f"Enrolled in {course_text}. Status: {adm.status}.",
+                        event_type="ADMISSION",
+                    )
+                )
+
+            # Sort timeline newest first
+            timeline.sort(key=lambda t: t.timestamp, reverse=True)
+
+            return StudentWorkspaceDTO(
+                student=student,
+                admissions=admissions,
+                timeline=timeline,
+            )
 
     def list_students(self, limit: int = 50, offset: int = 0) -> tuple[list[StudentDTO], int]:
         """Fetches a paginated list of students along with total count."""

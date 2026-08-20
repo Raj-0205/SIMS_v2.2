@@ -87,7 +87,8 @@ class StudentDetailDialog(ft.AlertDialog):
     def close_dialog(self, e: Optional[ft.ControlEvent] = None) -> None:
         """Closes the dialog."""
         self.open = False
-        if self.page:
-            self.page.update()
-        else:
-            self.update()
+        try:
+            if self.page:
+                self.page.pop_dialog()
+        except RuntimeError:
+            pass

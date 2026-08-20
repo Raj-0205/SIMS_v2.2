@@ -9,6 +9,7 @@ from modules.student.dto import (
     StudentCreateDTO,
     StudentUpdateDTO,
     StudentSearchResultDTO,
+    StudentWorkspaceDTO,
 )
 
 __all__ = ["StudentController"]
@@ -23,7 +24,6 @@ class StudentController:
 
     def __init__(self) -> None:
         self.service = StudentService()
-        # Keep search_service alias for any legacy internal reference
         self.search_service = self.service
 
     def create_student(self, raw_data: Mapping[str, Any]) -> int:
@@ -31,7 +31,7 @@ class StudentController:
         dto = StudentCreateDTO(
             first_name=str(raw_data.get("first_name") or "").strip(),
             last_name=str(raw_data.get("last_name") or "").strip(),
-            mobile_number=str(raw_data.get("mobile_number") or "").strip(),
+            mobile_number=str(raw_data.get("mobile_number") or "").strip() or None,
             email=str(raw_data.get("email") or "").strip() or None,
         )
         return self.service.create_student(dto)
@@ -42,14 +42,22 @@ class StudentController:
             id=student_id,
             first_name=str(raw_data.get("first_name") or "").strip(),
             last_name=str(raw_data.get("last_name") or "").strip(),
-            mobile_number=str(raw_data.get("mobile_number") or "").strip(),
+            mobile_number=str(raw_data.get("mobile_number") or "").strip() or None,
             email=str(raw_data.get("email") or "").strip() or None,
         )
         self.service.update_student(dto)
 
+    def delete_student(self, student_id: int) -> None:
+        """Deletes student record via service."""
+        self.service.delete_student(student_id)
+
     def get_student(self, student_id: int) -> StudentDTO:
         """Fetches full student profile by ID."""
         return self.service.get_student(student_id)
+
+    def get_student_workspace(self, student_id: int) -> StudentWorkspaceDTO:
+        """Fetches aggregate data required by the Student Workspace."""
+        return self.service.get_student_workspace(student_id)
 
     def list_students(self, limit: int = 50, offset: int = 0) -> tuple[list[StudentDTO], int]:
         """Returns paginated list of students and total count."""

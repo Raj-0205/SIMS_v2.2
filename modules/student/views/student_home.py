@@ -5,11 +5,12 @@ import threading
 from typing import Optional
 import flet as ft
 
+from core.exceptions import ValidationError, ConflictError, ServiceError
 from core.logger.service import LogService
 from modules.student.controller import StudentController
 from modules.student.dto import StudentDTO
 from modules.student.views.student_form_modal import StudentFormModal
-from modules.student.views.student_detail_dialog import StudentDetailDialog
+from modules.student.views.student_workspace_dialog import StudentWorkspaceDialog
 from ui.themes.theme import AppTheme
 
 __all__ = ["StudentHome"]
@@ -17,9 +18,10 @@ __all__ = ["StudentHome"]
 
 class StudentHome(ft.Container):
     """
-    Main Student Management Screen.
-    Provides directory search, database-level pagination, real-time summary KPIs,
-    clean empty-states, error states, and modal workflows for Add/Edit/View.
+    Main Student Management Screen (Student Directory).
+    Follows Part 05 of the SIMS Blueprint:
+    Provides fast indexed search, database-level pagination, real-time KPI badge,
+    robust empty/error states, double-click workspace opening, and context actions.
     """
 
     PAGE_SIZE: int = 15
@@ -63,15 +65,20 @@ class StudentHome(ft.Container):
 
     def show_snackbar(self, message: str, is_error: bool = False) -> None:
         """Displays transient feedback snackbar to the user."""
-        if not self.page:
+        try:
+            page = self.page
+        except RuntimeError:
+            page = None
+
+        if not page:
             return
         bg_color = AppTheme.DANGER if is_error else AppTheme.SUCCESS
-        self.page.snack_bar = ft.SnackBar(
+        snackbar = ft.SnackBar(
             content=ft.Text(message, color=AppTheme.SURFACE),
             bgcolor=bg_color,
         )
-        self.page.snack_bar.open = True
-        self.page.update()
+        snackbar.open = True
+        page.show_dialog(snackbar)
 
     def _build_header(self) -> ft.Row:
         return ft.Row(
@@ -88,7 +95,7 @@ class StudentHome(ft.Container):
                                     color=AppTheme.TEXT_PRIMARY,
                                 ),
                                 ft.Text(
-                                    "Manage institute student records, registrations, and contact info",
+                                    "Manage institute student master records, registrations, and academic history",
                                     size=AppTheme.SIZE_CAPTION,
                                     color=AppTheme.TEXT_SECONDARY,
                                 ),
@@ -98,16 +105,27 @@ class StudentHome(ft.Container):
                     ],
                     spacing=AppTheme.PAD_SM,
                 ),
-                ft.ElevatedButton(
-                    content=ft.Text("Add Student"),
-                    icon=ft.Icons.PERSON_ADD,
-                    style=ft.ButtonStyle(
-                        bgcolor=AppTheme.PRIMARY,
-                        color=AppTheme.SURFACE,
-                        shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
-                        padding=ft.Padding(left=16, top=12, right=16, bottom=12),
-                    ),
-                    on_click=self.handle_add_student,
+                ft.Row(
+                    controls=[
+                        ft.IconButton(
+                            icon=ft.Icons.REFRESH,
+                            tooltip="Refresh Directory",
+                            icon_color=AppTheme.PRIMARY,
+                            on_click=lambda _: self.load_data(),
+                        ),
+                        ft.ElevatedButton(
+                            content=ft.Text("Register Student"),
+                            icon=ft.Icons.PERSON_ADD,
+                            style=ft.ButtonStyle(
+                                bgcolor=AppTheme.PRIMARY,
+                                color=AppTheme.SURFACE,
+                                shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+                                padding=ft.Padding(left=16, top=12, right=16, bottom=12),
+                            ),
+                            on_click=self.handle_add_student,
+                        ),
+                    ],
+                    spacing=AppTheme.PAD_SM,
                 ),
             ],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -127,7 +145,7 @@ class StudentHome(ft.Container):
             border_radius=AppTheme.RADIUS_MD,
             text_size=AppTheme.SIZE_BODY,
             content_padding=ft.Padding(left=12, top=8, right=12, bottom=8),
-            width=360,
+            width=380,
             on_change=self.handle_search_change,
             on_submit=self.handle_search_submit,
         )
@@ -209,7 +227,7 @@ class StudentHome(ft.Container):
         else:
             icon = ft.Icons.PEOPLE_OUTLINE
             title = "No students registered yet"
-            subtitle = "Click 'Add Student' above to register your first student record."
+            subtitle = "Click 'Register Student' above to add your first student record."
             action_btn = ft.ElevatedButton(
                 content=ft.Text("Register Student"),
                 icon=ft.Icons.PERSON_ADD,
@@ -274,10 +292,15 @@ class StudentHome(ft.Container):
     def _build_data_table(self) -> ft.Container:
         rows = []
         for student in self.students:
+            status_text = student.status_label
+            is_active = status_text in ("ACTIVE", "CONFIRMED", "ENROLLED")
+            status_bg = AppTheme.SUCCESS_LIGHT if is_active else AppTheme.PRIMARY_LIGHT
+            status_fg = AppTheme.SUCCESS if is_active else AppTheme.PRIMARY
+
             rows.append(
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(ft.Text(str(student.id), weight=ft.FontWeight.W_500, size=AppTheme.SIZE_BODY)),
+                        ft.DataCell(ft.Text(f"#{student.id}", weight=ft.FontWeight.W_500, size=AppTheme.SIZE_BODY)),
                         ft.DataCell(
                             ft.Row(
                                 controls=[
@@ -285,49 +308,80 @@ class StudentHome(ft.Container):
                                     ft.Text(student.display_name, weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY),
                                 ],
                                 spacing=6,
+                            ),
+                            on_double_tap=lambda e, s=student: self.handle_open_workspace(s.id),
+                        ),
+                        ft.DataCell(ft.Text(student.mobile_number or "—", size=AppTheme.SIZE_BODY)),
+                        ft.DataCell(
+                            ft.Text(
+                                student.current_course or "Not Enrolled",
+                                color=AppTheme.TEXT_PRIMARY if student.current_course else AppTheme.TEXT_MUTED,
+                                size=AppTheme.SIZE_BODY,
+                                weight=ft.FontWeight.W_500 if student.current_course else ft.FontWeight.NORMAL,
                             )
                         ),
-                        ft.DataCell(ft.Text(student.mobile_number, size=AppTheme.SIZE_BODY)),
-                        ft.DataCell(ft.Text(student.email or "—", color=AppTheme.TEXT_SECONDARY if not student.email else AppTheme.TEXT_PRIMARY, size=AppTheme.SIZE_BODY)),
-                        ft.DataCell(ft.Text(student.created_at[:10] if len(student.created_at) >= 10 else student.created_at, size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY)),
+                        ft.DataCell(
+                            ft.Text(
+                                student.created_at[:10] if len(student.created_at) >= 10 else student.created_at or "—",
+                                size=AppTheme.SIZE_CAPTION,
+                                color=AppTheme.TEXT_SECONDARY,
+                            )
+                        ),
+                        ft.DataCell(
+                            ft.Container(
+                                content=ft.Text(status_text, size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=status_fg),
+                                bgcolor=status_bg,
+                                padding=ft.Padding(left=8, top=2, right=8, bottom=2),
+                                border_radius=AppTheme.RADIUS_SM,
+                            )
+                        ),
                         ft.DataCell(
                             ft.Row(
                                 controls=[
                                     ft.IconButton(
-                                        icon=ft.Icons.VISIBILITY_OUTLINED,
+                                        icon=ft.Icons.OPEN_IN_NEW,
                                         icon_color=AppTheme.PRIMARY,
                                         icon_size=18,
-                                        tooltip="View Details",
-                                        on_click=lambda e, s=student: self.handle_view_student(s),
+                                        tooltip="Open Workspace (Double-click)",
+                                        on_click=lambda e, s=student: self.handle_open_workspace(s.id),
                                     ),
                                     ft.IconButton(
                                         icon=ft.Icons.EDIT_OUTLINED,
                                         icon_color=AppTheme.TEXT_SECONDARY,
                                         icon_size=18,
-                                        tooltip="Edit Student",
+                                        tooltip="Edit Profile",
                                         on_click=lambda e, s=student: self.handle_edit_student(s),
+                                    ),
+                                    ft.IconButton(
+                                        icon=ft.Icons.DELETE_OUTLINE,
+                                        icon_color=AppTheme.DANGER,
+                                        icon_size=18,
+                                        tooltip="Delete Student",
+                                        on_click=lambda e, s=student: self.handle_delete_student(s),
                                     ),
                                 ],
                                 spacing=2,
                             )
                         ),
-                    ]
+                    ],
+                    on_select_change=lambda e, s=student: self.handle_open_workspace(s.id),
                 )
             )
 
         table = ft.DataTable(
             columns=[
                 ft.DataColumn(ft.Text("ID", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Name", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Student Name", weight=ft.FontWeight.BOLD)),
                 ft.DataColumn(ft.Text("Mobile Number", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Email", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Created", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Current Course", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Registration Date", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Status", weight=ft.FontWeight.BOLD)),
                 ft.DataColumn(ft.Text("Actions", weight=ft.FontWeight.BOLD)),
             ],
             rows=rows,
             heading_row_color=AppTheme.SURFACE_VARIANT,
-            data_row_min_height=44,
-            data_row_max_height=52,
+            data_row_min_height=48,
+            data_row_max_height=56,
             column_spacing=24,
             horizontal_margin=16,
         )
@@ -376,13 +430,22 @@ class StudentHome(ft.Container):
             self.prev_btn.disabled = self.current_page == 0
             self.next_btn.disabled = end_num >= self.total_count
 
-            if self.page:
+            try:
+                page = self.page
+            except RuntimeError:
+                page = None
+
+            if page:
                 self.update()
 
         except Exception as ex:
             LogService.error(f"Error loading student directory: {ex}", context=self.__class__.__name__)
             self.table_container.content = self._build_error_state("An internal error occurred while fetching records.")
-            if self.page:
+            try:
+                page = self.page
+            except RuntimeError:
+                page = None
+            if page:
                 self.update()
 
     def handle_search_change(self, e: ft.ControlEvent) -> None:
@@ -436,6 +499,7 @@ class StudentHome(ft.Container):
             controller=self.controller,
             on_saved=lambda: self._on_student_saved("Student registered successfully!"),
         )
+        modal.open = True
         self._open_dialog(modal)
 
     def handle_edit_student(self, student: StudentDTO) -> None:
@@ -445,16 +509,94 @@ class StudentHome(ft.Container):
             on_saved=lambda: self._on_student_saved("Student profile updated successfully!"),
             student=student,
         )
+        modal.open = True
         self._open_dialog(modal)
 
-    def handle_view_student(self, student: StudentDTO) -> None:
-        """Opens the Student Details dialog."""
-        dialog = StudentDetailDialog(student=student)
+    def handle_open_workspace(self, student_id: int) -> None:
+        """Opens the full Student Workspace (Blueprint Part 05)."""
+        workspace = StudentWorkspaceDialog(
+            controller=self.controller,
+            student_id=student_id,
+            on_refresh_required=self.load_data,
+        )
+        workspace.open = True
+        self._open_dialog(workspace)
+
+    def handle_delete_student(self, student: StudentDTO) -> None:
+        """Opens Delete Confirmation Dialog with ERP foreign key & audit rules."""
+        def confirm_delete(e):
+            try:
+                self.controller.delete_student(student.id)
+                self.show_snackbar(f"Student '{student.display_name}' deleted successfully.")
+                self.load_data()
+            except (ValidationError, ConflictError, ServiceError) as ex:
+                self.show_snackbar(str(ex), is_error=True)
+            except Exception as ex:
+                LogService.error(f"Error during student deletion: {ex}", context="StudentDelete")
+                self.show_snackbar("An unexpected error occurred during deletion.", is_error=True)
+            finally:
+                dialog.open = False
+                try:
+                    if self.page:
+                        self.page.pop_dialog()
+                except RuntimeError:
+                    pass
+
+        def cancel_delete(e):
+            dialog.open = False
+            try:
+                if self.page:
+                    self.page.pop_dialog()
+            except RuntimeError:
+                pass
+
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.WARNING_AMBER, color=AppTheme.DANGER, size=24),
+                    ft.Text("Confirm Student Deletion", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
+                ],
+                spacing=AppTheme.PAD_SM,
+            ),
+            content=ft.Container(
+                width=420,
+                content=ft.Column(
+                    controls=[
+                        ft.Text(
+                            f"Are you sure you want to delete student '{student.display_name}' (ID: #{student.id})?",
+                            size=AppTheme.SIZE_BODY,
+                            color=AppTheme.TEXT_PRIMARY,
+                        ),
+                        ft.Text(
+                            "ERP Policy: Student profiles with linked admission history cannot be deleted.",
+                            size=AppTheme.SIZE_CAPTION,
+                            color=AppTheme.TEXT_SECONDARY,
+                        ),
+                    ],
+                    spacing=AppTheme.PAD_SM,
+                    tight=True,
+                ),
+            ),
+            actions=[
+                ft.TextButton(content=ft.Text("Cancel"), on_click=cancel_delete),
+                ft.ElevatedButton(
+                    content=ft.Text("Delete Record"),
+                    style=ft.ButtonStyle(bgcolor=AppTheme.DANGER, color=AppTheme.SURFACE),
+                    on_click=confirm_delete,
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        dialog.open = True
         self._open_dialog(dialog)
 
     def _open_dialog(self, dialog: ft.AlertDialog) -> None:
-        if not self.page:
+        try:
+            page = self.page
+        except RuntimeError:
+            page = None
+        if not page:
             return
-        self.page.dialog = dialog
         dialog.open = True
-        self.page.update()
+        page.show_dialog(dialog)
