@@ -384,6 +384,7 @@ class StudentWorkspaceDialog(ft.AlertDialog):
 
     # --- TAB 3: PAYMENTS ---
     def _build_payments_tab(self) -> ft.Container:
+        student = self.workspace_data.student
         return ft.Container(
             content=ft.Column(
                 controls=[
@@ -393,7 +394,7 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                                 content=ft.Column(
                                     controls=[
                                         ft.Text("Total Course Fee", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
-                                        ft.Text("₹0.00", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                                        ft.Text(student.fee_display, size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
                                     ],
                                     spacing=2,
                                 ),
@@ -406,7 +407,7 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                                 content=ft.Column(
                                     controls=[
                                         ft.Text("Total Paid", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
-                                        ft.Text("₹0.00", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD, color=AppTheme.SUCCESS),
+                                        ft.Text(student.paid_display, size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.SUCCESS),
                                     ],
                                     spacing=2,
                                 ),
@@ -419,7 +420,7 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                                 content=ft.Column(
                                     controls=[
                                         ft.Text("Pending Dues", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
-                                        ft.Text("₹0.00", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_SECONDARY),
+                                        ft.Text(student.pending_display, size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_SECONDARY),
                                     ],
                                     spacing=2,
                                 ),

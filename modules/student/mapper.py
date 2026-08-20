@@ -17,20 +17,28 @@ class StudentMapper:
     @staticmethod
     def to_dto(row: Mapping[str, Any]) -> StudentDTO:
         """Maps a database row dictionary to StudentDTO."""
+        raw_fee = row.get("latest_course_base_fee")
+        base_fee_val = float(raw_fee) if raw_fee is not None else None
+
         return StudentDTO(
             id=int(row["id"]),
             first_name=str(row.get("first_name") or ""),
             last_name=str(row.get("last_name") or ""),
             mobile_number=str(row.get("mobile_number") or "") if row.get("mobile_number") else None,
             email=str(row["email"]) if row.get("email") else None,
+            address=str(row["address"]) if row.get("address") else None,
             created_at=str(row.get("created_at") or ""),
             admissions_count=int(row.get("admissions_count") or 0),
+            course_id=int(row["latest_course_id"]) if row.get("latest_course_id") else None,
             current_course=str(row["latest_course_name"]) if row.get("latest_course_name") else None,
             latest_admission_id=int(row["latest_admission_id"]) if row.get("latest_admission_id") else None,
             latest_admission_year=int(row["latest_admission_year"]) if row.get("latest_admission_year") else None,
             latest_admission_seq=int(row["latest_admission_seq"]) if row.get("latest_admission_seq") else None,
             admission_status=str(row["latest_admission_status"]) if row.get("latest_admission_status") else None,
             latest_admission_date=str(row["latest_admission_date"]) if row.get("latest_admission_date") else None,
+            total_fee=base_fee_val,
+            paid_amount=None,      # Pending Finance Engine
+            pending_amount=None,   # Pending Finance Engine
         )
 
     @staticmethod

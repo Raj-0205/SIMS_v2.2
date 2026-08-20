@@ -1,16 +1,21 @@
 # modules/student/service.py
 
 from __future__ import annotations
+from datetime import datetime
+from pathlib import Path
 import re
 from typing import Optional
 
 from core.logger.service import LogService
 from core.service.base import BaseService
 from core.exceptions import ValidationError, ConflictError, ServiceError
+from infrastructure.excel import ExcelExporter
+from infrastructure.pdf import PDFExporter
 from modules.student.repository import StudentRepository
 from modules.student.mapper import StudentMapper, StudentSearchMapper
 from modules.student.dto import (
     StudentDTO,
+    StudentFilterDTO,
     StudentCreateDTO,
     StudentUpdateDTO,
     StudentSearchResultDTO,
@@ -264,15 +269,46 @@ class StudentService(BaseService):
                 timeline=timeline,
             )
 
-    def list_students(self, limit: int = 50, offset: int = 0) -> tuple[list[StudentDTO], int]:
-        """Fetches a paginated list of students along with total count."""
-        safe_limit = max(1, min(limit, 100))
-        safe_offset = max(0, offset)
+    def filter_students(self, filter_dto: StudentFilterDTO) -> tuple[list[StudentDTO], int]:
+        """
+        Retrieves a paginated list of students based on multi-criteria search, course, status, year, and month filters
+        along with the total matching count. Uses database-level filtering, sorting, and pagination.
+        Supports multi-sort via sort_keys; falls back to sort_by/sort_dir when sort_keys is empty.
+        """
+        clean_query = self._sanitize_string(filter_dto.query)
+        safe_limit = max(1, min(filter_dto.limit, 200))
+        safe_offset = max(0, filter_dto.offset)
+
+        # Resolve sort_keys: DTO tuple → list for repository
+        resolved_sort_keys: list[tuple[str, str]] | None = None
+        if filter_dto.sort_keys:
+            resolved_sort_keys = list(filter_dto.sort_keys)
 
         with self.unit_of_work():
-            rows = self.repository.get_all_paged(safe_limit, safe_offset)
-            total = self.repository.count_all()
+            rows = self.repository.filter_paged(
+                query=clean_query if clean_query else None,
+                course_id=filter_dto.course_id,
+                status=filter_dto.status,
+                year=filter_dto.year,
+                month=filter_dto.month,
+                sort_by=filter_dto.sort_by,
+                sort_dir=filter_dto.sort_dir,
+                sort_keys=resolved_sort_keys,
+                limit=safe_limit,
+                offset=safe_offset,
+            )
+            total = self.repository.count_filtered(
+                query=clean_query if clean_query else None,
+                course_id=filter_dto.course_id,
+                status=filter_dto.status,
+                year=filter_dto.year,
+                month=filter_dto.month,
+            )
             return [StudentMapper.to_dto(r) for r in rows], total
+
+    def list_students(self, limit: int = 50, offset: int = 0) -> tuple[list[StudentDTO], int]:
+        """Fetches a paginated list of students along with total count."""
+        return self.filter_students(StudentFilterDTO(limit=limit, offset=offset))
 
     def search_students_paged(
         self, query: str, limit: int = 50, offset: int = 0
@@ -280,24 +316,148 @@ class StudentService(BaseService):
         """
         Searches students across fields with pagination and total count.
         """
-        clean_query = self._sanitize_string(query)
-        safe_limit = max(1, min(limit, 100))
-        safe_offset = max(0, offset)
-
-        with self.unit_of_work():
-            if not clean_query:
-                rows = self.repository.get_all_paged(safe_limit, safe_offset)
-                total = self.repository.count_all()
-            else:
-                rows = self.repository.search_paged(clean_query, safe_limit, safe_offset)
-                total = self.repository.count_search(clean_query)
-
-            return [StudentMapper.to_dto(r) for r in rows], total
+        return self.filter_students(StudentFilterDTO(query=query, limit=limit, offset=offset))
 
     def count_students(self) -> int:
         """Returns total active student count."""
         with self.unit_of_work():
             return self.repository.count_all()
+
+    def export_students_data(self, filter_dto: StudentFilterDTO) -> list[StudentDTO]:
+        """
+        Fetches the complete dataset matching the filter criteria without pagination for exports.
+        """
+        clean_query = self._sanitize_string(filter_dto.query)
+
+        resolved_sort_keys: list[tuple[str, str]] | None = None
+        if filter_dto.sort_keys:
+            resolved_sort_keys = list(filter_dto.sort_keys)
+
+        with self.unit_of_work():
+            rows = self.repository.get_all_filtered(
+                query=clean_query if clean_query else None,
+                course_id=filter_dto.course_id,
+                status=filter_dto.status,
+                year=filter_dto.year,
+                month=filter_dto.month,
+                sort_by=filter_dto.sort_by,
+                sort_dir=filter_dto.sort_dir,
+                sort_keys=resolved_sort_keys,
+            )
+            return [StudentMapper.to_dto(r) for r in rows]
+
+    def export_students_csv(
+        self, filter_dto: StudentFilterDTO, target_path: Optional[str | Path] = None
+    ) -> Path:
+        """
+        Exports filtered student dataset to an Excel-compatible CSV file.
+        """
+        students = self.export_students_data(filter_dto)
+        default_dir = Path("exports/students")
+        default_name = f"student_directory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        path = Path(target_path) if target_path else default_dir / default_name
+
+        headers = [
+            "ID",
+            "Admission No",
+            "Student Name",
+            "Mobile Number",
+            "Email",
+            "Current Course",
+            "Admission Date",
+            "Status",
+            "Base Fee",
+            "Paid Amount",
+            "Pending Amount",
+        ]
+
+        rows = [
+            [
+                s.id,
+                s.candidate_number or "—",
+                s.display_name,
+                s.mobile_number or "—",
+                s.email or "—",
+                s.current_course or "—",
+                s.latest_admission_date[:10] if s.latest_admission_date else (s.created_at[:10] if s.created_at else "—"),
+                s.status_label,
+                s.fee_display,
+                s.paid_display,
+                s.pending_display,
+            ]
+            for s in students
+        ]
+
+        metadata = {
+            "Module": "SIMS v2.2 Student Management System",
+            "Export Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Total Records": len(students),
+            "Search Query": filter_dto.query or "None",
+            "Status Filter": filter_dto.status or "All",
+        }
+
+        return ExcelExporter.export_to_csv(
+            headers=headers,
+            rows=rows,
+            output_path=path,
+            metadata=metadata,
+        )
+
+    def export_students_pdf(
+        self, filter_dto: StudentFilterDTO, target_path: Optional[str | Path] = None
+    ) -> Path:
+        """
+        Exports filtered student dataset into a professional multi-page PDF report.
+        """
+        students = self.export_students_data(filter_dto)
+        default_dir = Path("exports/students")
+        default_name = f"student_directory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        path = Path(target_path) if target_path else default_dir / default_name
+
+        headers = [
+            "ID",
+            "Adm No",
+            "Student Name",
+            "Mobile",
+            "Course",
+            "Date",
+            "Status",
+            "Base Fee",
+            "Paid",
+            "Pending",
+        ]
+        column_widths = [0.8, 1.4, 2.2, 1.4, 2.0, 1.2, 1.2, 1.1, 1.3, 1.3]
+
+        rows = [
+            [
+                s.id,
+                s.candidate_number or "—",
+                s.display_name,
+                s.mobile_number or "—",
+                s.current_course or "—",
+                s.latest_admission_date[:10] if s.latest_admission_date else (s.created_at[:10] if s.created_at else "—"),
+                s.status_label,
+                s.fee_display,
+                s.paid_display,
+                s.pending_display,
+            ]
+            for s in students
+        ]
+
+        metadata = {
+            "Filter Status": filter_dto.status or "All",
+            "Sorted By": f"{filter_dto.sort_by} ({filter_dto.sort_dir.upper()})",
+        }
+
+        return PDFExporter.export_table_pdf(
+            title="SIMS v2.2 — Student Directory Report",
+            headers=headers,
+            column_widths=column_widths,
+            rows=rows,
+            output_path=path,
+            subtitle=f"Exported on {datetime.now().strftime('%d-%b-%Y %H:%M:%S')}  |  Total Filtered Records: {len(students)}",
+            metadata=metadata,
+        )
 
     def search_students(self, query: str, limit: int = 25) -> list[StudentSearchResultDTO]:
         """

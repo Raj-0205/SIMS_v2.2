@@ -43,6 +43,15 @@ class StudentRepository(BaseRepository):
             s.created_at,
             (SELECT COUNT(*) FROM admissions a WHERE a.student_id = s.id) AS admissions_count,
             (
+                SELECT c.id
+                FROM admissions a
+                JOIN admission_courses ac ON ac.admission_id = a.id
+                JOIN courses c ON c.id = ac.course_id
+                WHERE a.student_id = s.id
+                ORDER BY a.id DESC
+                LIMIT 1
+            ) AS latest_course_id,
+            (
                 SELECT c.name
                 FROM admissions a
                 JOIN admission_courses ac ON ac.admission_id = a.id
@@ -51,6 +60,15 @@ class StudentRepository(BaseRepository):
                 ORDER BY a.id DESC
                 LIMIT 1
             ) AS latest_course_name,
+            (
+                SELECT c.base_fee
+                FROM admissions a
+                JOIN admission_courses ac ON ac.admission_id = a.id
+                JOIN courses c ON c.id = ac.course_id
+                WHERE a.student_id = s.id
+                ORDER BY a.id DESC
+                LIMIT 1
+            ) AS latest_course_base_fee,
             (
                 SELECT a.id
                 FROM admissions a
@@ -95,6 +113,7 @@ class StudentRepository(BaseRepository):
         Builds robust tokenized search conditions across multiple fields:
         - First Name, Last Name, Full Name (first_name || ' ' || last_name)
         - Student ID
+        - Admission ID / Candidate Number (YYYY-NNN format or raw sequence)
         - Mobile Number (including normalized digits & international formats)
         - Email Address
         """
@@ -103,10 +122,30 @@ class StudentRepository(BaseRepository):
             return "", []
 
         prefix = f"{table_alias}." if table_alias else ""
+        student_id_ref = f"{prefix}id" if prefix else "id"
 
-        # Check if entire query is primarily a phone candidate (digits and phone formatting chars)
+        # Check for Candidate Number format: YYYY-NNN (e.g. 2026-001 or 2026-1)
+        cand_match = re.match(r"^(\d{4})-(\d{1,4})$", clean)
+        if cand_match:
+            year = int(cand_match.group(1))
+            seq = int(cand_match.group(2))
+            cand_pattern = f"%{clean}%"
+            where = f"""(
+                EXISTS (
+                    SELECT 1 FROM admissions a_cand
+                    WHERE a_cand.student_id = {student_id_ref}
+                      AND (
+                          (a_cand.candidate_year = ? AND a_cand.candidate_sequence = ?)
+                          OR PRINTF('%04d-%03d', a_cand.candidate_year, a_cand.candidate_sequence) LIKE ?
+                      )
+                )
+                OR CAST({prefix}id AS TEXT) LIKE ?
+            )"""
+            return where, [year, seq, cand_pattern, cand_pattern]
+
+        # Check if entire query is primarily a phone candidate (only digits, spaces, plus, minus, parens, and length >= 8)
         clean_no_phone_chars = re.sub(r"[\s\+\-\(\)]", "", clean)
-        if clean_no_phone_chars.isdigit() and len(clean_no_phone_chars) >= 4:
+        if clean_no_phone_chars.isdigit() and len(clean_no_phone_chars) >= 8 and "-" not in clean:
             phone_digits = clean_no_phone_chars
             # Normalize Indian country code (+91 / 91)
             if phone_digits.startswith("91") and len(phone_digits) == 12:
@@ -135,9 +174,21 @@ class StudentRepository(BaseRepository):
                 {prefix}last_name LIKE ? OR
                 ({prefix}first_name || ' ' || {prefix}last_name) LIKE ? OR
                 {prefix}mobile_number LIKE ? OR
-                {prefix}email LIKE ?
+                {prefix}email LIKE ? OR
+                EXISTS (
+                    SELECT 1 FROM admissions a_tok
+                    WHERE a_tok.student_id = {student_id_ref}
+                      AND (
+                          PRINTF('%04d-%03d', a_tok.candidate_year, a_tok.candidate_sequence) LIKE ?
+                          OR CAST(a_tok.candidate_year AS TEXT) LIKE ?
+                          OR CAST(a_tok.id AS TEXT) LIKE ?
+                      )
+                )
             """
             token_params = [
+                token_pattern,
+                token_pattern,
+                token_pattern,
                 token_pattern,
                 token_pattern,
                 token_pattern,
@@ -198,14 +249,223 @@ class StudentRepository(BaseRepository):
         """
         return self.execute_fetchone(sql, (email,))
 
-    def get_all_paged(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
-        """Fetches paginated student records ordered by newest first with latest admission summary."""
+    @classmethod
+    def _build_filter_conditions(
+        cls,
+        query: Optional[str] = None,
+        course_id: Optional[int] = None,
+        status: Optional[str] = None,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        table_alias: str = "s",
+    ) -> tuple[str, list[Any]]:
+        """
+        Builds dynamic parameterized WHERE clauses combining search, course, status, year, and month filters.
+        """
+        clauses: list[str] = []
+        params: list[Any] = []
+
+        # 1. Search Query
+        if query and query.strip():
+            search_clause, search_params = cls._build_search_conditions(query.strip(), table_alias=table_alias)
+            if search_clause:
+                clauses.append(f"({search_clause})")
+                params.extend(search_params)
+
+        # 2. Course Filter
+        if course_id is not None and int(course_id) > 0:
+            clauses.append(f"""EXISTS (
+                SELECT 1 FROM admissions a_cf
+                JOIN admission_courses ac_cf ON ac_cf.admission_id = a_cf.id
+                WHERE a_cf.student_id = {table_alias}.id AND ac_cf.course_id = ?
+            )""")
+            params.append(int(course_id))
+
+        # 3. Status Filter (DRAFT, REGISTERED, CONFIRMED, CANCELLED, COMPLETED)
+        if status and status.strip() and status.strip().upper() != "ALL":
+            clean_status = status.strip().upper()
+            clauses.append(f"""EXISTS (
+                SELECT 1 FROM admissions a_sf
+                WHERE a_sf.student_id = {table_alias}.id AND a_sf.status = ?
+            )""")
+            params.append(clean_status)
+
+        # 4. Year Filter
+        if year is not None and int(year) > 0:
+            year_int = int(year)
+            clauses.append(f"""EXISTS (
+                SELECT 1 FROM admissions a_yf
+                WHERE a_yf.student_id = {table_alias}.id 
+                  AND (a_yf.candidate_year = ? OR CAST(strftime('%Y', a_yf.created_at) AS INTEGER) = ?)
+            )""")
+            params.extend([year_int, year_int])
+
+        # 5. Month Filter (1-12)
+        if month is not None and 1 <= int(month) <= 12:
+            month_int = int(month)
+            clauses.append(f"""EXISTS (
+                SELECT 1 FROM admissions a_mf
+                WHERE a_mf.student_id = {table_alias}.id 
+                  AND CAST(strftime('%m', a_mf.created_at) AS INTEGER) = ?
+            )""")
+            params.append(month_int)
+
+        where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        return where_clause, params
+
+    # Whitelist of allowed sort fields → SQL expression fragments.
+    # Direction placeholder is added at call time.
+    _SORT_FIELD_MAP: dict[str, str | list[str]] = {
+        "id": "s.id",
+        "name": ["s.first_name", "s.last_name"],
+        "student_name": ["s.first_name", "s.last_name"],
+        "admission_id": ["latest_admission_year", "latest_admission_seq", "latest_admission_id"],
+        "candidate_number": ["latest_admission_year", "latest_admission_seq", "latest_admission_id"],
+        "mobile": "s.mobile_number",
+        "mobile_number": "s.mobile_number",
+        "course": "latest_course_name",
+        "date": ["latest_admission_date", "s.created_at"],
+        "admission_date": ["latest_admission_date", "s.created_at"],
+        "registration_date": "s.created_at",
+        "status": "latest_admission_status",
+        "fee": "latest_course_base_fee",
+        "year": "latest_admission_year",
+        "month": "CAST(strftime('%m', COALESCE(latest_admission_date, s.created_at)) AS INTEGER)",
+    }
+
+    @classmethod
+    def _build_order_by(cls, sort_by: str = "id", sort_dir: str = "desc") -> str:
+        """Constructs database-level ORDER BY clause from a single sort field."""
+        return cls._build_multi_order_by([(sort_by, sort_dir)])
+
+    @classmethod
+    def _build_multi_order_by(cls, sort_keys: list[tuple[str, str]] | None = None) -> str:
+        """
+        Constructs database-level ORDER BY from one or more (field, direction) pairs.
+        Falls back to 's.id DESC' when sort_keys is empty or invalid.
+        Every field is validated against the _SORT_FIELD_MAP whitelist.
+        """
+        if not sort_keys:
+            return "ORDER BY s.id DESC"
+
+        clauses: list[str] = []
+        for field, direction in sort_keys:
+            clean_field = str(field).lower().strip()
+            dir_str = "ASC" if str(direction).lower() == "asc" else "DESC"
+
+            mapping = cls._SORT_FIELD_MAP.get(clean_field)
+            if mapping is None:
+                continue  # Skip unknown fields silently
+
+            if isinstance(mapping, list):
+                for expr in mapping:
+                    clauses.append(f"{expr} {dir_str}")
+            else:
+                clauses.append(f"{mapping} {dir_str}")
+
+        if not clauses:
+            return "ORDER BY s.id DESC"
+
+        return f"ORDER BY {', '.join(clauses)}"
+
+    def filter_paged(
+        self,
+        query: Optional[str] = None,
+        course_id: Optional[int] = None,
+        status: Optional[str] = None,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        sort_by: str = "id",
+        sort_dir: str = "desc",
+        sort_keys: list[tuple[str, str]] | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """
+        Executes an indexed, multi-criteria filtered search with database-level sorting and pagination.
+        sort_keys takes precedence over sort_by/sort_dir when provided.
+        """
+        where_clause, params = self._build_filter_conditions(
+            query=query,
+            course_id=course_id,
+            status=status,
+            year=year,
+            month=month,
+            table_alias="s",
+        )
+        if sort_keys:
+            order_by = self._build_multi_order_by(sort_keys)
+        else:
+            order_by = self._build_order_by(sort_by=sort_by, sort_dir=sort_dir)
+
         sql = f"""
             {self._STUDENT_SELECT_BASE}
-            ORDER BY s.id DESC
+            {where_clause}
+            {order_by}
             LIMIT ? OFFSET ?;
         """
-        return self.execute_fetchall(sql, (limit, offset))
+        params.extend([limit, offset])
+        return self.execute_fetchall(sql, tuple(params))
+
+    def count_filtered(
+        self,
+        query: Optional[str] = None,
+        course_id: Optional[int] = None,
+        status: Optional[str] = None,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+    ) -> int:
+        """Returns total matching records for the active filter set."""
+        where_clause, params = self._build_filter_conditions(
+            query=query,
+            course_id=course_id,
+            status=status,
+            year=year,
+            month=month,
+            table_alias="s",
+        )
+        sql = f"SELECT COUNT(*) as count FROM students s {where_clause};"
+        row = self.execute_fetchone(sql, tuple(params))
+        return int(row["count"]) if row else 0
+
+    def get_all_filtered(
+        self,
+        query: Optional[str] = None,
+        course_id: Optional[int] = None,
+        status: Optional[str] = None,
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        sort_by: str = "id",
+        sort_dir: str = "desc",
+        sort_keys: list[tuple[str, str]] | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Returns all matching filtered records without limit for full dataset exports (Excel/PDF).
+        sort_keys takes precedence over sort_by/sort_dir when provided.
+        """
+        where_clause, params = self._build_filter_conditions(
+            query=query,
+            course_id=course_id,
+            status=status,
+            year=year,
+            month=month,
+            table_alias="s",
+        )
+        if sort_keys:
+            order_by = self._build_multi_order_by(sort_keys)
+        else:
+            order_by = self._build_order_by(sort_by=sort_by, sort_dir=sort_dir)
+
+        sql = f"""
+            {self._STUDENT_SELECT_BASE}
+            {where_clause}
+            {order_by};
+        """
+        return self.execute_fetchall(sql, tuple(params))
+
+    def get_all_paged(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
+        """Fetches paginated student records ordered by newest first with latest admission summary."""
+        return self.filter_paged(limit=limit, offset=offset)
 
     def count_all(self) -> int:
         """Returns the total number of students."""
@@ -217,18 +477,7 @@ class StudentRepository(BaseRepository):
         """
         Universal tokenized search across ID, first name, last name, full name, mobile, and email with pagination.
         """
-        where_clause, params = self._build_search_conditions(query, table_alias="s")
-        if not where_clause:
-            return self.get_all_paged(limit, offset)
-
-        sql = f"""
-            {self._STUDENT_SELECT_BASE}
-            WHERE {where_clause}
-            ORDER BY s.id DESC
-            LIMIT ? OFFSET ?;
-        """
-        params.extend([limit, offset])
-        return self.execute_fetchall(sql, tuple(params))
+        return self.filter_paged(query=query, limit=limit, offset=offset)
 
     def count_search(self, query: str) -> int:
         """Counts total matching records for a given universal search query."""
