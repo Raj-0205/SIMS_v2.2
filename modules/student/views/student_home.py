@@ -19,7 +19,7 @@ class StudentHome(ft.Container):
     """
     Main Student Management Screen.
     Provides directory search, database-level pagination, real-time summary KPIs,
-    clean empty-states, and modal workflows for Add/Edit/View.
+    clean empty-states, error states, and modal workflows for Add/Edit/View.
     """
 
     PAGE_SIZE: int = 15
@@ -60,6 +60,18 @@ class StudentHome(ft.Container):
     def did_mount(self) -> None:
         """Called when the control is mounted to the page tree."""
         self.load_data()
+
+    def show_snackbar(self, message: str, is_error: bool = False) -> None:
+        """Displays transient feedback snackbar to the user."""
+        if not self.page:
+            return
+        bg_color = AppTheme.DANGER if is_error else AppTheme.SUCCESS
+        self.page.snack_bar = ft.SnackBar(
+            content=ft.Text(message, color=AppTheme.SURFACE),
+            bgcolor=bg_color,
+        )
+        self.page.snack_bar.open = True
+        self.page.update()
 
     def _build_header(self) -> ft.Row:
         return ft.Row(
@@ -180,13 +192,34 @@ class StudentHome(ft.Container):
         )
 
     def _build_empty_state(self, is_search: bool = False) -> ft.Container:
-        icon = ft.Icons.SEARCH_OFF if is_search else ft.Icons.PEOPLE_OUTLINE
-        title = "No matching students found" if is_search else "No students registered yet"
-        subtitle = (
-            "Try searching with a different name, mobile number, or ID."
-            if is_search
-            else "Click 'Add Student' above to create your first student record."
-        )
+        if is_search:
+            icon = ft.Icons.SEARCH_OFF
+            title = "No matching students found"
+            subtitle = f"No student records matched '{self.current_query}'."
+            action_btn = ft.ElevatedButton(
+                content=ft.Text("Clear Search"),
+                icon=ft.Icons.CLEAR,
+                style=ft.ButtonStyle(
+                    bgcolor=AppTheme.SURFACE_VARIANT,
+                    color=AppTheme.TEXT_PRIMARY,
+                    shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+                ),
+                on_click=self.handle_clear_search,
+            )
+        else:
+            icon = ft.Icons.PEOPLE_OUTLINE
+            title = "No students registered yet"
+            subtitle = "Click 'Add Student' above to register your first student record."
+            action_btn = ft.ElevatedButton(
+                content=ft.Text("Register Student"),
+                icon=ft.Icons.PERSON_ADD,
+                style=ft.ButtonStyle(
+                    bgcolor=AppTheme.PRIMARY,
+                    color=AppTheme.SURFACE,
+                    shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+                ),
+                on_click=self.handle_add_student,
+            )
 
         return ft.Container(
             content=ft.Column(
@@ -194,9 +227,40 @@ class StudentHome(ft.Container):
                     ft.Icon(icon, size=64, color=AppTheme.TEXT_MUTED),
                     ft.Text(title, size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
                     ft.Text(subtitle, size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_SECONDARY, text_align=ft.TextAlign.CENTER),
+                    action_btn,
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                spacing=AppTheme.PAD_SM,
+                spacing=AppTheme.PAD_MD,
+                alignment=ft.MainAxisAlignment.CENTER,
+            ),
+            alignment=ft.Alignment.CENTER,
+            expand=True,
+            bgcolor=AppTheme.SURFACE,
+            border_radius=AppTheme.RADIUS_MD,
+            border=ft.Border.all(1, AppTheme.BORDER),
+            padding=AppTheme.PAD_XL,
+        )
+
+    def _build_error_state(self, error_message: str) -> ft.Container:
+        return ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Icon(ft.Icons.ERROR_OUTLINE, size=64, color=AppTheme.DANGER),
+                    ft.Text("Unable to load student directory", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
+                    ft.Text(error_message, size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_SECONDARY, text_align=ft.TextAlign.CENTER),
+                    ft.ElevatedButton(
+                        content=ft.Text("Retry"),
+                        icon=ft.Icons.REFRESH,
+                        style=ft.ButtonStyle(
+                            bgcolor=AppTheme.PRIMARY,
+                            color=AppTheme.SURFACE,
+                            shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+                        ),
+                        on_click=lambda _: self.load_data(),
+                    ),
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=AppTheme.PAD_MD,
                 alignment=ft.MainAxisAlignment.CENTER,
             ),
             alignment=ft.Alignment.CENTER,
@@ -317,6 +381,9 @@ class StudentHome(ft.Container):
 
         except Exception as ex:
             LogService.error(f"Error loading student directory: {ex}", context=self.__class__.__name__)
+            self.table_container.content = self._build_error_state("An internal error occurred while fetching records.")
+            if self.page:
+                self.update()
 
     def handle_search_change(self, e: ft.ControlEvent) -> None:
         """Debounced search input handling (300ms delay)."""
@@ -334,6 +401,15 @@ class StudentHome(ft.Container):
         query = (self.search_field.value or "").strip()
         self._apply_search(query)
 
+    def handle_clear_search(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Clears search filter and reloads normal student directory."""
+        if self._search_timer:
+            self._search_timer.cancel()
+        self.search_field.value = ""
+        self.current_query = ""
+        self.current_page = 0
+        self.load_data()
+
     def _apply_search(self, query: str) -> None:
         self.current_query = query
         self.current_page = 0
@@ -349,11 +425,16 @@ class StudentHome(ft.Container):
             self.current_page += 1
             self.load_data()
 
+    def _on_student_saved(self, message: str) -> None:
+        """Callback invoked when student is successfully added or updated."""
+        self.load_data()
+        self.show_snackbar(message)
+
     def handle_add_student(self, e: ft.ControlEvent) -> None:
         """Opens the Student Registration modal."""
         modal = StudentFormModal(
             controller=self.controller,
-            on_saved=self.load_data,
+            on_saved=lambda: self._on_student_saved("Student registered successfully!"),
         )
         self._open_dialog(modal)
 
@@ -361,7 +442,7 @@ class StudentHome(ft.Container):
         """Opens the Student Edit modal."""
         modal = StudentFormModal(
             controller=self.controller,
-            on_saved=self.load_data,
+            on_saved=lambda: self._on_student_saved("Student profile updated successfully!"),
             student=student,
         )
         self._open_dialog(modal)

@@ -31,7 +31,7 @@ class StudentSearchDialog(ft.AlertDialog):
             hint_text="Type and press Enter...",
             autofocus=True,
             on_submit=self.handle_search,  # Triggers only on Enter
-            prefix_icon=ft.icons.SEARCH
+            prefix_icon=ft.Icons.SEARCH,
         )
         
         self.results_list = ft.ListView(expand=1, spacing=5, height=350, width=500)
@@ -48,7 +48,7 @@ class StudentSearchDialog(ft.AlertDialog):
         
         if not results and len(query.strip()) >= 2:
             self.results_list.controls.append(
-                ft.Container(content=ft.Text("No students found.", color=ft.colors.GREY_500), padding=20)
+                ft.Container(content=ft.Text("No students found.", color=ft.Colors.GREY_500), padding=20)
             )
             
         for student in results:
@@ -56,7 +56,7 @@ class StudentSearchDialog(ft.AlertDialog):
                 ft.ListTile(
                     title=ft.Text(student.display_name, weight=ft.FontWeight.W_500),
                     subtitle=ft.Text(f"Mobile: {student.mobile_number}  •  ID: {student.id}"),
-                    leading=ft.Icon(ft.icons.PERSON),
+                    leading=ft.Icon(ft.Icons.PERSON),
                     on_click=lambda e, s=student: self.select_and_close(s)
                 )
             )
