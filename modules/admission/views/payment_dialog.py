@@ -32,6 +32,7 @@ class PaymentDialog(ft.AlertDialog):
         already_paid: float = 0.0,
         default_amount: float = 500.0,
         on_payment_completed: Optional[Callable[[int], None]] = None,
+        on_payment_success: Optional[Callable[[int], None]] = None,
     ) -> None:
         super().__init__(modal=True)
 
@@ -42,7 +43,7 @@ class PaymentDialog(ft.AlertDialog):
         self.total_fee = total_fee
         self.already_paid = already_paid
         self.pending_balance = max(0.0, total_fee - already_paid)
-        self.on_payment_completed = on_payment_completed or (lambda pid: None)
+        self.on_payment_completed = on_payment_completed or on_payment_success or (lambda pid: None)
 
         self.controller = AdmissionController()
 

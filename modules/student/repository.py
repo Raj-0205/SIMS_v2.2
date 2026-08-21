@@ -122,14 +122,6 @@ class StudentRepository(BaseRepository):
 
     @staticmethod
     def _build_search_conditions(query: str, table_alias: str = "s") -> tuple[str, list[Any]]:
-        """
-        Builds robust tokenized search conditions across multiple fields:
-        - First Name, Last Name, Full Name (first_name || ' ' || last_name)
-        - Student ID
-        - Admission ID / Candidate Number (YYYY-NNN format or raw sequence)
-        - Mobile Number (including normalized digits & international formats)
-        - Email Address
-        """
         clean = query.strip()
         if not clean:
             return "", []
@@ -137,7 +129,6 @@ class StudentRepository(BaseRepository):
         prefix = f"{table_alias}." if table_alias else ""
         student_id_ref = f"{prefix}id" if prefix else "id"
 
-        # Check for Candidate Number format: YYYY-NNN (e.g. 2026-001 or 2026-1)
         cand_match = re.match(r"^(\d{4})-(\d{1,4})$", clean)
         if cand_match:
             year = int(cand_match.group(1))
@@ -156,11 +147,9 @@ class StudentRepository(BaseRepository):
             )"""
             return where, [year, seq, cand_pattern, cand_pattern]
 
-        # Check if entire query is primarily a phone candidate (only digits, spaces, plus, minus, parens, and length >= 8)
         clean_no_phone_chars = re.sub(r"[\s\+\-\(\)]", "", clean)
         if clean_no_phone_chars.isdigit() and len(clean_no_phone_chars) >= 8 and "-" not in clean:
             phone_digits = clean_no_phone_chars
-            # Normalize Indian country code (+91 / 91)
             if phone_digits.startswith("91") and len(phone_digits) == 12:
                 phone_digits = phone_digits[2:]
 
@@ -171,7 +160,6 @@ class StudentRepository(BaseRepository):
             )"""
             return where, [pattern, pattern]
 
-        # Multi-token matching
         tokens = clean.split()
         token_clauses = []
         params: list[Any] = []
@@ -223,16 +211,82 @@ class StudentRepository(BaseRepository):
     def insert(self, data: dict[str, Any]) -> int:
         """Inserts a new student record and returns the generated ID."""
         sql = """
-            INSERT INTO students (first_name, last_name, email, mobile_number)
-            VALUES (?, ?, ?, ?);
+            INSERT INTO students (
+                first_name, middle_name, last_name, mother_name, dob, gender,
+                aadhaar_number, parent_guardian_name, village, address,
+                qualification, blood_group, photo_path, signature_path,
+                email, mobile_number
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         params = (
             data["first_name"],
+            data.get("middle_name"),
             data["last_name"],
+            data.get("mother_name"),
+            data.get("dob"),
+            data.get("gender"),
+            data.get("aadhaar_number"),
+            data.get("parent_guardian_name"),
+            data.get("village"),
+            data.get("address"),
+            data.get("qualification"),
+            data.get("blood_group"),
+            data.get("photo_path"),
+            data.get("signature_path"),
             data.get("email"),
             data.get("mobile_number"),
         )
         return self.execute_insert(sql, params)
+
+    def update(self, student_id: int, data: dict[str, Any]) -> int:
+        """Updates an existing student record completely and returns affected rows count."""
+        sql = """
+            UPDATE students
+            SET first_name = ?,
+                middle_name = COALESCE(?, middle_name),
+                last_name = ?,
+                mother_name = COALESCE(?, mother_name),
+                dob = COALESCE(?, dob),
+                gender = COALESCE(?, gender),
+                aadhaar_number = COALESCE(?, aadhaar_number),
+                parent_guardian_name = COALESCE(?, parent_guardian_name),
+                village = COALESCE(?, village),
+                address = COALESCE(?, address),
+                qualification = COALESCE(?, qualification),
+                blood_group = COALESCE(?, blood_group),
+                photo_path = COALESCE(?, photo_path),
+                signature_path = COALESCE(?, signature_path),
+                email = ?,
+                mobile_number = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?;
+        """
+        params = (
+            data["first_name"],
+            data.get("middle_name"),
+            data["last_name"],
+            data.get("mother_name"),
+            data.get("dob"),
+            data.get("gender"),
+            data.get("aadhaar_number"),
+            data.get("parent_guardian_name"),
+            data.get("village"),
+            data.get("address"),
+            data.get("qualification"),
+            data.get("blood_group"),
+            data.get("photo_path"),
+            data.get("signature_path"),
+            data.get("email"),
+            data.get("mobile_number"),
+            student_id,
+        )
+        return self.execute(sql, params)
+
+    def update_document_path(self, student_id: int, doc_type: str, file_path: Optional[str]) -> int:
+        """Updates photo_path or signature_path for a student."""
+        col = "photo_path" if doc_type.lower() == "photo" else "signature_path"
+        sql = f"UPDATE students SET {col} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;"
+        return self.execute(sql, (file_path, student_id))
 
     def get_by_id(self, student_id: int) -> Optional[dict[str, Any]]:
         """Retrieves a single student record with admission summary by Primary Key."""
@@ -272,20 +326,15 @@ class StudentRepository(BaseRepository):
         month: Optional[int] = None,
         table_alias: str = "s",
     ) -> tuple[str, list[Any]]:
-        """
-        Builds dynamic parameterized WHERE clauses combining search, course, status, year, and month filters.
-        """
         clauses: list[str] = []
         params: list[Any] = []
 
-        # 1. Search Query
         if query and query.strip():
             search_clause, search_params = cls._build_search_conditions(query.strip(), table_alias=table_alias)
             if search_clause:
                 clauses.append(f"({search_clause})")
                 params.extend(search_params)
 
-        # 2. Course Filter
         if course_id is not None and int(course_id) > 0:
             clauses.append(f"""EXISTS (
                 SELECT 1 FROM admissions a_cf
@@ -294,7 +343,6 @@ class StudentRepository(BaseRepository):
             )""")
             params.append(int(course_id))
 
-        # 3. Status Filter (DRAFT, REGISTERED, CONFIRMED, CANCELLED, COMPLETED)
         if status and status.strip() and status.strip().upper() != "ALL":
             clean_status = status.strip().upper()
             if clean_status == "REGISTERED":
@@ -315,9 +363,6 @@ class StudentRepository(BaseRepository):
                 )""")
                 params.append(clean_status)
 
-        # 4. Year and Month Filters
-        # For admitted students: filters against admission dates / candidate year.
-        # For purely registered students (no admissions): filters against student registration date.
         if year is not None and int(year) > 0 and month is not None and 1 <= int(month) <= 12:
             year_int = int(year)
             month_int = int(month)
@@ -367,8 +412,6 @@ class StudentRepository(BaseRepository):
         where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         return where_clause, params
 
-    # Whitelist of allowed sort fields → SQL expression fragments.
-    # Strictly valid sorting criteria. Year and Month are filters, not sorts.
     _SORT_FIELD_MAP: dict[str, str | list[str]] = {
         "id": "s.id",
         "student_id": "s.id",
@@ -388,16 +431,10 @@ class StudentRepository(BaseRepository):
 
     @classmethod
     def _build_order_by(cls, sort_by: str = "id", sort_dir: str = "desc") -> str:
-        """Constructs database-level ORDER BY clause from a single sort field."""
         return cls._build_multi_order_by([(sort_by, sort_dir)])
 
     @classmethod
     def _build_multi_order_by(cls, sort_keys: list[tuple[str, str]] | None = None) -> str:
-        """
-        Constructs database-level ORDER BY from one or more (field, direction) pairs.
-        Every field is validated against the _SORT_FIELD_MAP whitelist.
-        Adds a final stable tie-breaker ', s.id ASC' unless ID is already sorted.
-        """
         if not sort_keys:
             return "ORDER BY s.id DESC"
 
@@ -413,7 +450,7 @@ class StudentRepository(BaseRepository):
 
             mapping = cls._SORT_FIELD_MAP.get(clean_field)
             if mapping is None:
-                continue  # Skip unknown fields silently
+                continue
 
             if isinstance(mapping, list):
                 for expr in mapping:
@@ -424,7 +461,6 @@ class StudentRepository(BaseRepository):
         if not clauses:
             return "ORDER BY s.id DESC"
 
-        # Add deterministic stable tie-breaker if not already present
         if not has_id_sort:
             clauses.append("s.id ASC")
 
@@ -443,10 +479,6 @@ class StudentRepository(BaseRepository):
         limit: int = 50,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
-        """
-        Executes an indexed, multi-criteria filtered search with database-level sorting and pagination.
-        sort_keys takes precedence over sort_by/sort_dir when provided.
-        """
         where_clause, params = self._build_filter_conditions(
             query=query,
             course_id=course_id,
@@ -477,7 +509,6 @@ class StudentRepository(BaseRepository):
         year: Optional[int] = None,
         month: Optional[int] = None,
     ) -> int:
-        """Returns total matching records for the active filter set."""
         where_clause, params = self._build_filter_conditions(
             query=query,
             course_id=course_id,
@@ -501,10 +532,6 @@ class StudentRepository(BaseRepository):
         sort_dir: str = "desc",
         sort_keys: list[tuple[str, str]] | None = None,
     ) -> list[dict[str, Any]]:
-        """
-        Returns all matching filtered records without limit for full dataset exports (Excel/PDF).
-        sort_keys takes precedence over sort_by/sort_dir when provided.
-        """
         where_clause, params = self._build_filter_conditions(
             query=query,
             course_id=course_id,
@@ -526,23 +553,17 @@ class StudentRepository(BaseRepository):
         return self.execute_fetchall(sql, tuple(params))
 
     def get_all_paged(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
-        """Fetches paginated student records ordered by newest first with latest admission summary."""
         return self.filter_paged(limit=limit, offset=offset)
 
     def count_all(self) -> int:
-        """Returns the total number of students."""
         sql = "SELECT COUNT(*) as count FROM students;"
         row = self.execute_fetchone(sql)
         return int(row["count"]) if row else 0
 
     def search_paged(self, query: str, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
-        """
-        Universal tokenized search across ID, first name, last name, full name, mobile, and email with pagination.
-        """
         return self.filter_paged(query=query, limit=limit, offset=offset)
 
     def count_search(self, query: str) -> int:
-        """Counts total matching records for a given universal search query."""
         where_clause, params = self._build_search_conditions(query, table_alias="")
         if not where_clause:
             return self.count_all()
@@ -555,37 +576,15 @@ class StudentRepository(BaseRepository):
         row = self.execute_fetchone(sql, tuple(params))
         return int(row["count"]) if row else 0
 
-    def update(self, student_id: int, data: dict[str, Any]) -> int:
-        """Updates an existing student record and returns affected rows count."""
-        sql = """
-            UPDATE students
-            SET first_name = ?, last_name = ?, email = ?, mobile_number = ?
-            WHERE id = ?;
-        """
-        params = (
-            data["first_name"],
-            data["last_name"],
-            data.get("email"),
-            data.get("mobile_number"),
-            student_id,
-        )
-        return self.execute(sql, params)
-
     def has_admissions(self, student_id: int) -> bool:
-        """Checks whether a student has any linked admission records."""
         sql = "SELECT 1 FROM admissions WHERE student_id = ? LIMIT 1;"
         return self.exists(sql, (student_id,))
 
     def delete(self, student_id: int) -> int:
-        """Deletes a student record (only if no foreign key constraints violate)."""
         sql = "DELETE FROM students WHERE id = ?;"
         return self.execute(sql, (student_id,))
 
     def get_student_admissions(self, student_id: int) -> list[dict[str, Any]]:
-        """
-        Fetches all admissions linked to a student with course details and candidate sequence numbers.
-        Demonstrates the Student != Admission rule (1 student, many admissions).
-        """
         sql = """
             SELECT
                 a.id AS admission_id,
@@ -612,9 +611,6 @@ class StudentRepository(BaseRepository):
         return self.execute_fetchall(sql, (student_id,))
 
     def search(self, query: str, limit: int = 25) -> list[StudentSearchRow]:
-        """
-        Universal search helper query method for backward compatibility.
-        """
         where_clause, params = self._build_search_conditions(query, table_alias="")
         if not where_clause:
             sql = """

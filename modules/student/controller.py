@@ -33,6 +33,18 @@ class StudentController:
         dto = StudentCreateDTO(
             first_name=str(raw_data.get("first_name") or "").strip(),
             last_name=str(raw_data.get("last_name") or "").strip(),
+            middle_name=str(raw_data["middle_name"]).strip() if raw_data.get("middle_name") else None,
+            mother_name=str(raw_data["mother_name"]).strip() if raw_data.get("mother_name") else None,
+            dob=str(raw_data["dob"]).strip() if raw_data.get("dob") else None,
+            gender=str(raw_data["gender"]).strip() if raw_data.get("gender") else None,
+            aadhaar_number=str(raw_data["aadhaar_number"]).strip() if raw_data.get("aadhaar_number") else None,
+            parent_guardian_name=str(raw_data["parent_guardian_name"]).strip() if raw_data.get("parent_guardian_name") else None,
+            village=str(raw_data["village"]).strip() if raw_data.get("village") else None,
+            address=str(raw_data["address"]).strip() if raw_data.get("address") else None,
+            qualification=str(raw_data["qualification"]).strip() if raw_data.get("qualification") else None,
+            blood_group=str(raw_data["blood_group"]).strip() if raw_data.get("blood_group") else None,
+            photo_path=str(raw_data["photo_path"]).strip() if raw_data.get("photo_path") else None,
+            signature_path=str(raw_data["signature_path"]).strip() if raw_data.get("signature_path") else None,
             mobile_number=str(raw_data.get("mobile_number") or "").strip(),
             email=str(raw_data.get("email") or "").strip() or None,
         )
@@ -44,6 +56,18 @@ class StudentController:
             id=student_id,
             first_name=str(raw_data.get("first_name") or "").strip(),
             last_name=str(raw_data.get("last_name") or "").strip(),
+            middle_name=str(raw_data["middle_name"]).strip() if raw_data.get("middle_name") else None,
+            mother_name=str(raw_data["mother_name"]).strip() if raw_data.get("mother_name") else None,
+            dob=str(raw_data["dob"]).strip() if raw_data.get("dob") else None,
+            gender=str(raw_data["gender"]).strip() if raw_data.get("gender") else None,
+            aadhaar_number=str(raw_data["aadhaar_number"]).strip() if raw_data.get("aadhaar_number") else None,
+            parent_guardian_name=str(raw_data["parent_guardian_name"]).strip() if raw_data.get("parent_guardian_name") else None,
+            village=str(raw_data["village"]).strip() if raw_data.get("village") else None,
+            address=str(raw_data["address"]).strip() if raw_data.get("address") else None,
+            qualification=str(raw_data["qualification"]).strip() if raw_data.get("qualification") else None,
+            blood_group=str(raw_data["blood_group"]).strip() if raw_data.get("blood_group") else None,
+            photo_path=str(raw_data["photo_path"]).strip() if raw_data.get("photo_path") else None,
+            signature_path=str(raw_data["signature_path"]).strip() if raw_data.get("signature_path") else None,
             mobile_number=str(raw_data.get("mobile_number") or "").strip(),
             email=str(raw_data.get("email") or "").strip() or None,
         )
@@ -63,7 +87,6 @@ class StudentController:
 
     def filter_students(self, raw_filter: Mapping[str, Any]) -> tuple[list[StudentDTO], int]:
         """Translates raw filter map into StudentFilterDTO and delegates."""
-        # Resolve sort_keys: expects list of (field, direction) tuples or None
         raw_sort_keys = raw_filter.get("sort_keys")
         sort_keys_tuple: tuple[tuple[str, str], ...] = ()
         if raw_sort_keys and isinstance(raw_sort_keys, (list, tuple)):
@@ -155,3 +178,24 @@ class StudentController:
         """
         clean_query = str(query).strip() if query else ""
         return self.service.search_students(clean_query)
+
+    # ── Notes & Friendship & Documents API ──
+    def add_student_note(self, student_id: int, note_text: str, actor_name: str = "ADMIN") -> int:
+        return self.service.add_student_note(student_id, note_text, actor_name)
+
+    def get_student_notes(self, student_id: int) -> list[dict[str, Any]]:
+        return self.service.get_student_notes(student_id)
+
+    def add_student_friend(self, student_id: int, friend_student_id: int) -> int:
+        return self.service.add_student_friend(student_id, friend_student_id)
+
+    def remove_student_friend(self, student_id: int, friend_student_id: int) -> int:
+        return self.service.remove_student_friend(student_id, friend_student_id)
+
+    def upload_student_document(
+        self, student_id: int, doc_type: str, file_bytes: bytes, filename: str
+    ) -> str:
+        return self.service.upload_student_document(student_id, doc_type, file_bytes, filename)
+
+    def delete_student_document(self, student_id: int, doc_type: str) -> None:
+        self.service.delete_student_document(student_id, doc_type)

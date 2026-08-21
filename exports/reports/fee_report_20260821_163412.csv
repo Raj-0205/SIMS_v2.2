@@ -1,0 +1,12 @@
+﻿# Module: SIMS v2.2 Admission & Fee Reporting System
+# Export Timestamp: 2026-08-21 16:34:12
+# Total Records: 7
+
+SR.NO,COURSE NAME,ADMISSION DATE,ADMISSION ID,NAME,MOB NO,ADMISSION STATUS,TOTAL FEES,1ST INSTALLMENT,2ND INSTALLMENT,3RD INSTALLMENT,4TH INSTALLMENT,TOTAL FEES PAID,PENDING FEES,ADDRESS,FRIEND NAME,FRIEND CONTACT NO
+1,KLiC Advanced Java,2026-08-21,2026-015,Anuj Pagar,9822606496,CANCELLED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,Rohit Shinde,9823768958
+2,KLiC Advanced Excel,2026-08-21,2026-014,Anuj Pagar,9822606496,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00","Rs. 1,000.00",—,—,"Rs. 2,500.00","Rs. 2,000.00",Chandwad,Rohit Shinde,9823768958
+3,KLiC Advanced Java,2026-08-21,2026-013,Anuj Pagar,9822000017,CANCELLED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,Rohit Shinde,9823000017
+4,KLiC Advanced Excel,2026-08-21,2026-012,Anuj Pagar,9822000017,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00","Rs. 1,000.00",—,—,"Rs. 2,500.00","Rs. 2,000.00",Chandwad,Rohit Shinde,9823000017
+5,KLiC Mobile App Development,2026-08-21,2026-010,Anuj Raj Pagar,8010120768,CONFIRMED,"Rs. 5,200.00","Rs. 3,500.00",—,—,—,"Rs. 3,500.00","Rs. 1,700.00",Khadak Ozar,Pooja Patil,9876543212
+6,KLiC Advanced Excel,2026-08-20,2026-005,Anuj Raj Pagar,8010120768,REGISTERED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Khadak Ozar,Pooja Patil,9876543212
+7,MS-CIT (Mastering IT),2026-08-20,2026-003,Anuj Raj Pagar,8010120768,CONFIRMED,"Rs. 4,000.00","Rs. 2,500.00",—,—,—,"Rs. 2,500.00","Rs. 1,500.00","near jio tower, sawargaon road",Pooja Patil,9876543212

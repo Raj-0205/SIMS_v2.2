@@ -1,13 +1,19 @@
+# modules/student/views/student_workspace_dialog.py
+
 from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
+import subprocess
 from typing import Any, Callable, Optional
+import webbrowser
 import flet as ft
 
 from core.logger.service import LogService
+from core.exceptions import ValidationError, ServiceError
 from modules.student.controller import StudentController
 from modules.student.dto import StudentDTO, StudentWorkspaceDTO
 from modules.student.views.student_form_modal import StudentFormModal
+from shared.utils.formatting import format_whatsapp_url, format_file_size
 from ui.themes.theme import AppTheme
 
 __all__ = ["StudentWorkspaceDialog"]
@@ -15,8 +21,8 @@ __all__ = ["StudentWorkspaceDialog"]
 
 class StudentWorkspaceDialog(ft.AlertDialog):
     """
-    Comprehensive Student Master Workspace.
-    Enforces Student != Admission domain boundary with full multi-admission visibility,
+    Comprehensive Student Master Workspace (Student != Admission).
+    Enforces master student profile separation from multiple enrollments,
     installment-grouped payments, official receipts, village friends, and internal notes.
     """
 
@@ -33,10 +39,23 @@ class StudentWorkspaceDialog(ft.AlertDialog):
         self.on_refresh_required = on_refresh_required
         self.modal = True
 
-        # Fetch full aggregate workspace data
         self.load_workspace_data()
-
         self.active_tab_index: int = 0
+
+        # Top Notification Toast Banner
+        self.toast_banner = ft.Container(
+            content=ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.INFO, color=AppTheme.PRIMARY, size=18),
+                    ft.Text("", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.W_500, color=AppTheme.TEXT_PRIMARY),
+                ],
+                spacing=AppTheme.PAD_SM,
+            ),
+            bgcolor=AppTheme.PRIMARY_LIGHT,
+            padding=ft.Padding(left=14, top=8, right=14, bottom=8),
+            border_radius=AppTheme.RADIUS_SM,
+            visible=False,
+        )
 
         # Build UI Elements
         self.title = self._build_header()
@@ -48,15 +67,16 @@ class StudentWorkspaceDialog(ft.AlertDialog):
         )
 
         self.content = ft.Container(
-            width=920,
-            height=600,
+            width=940,
+            height=620,
             content=ft.Column(
                 controls=[
+                    self.toast_banner,
                     self.tab_buttons_row,
                     ft.Divider(height=1, color=AppTheme.BORDER),
                     self.tab_content_area,
                 ],
-                spacing=0,
+                spacing=AppTheme.PAD_XS,
                 expand=True,
             ),
         )
@@ -86,6 +106,20 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                 self.update()
             except RuntimeError:
                 pass
+
+    def show_toast(self, message: str, is_error: bool = False, is_success: bool = False) -> None:
+        """Displays prominent AirDrop-style top notification."""
+        bg_color = AppTheme.DANGER_LIGHT if is_error else (AppTheme.SUCCESS_LIGHT if is_success else AppTheme.PRIMARY_LIGHT)
+        icon_color = AppTheme.DANGER if is_error else (AppTheme.SUCCESS if is_success else AppTheme.PRIMARY)
+        icon_name = ft.Icons.ERROR_OUTLINE if is_error else (ft.Icons.CHECK_CIRCLE if is_success else ft.Icons.INFO)
+
+        row: ft.Row = self.toast_banner.content
+        row.controls[0].name = icon_name
+        row.controls[0].color = icon_color
+        row.controls[1].value = message
+        self.toast_banner.bgcolor = bg_color
+        self.toast_banner.visible = True
+        self._safe_update()
 
     def _build_header(self) -> ft.Container:
         student = self.workspace_data.student
@@ -143,7 +177,7 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                         ft.Text(f"Student ID: #{student.id}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY, weight=ft.FontWeight.W_500),
                         ft.Text("•", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
                         ft.Text(
-                            f"Enrolled Admissions: {len(self.workspace_data.admissions)}",
+                            f"Total Admissions: {len(self.workspace_data.admissions)}",
                             size=AppTheme.SIZE_CAPTION,
                             color=AppTheme.PRIMARY if self.workspace_data.admissions else AppTheme.TEXT_SECONDARY,
                             weight=ft.FontWeight.BOLD if self.workspace_data.admissions else ft.FontWeight.NORMAL,
@@ -179,12 +213,12 @@ class StudentWorkspaceDialog(ft.AlertDialog):
     def _open_whatsapp(self, mobile_number: Optional[str]) -> None:
         if not mobile_number:
             return
-        clean_num = "".join(c for c in mobile_number if c.isdigit())
-        if len(clean_num) == 10:
-            clean_num = f"91{clean_num}"
-        p = self.safe_page
-        if p:
-            p.launch_url(f"https://wa.me/{clean_num}")
+        url = format_whatsapp_url(mobile_number)
+        try:
+            webbrowser.open(url)
+            self.show_toast(f"Opened WhatsApp for {mobile_number}", is_success=True)
+        except Exception as ex:
+            LogService.warning(f"Could not open WhatsApp URL: {ex}", context="StudentWorkspace")
 
     def _build_tab_bar(self) -> ft.Row:
         tabs_spec = [
@@ -194,41 +228,35 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             (3, f"Receipts ({len(self.workspace_data.receipts)})", ft.Icons.RECEIPT_LONG_OUTLINED),
             (4, f"Village Friends ({len(self.workspace_data.friends)})", ft.Icons.GROUP_OUTLINED),
             (5, "Documents", ft.Icons.FOLDER_OPEN_OUTLINED),
-            (6, "History & Activity", ft.Icons.TIMELINE_OUTLINED),
+            (6, "History & Notes", ft.Icons.TIMELINE_OUTLINED),
         ]
 
         buttons = []
         for idx, label, icon in tabs_spec:
-            is_selected = (self.active_tab_index == idx)
-            btn = ft.Container(
+            is_active = (idx == self.active_tab_index)
+            btn = ft.TextButton(
                 content=ft.Row(
                     controls=[
-                        ft.Icon(
-                            icon,
-                            size=16,
-                            color=AppTheme.PRIMARY if is_selected else AppTheme.TEXT_SECONDARY,
-                        ),
+                        ft.Icon(icon, size=16, color=AppTheme.PRIMARY if is_active else AppTheme.TEXT_SECONDARY),
                         ft.Text(
                             label,
-                            size=AppTheme.SIZE_CAPTION,
-                            weight=ft.FontWeight.BOLD if is_selected else ft.FontWeight.W_500,
-                            color=AppTheme.PRIMARY if is_selected else AppTheme.TEXT_SECONDARY,
+                            size=AppTheme.SIZE_BODY,
+                            weight=ft.FontWeight.BOLD if is_active else ft.FontWeight.NORMAL,
+                            color=AppTheme.PRIMARY if is_active else AppTheme.TEXT_SECONDARY,
                         ),
                     ],
                     spacing=6,
                 ),
-                padding=ft.Padding(left=12, top=8, right=12, bottom=8),
-                border_radius=AppTheme.RADIUS_SM,
-                bgcolor=AppTheme.PRIMARY_LIGHT if is_selected else ft.Colors.TRANSPARENT,
+                style=ft.ButtonStyle(
+                    bgcolor=AppTheme.PRIMARY_LIGHT if is_active else ft.Colors.TRANSPARENT,
+                    shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+                    padding=ft.Padding(left=12, top=6, right=12, bottom=6),
+                ),
                 on_click=lambda e, i=idx: self._switch_tab(i),
             )
             buttons.append(btn)
 
-        return ft.Row(
-            controls=buttons,
-            spacing=4,
-            scroll=ft.ScrollMode.AUTO,
-        )
+        return ft.Row(controls=buttons, spacing=4, scroll=ft.ScrollMode.AUTO)
 
     def _switch_tab(self, index: int) -> None:
         self.active_tab_index = index
@@ -249,39 +277,44 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             return self._build_friends_tab()
         elif self.active_tab_index == 5:
             return self._build_documents_tab()
-        else:
+        elif self.active_tab_index == 6:
             return self._build_history_tab()
+        return ft.Text("Tab not found")
 
-    # --- TAB 1: OVERVIEW ---
+    # ── TAB 1: OVERVIEW ──
     def _build_overview_tab(self) -> ft.Container:
         student = self.workspace_data.student
 
-        def info_row(label: str, value: str, icon: str) -> ft.Row:
+        def info_row(label: str, value: Optional[str], icon: str) -> ft.Row:
             return ft.Row(
                 controls=[
-                    ft.Icon(icon, size=16, color=AppTheme.TEXT_SECONDARY),
-                    ft.Text(f"{label}:", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.W_500, color=AppTheme.TEXT_SECONDARY, width=140),
-                    ft.Text(value, size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
+                    ft.Row(
+                        controls=[
+                            ft.Icon(icon, size=15, color=AppTheme.PRIMARY),
+                            ft.Text(label, size=AppTheme.SIZE_BODY, weight=ft.FontWeight.W_500, color=AppTheme.TEXT_SECONDARY),
+                        ],
+                        spacing=6,
+                    ),
+                    ft.Text(value or "—", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_PRIMARY, weight=ft.FontWeight.W_500),
                 ],
-                spacing=8,
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             )
 
         personal_card = ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Text("Personal Information", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                    ft.Text("Personal Details", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
                     ft.Divider(height=1, color=AppTheme.BORDER),
                     info_row("Full Name", student.display_name, ft.Icons.PERSON),
-                    info_row("Student ID", f"#{student.id}", ft.Icons.NUMBERS),
-                    info_row("Mobile Number", student.mobile_number or "Not Provided", ft.Icons.PHONE),
-                    info_row("Gender / DOB", f"{student.gender or '—'}  |  {student.dob or '—'}", ft.Icons.CAKE),
-                    info_row("Mother's Name", student.mother_name or "Not Provided", ft.Icons.FAMILY_RESTROOM),
-                    info_row("Parent / Guardian", student.parent_guardian_name or "Not Provided", ft.Icons.PERSON_PIN),
-                    info_row("Aadhaar Number", student.aadhaar_number or "Not Provided", ft.Icons.BADGE),
-                    info_row("Village / City", student.village or "Not Provided", ft.Icons.LOCATION_CITY),
-                    info_row("Address", student.address or "Not Provided", ft.Icons.HOME),
-                    info_row("Qualification", student.qualification or "Not Provided", ft.Icons.SCHOOL),
-                    info_row("Blood Group", student.blood_group or "Not Provided", ft.Icons.BLOODTYPE),
+                    info_row("Mother's Name", student.mother_name, ft.Icons.FAMILY_RESTROOM),
+                    info_row("Parent / Guardian", student.parent_guardian_name, ft.Icons.SUPERVISED_USER_CIRCLE),
+                    info_row("Date of Birth", student.dob, ft.Icons.CAKE),
+                    info_row("Gender", student.gender, ft.Icons.WC),
+                    info_row("Blood Group", student.blood_group, ft.Icons.BLOODTYPE),
+                    info_row("Aadhaar Number", student.aadhaar_number, ft.Icons.FINGERPRINT),
+                    info_row("Village / City", student.village, ft.Icons.LOCATION_CITY),
+                    info_row("Address", student.address, ft.Icons.HOME),
+                    info_row("Highest Qualification", student.qualification, ft.Icons.SCHOOL),
                 ],
                 spacing=AppTheme.PAD_XS,
             ),
@@ -295,14 +328,13 @@ class StudentWorkspaceDialog(ft.AlertDialog):
         academic_card = ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Text("Academic & Admission Summary", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                    ft.Text("Enrollment & Academic Summary", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
                     ft.Divider(height=1, color=AppTheme.BORDER),
                     info_row("Total Admissions", str(len(self.workspace_data.admissions)), ft.Icons.SCHOOL),
-                    info_row("Current Course", student.current_course or "Not Enrolled", ft.Icons.MENU_BOOK),
+                    info_row("Latest Course", student.current_course or "Not Enrolled", ft.Icons.MENU_BOOK),
                     info_row("Admission Status", student.admission_status or "REGISTERED", ft.Icons.CHECK_CIRCLE_OUTLINE),
-                    info_row("Latest Admission No.", student.latest_admission_number or (f"#{student.latest_admission_id}" if student.latest_admission_id else "None"), ft.Icons.BADGE),
-                    info_row("Enrolled Date", student.latest_admission_date or "N/A", ft.Icons.EVENT),
-                    info_row("Registration Date", student.created_at or "N/A", ft.Icons.CALENDAR_TODAY),
+                    info_row("Latest Admission No.", student.latest_admission_number or "None", ft.Icons.BADGE),
+                    info_row("Registration Date", student.created_at[:10] if student.created_at else "N/A", ft.Icons.CALENDAR_TODAY),
                 ],
                 spacing=AppTheme.PAD_XS,
             ),
@@ -328,20 +360,14 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             if not n_val:
                 return
             try:
-                from modules.admission.activity_log_repository import ActivityLogRepository
-                ActivityLogRepository().insert(
-                    entity_type="STUDENT",
-                    entity_id=student.id,
-                    action="NOTE_ADDED",
-                    actor_name="ADMIN",
-                    details=n_val,
-                )
+                self.controller.add_student_note(student.id, n_val, actor_name="ADMIN")
                 note_input.value = ""
                 self.load_workspace_data()
                 self.tab_content_area.content = self._build_active_tab_content()
-                self._safe_update()
+                self.show_toast("Internal note saved successfully.", is_success=True)
             except Exception as ex:
                 LogService.error(f"Error adding note: {ex}", context="StudentWorkspace")
+                self.show_toast(str(ex), is_error=True)
 
         notes_controls = [
             ft.Text("Internal Notes & Remarks", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
@@ -349,34 +375,40 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             ft.Row(
                 controls=[
                     note_input,
-                    ft.IconButton(icon=ft.Icons.SEND, icon_color=AppTheme.PRIMARY, tooltip="Save Note", on_click=handle_add_note),
+                    ft.ElevatedButton(
+                        content=ft.Text("Save Note"),
+                        icon=ft.Icons.SEND,
+                        style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE),
+                        on_click=handle_add_note,
+                    ),
                 ],
                 spacing=AppTheme.PAD_SM,
             ),
         ]
 
-        note_events = [t for t in self.workspace_data.timeline if t.event_type in ("NOTE_ADDED", "REGISTRATION")]
-        for ev in note_events[:3]:
-            notes_controls.append(
-                ft.Container(
-                    content=ft.Column(
-                        controls=[
-                            ft.Row(
-                                controls=[
-                                    ft.Text(ev.title, size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
-                                    ft.Text(ev.timestamp[:16], size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
-                                ],
-                                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                            ),
-                            ft.Text(ev.description, size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
-                        ],
-                        spacing=2,
-                    ),
-                    bgcolor=AppTheme.SURFACE_VARIANT,
-                    padding=AppTheme.PAD_SM,
-                    border_radius=AppTheme.RADIUS_SM,
+        notes_list = self.workspace_data.notes
+        if notes_list:
+            for n in notes_list[:4]:
+                notes_controls.append(
+                    ft.Container(
+                        content=ft.Column(
+                            controls=[
+                                ft.Row(
+                                    controls=[
+                                        ft.Text(f"By {n.get('actor_name') or 'ADMIN'}", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                                        ft.Text(str(n.get('created_at') or '')[:16], size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
+                                    ],
+                                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                                ),
+                                ft.Text(str(n.get('details') or ''), size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_PRIMARY),
+                            ],
+                            spacing=2,
+                        ),
+                        bgcolor=AppTheme.SURFACE_VARIANT,
+                        padding=AppTheme.PAD_SM,
+                        border_radius=AppTheme.RADIUS_SM,
+                    )
                 )
-            )
 
         notes_card = ft.Container(
             content=ft.Column(controls=notes_controls, spacing=AppTheme.PAD_SM),
@@ -398,7 +430,7 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             expand=True,
         )
 
-    # --- TAB 2: ADMISSIONS (ALL ADMISSIONS) ---
+    # ── TAB 2: ADMISSIONS (MULTI-ADMISSION) ──
     def _build_admissions_tab(self) -> ft.Container:
         admissions = self.workspace_data.admissions
 
@@ -410,7 +442,7 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                         ft.Text("No Admissions Linked", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
                         ft.Text(
                             "This student has not been enrolled in any course yet.\n"
-                            "Use the Admissions module to enroll this student in courses.",
+                            "Use the Admissions module to create a new enrollment.",
                             size=AppTheme.SIZE_BODY,
                             color=AppTheme.TEXT_SECONDARY,
                             text_align=ft.TextAlign.CENTER,
@@ -430,11 +462,18 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             adm_display = adm.admission_number if getattr(adm, "admission_number", None) else f"#{adm.admission_id}"
             batch_display = f"{adm.batch_name} ({adm.batch_timing})" if adm.batch_name else "Unallocated"
 
+            def open_adm_workspace(e, aid=adm.admission_id):
+                from modules.admission.views.admission_workspace_dialog import AdmissionWorkspaceDialog
+                p = self.safe_page
+                if p:
+                    dlg = AdmissionWorkspaceDialog(admission_id=aid, on_updated=self.load_workspace_data)
+                    p.show_dialog(dlg)
+
             rows.append(
                 ft.DataRow(
                     cells=[
                         ft.DataCell(ft.Text(adm_display, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY)),
-                        ft.DataCell(ft.Text(adm.course_name or "General Admission")),
+                        ft.DataCell(ft.Text(adm.course_name or "General Admission", weight=ft.FontWeight.W_500)),
                         ft.DataCell(ft.Text(batch_display, size=AppTheme.SIZE_CAPTION)),
                         ft.DataCell(ft.Text(adm.admission_date[:10] if len(adm.admission_date) >= 10 else adm.admission_date)),
                         ft.DataCell(ft.Text(f"₹{adm.final_fee:,.2f}", weight=ft.FontWeight.W_500)),
@@ -448,24 +487,33 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                                 border_radius=AppTheme.RADIUS_SM,
                             )
                         ),
+                        ft.DataCell(
+                            ft.IconButton(
+                                icon=ft.Icons.OPEN_IN_NEW,
+                                icon_color=AppTheme.PRIMARY,
+                                tooltip="Open Admission Workspace",
+                                on_click=open_adm_workspace,
+                            )
+                        ),
                     ]
                 )
             )
 
         table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("Admission No.", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Course Name", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Admission ID", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Course", weight=ft.FontWeight.BOLD)),
                 ft.DataColumn(ft.Text("Batch", weight=ft.FontWeight.BOLD)),
                 ft.DataColumn(ft.Text("Date", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Total Fee", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Total Paid", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Agreed Fee", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Paid", weight=ft.FontWeight.BOLD)),
                 ft.DataColumn(ft.Text("Pending", weight=ft.FontWeight.BOLD)),
                 ft.DataColumn(ft.Text("Status", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Action", weight=ft.FontWeight.BOLD)),
             ],
             rows=rows,
             heading_row_color=AppTheme.SURFACE_VARIANT,
-            column_spacing=18,
+            column_spacing=14,
         )
 
         return ft.Container(
@@ -477,115 +525,69 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             expand=True,
         )
 
-    # --- TAB 3: PAYMENTS & INSTALLMENTS ---
+    # ── TAB 3: PAYMENTS & INSTALLMENTS ──
     def _build_payments_tab(self) -> ft.Container:
-        admissions = self.workspace_data.admissions
-        all_payments = self.workspace_data.payments
+        payments = self.workspace_data.payments
 
-        total_fee = sum(a.final_fee for a in admissions)
-        total_paid = sum(a.total_paid for a in admissions)
-        total_pending = max(0.0, total_fee - total_paid)
+        if not payments:
+            return ft.Container(
+                content=ft.Column(
+                    controls=[
+                        ft.Icon(ft.Icons.PAYMENTS_OUTLINED, size=54, color=AppTheme.TEXT_MUTED),
+                        ft.Text("No Payment Records", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
+                        ft.Text("No payments have been collected for this student yet.", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_SECONDARY),
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    spacing=AppTheme.PAD_SM,
+                ),
+                alignment=ft.Alignment.CENTER,
+                expand=True,
+            )
 
-        summary_row = ft.Row(
-            controls=[
-                ft.Container(
-                    content=ft.Column(
-                        controls=[
-                            ft.Text("Total Agreed Fees", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
-                            ft.Text(f"₹{total_fee:,.2f}", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
-                        ],
-                        spacing=2,
-                    ),
-                    bgcolor=AppTheme.PRIMARY_LIGHT,
-                    padding=AppTheme.PAD_MD,
-                    border_radius=AppTheme.RADIUS_MD,
-                    expand=True,
-                ),
-                ft.Container(
-                    content=ft.Column(
-                        controls=[
-                            ft.Text("Total Fees Paid", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
-                            ft.Text(f"₹{total_paid:,.2f}", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.SUCCESS),
-                        ],
-                        spacing=2,
-                    ),
-                    bgcolor=AppTheme.SUCCESS_LIGHT,
-                    padding=AppTheme.PAD_MD,
-                    border_radius=AppTheme.RADIUS_MD,
-                    expand=True,
-                ),
-                ft.Container(
-                    content=ft.Column(
-                        controls=[
-                            ft.Text("Total Pending Dues", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
-                            ft.Text(f"₹{total_pending:,.2f}", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.DANGER if total_pending > 0 else AppTheme.SUCCESS),
-                        ],
-                        spacing=2,
-                    ),
-                    bgcolor=AppTheme.DANGER_LIGHT if total_pending > 0 else AppTheme.SUCCESS_LIGHT,
-                    padding=AppTheme.PAD_MD,
-                    border_radius=AppTheme.RADIUS_MD,
-                    expand=True,
-                ),
-            ],
-            spacing=AppTheme.PAD_MD,
-        )
-
-        # Per-Admission Installment Breakdown Table
-        installment_rows = []
-        for adm in admissions:
-            insts = adm.installments or {}
-            i1 = insts.get(1, 0.0)
-            i2 = insts.get(2, 0.0)
-            i3 = insts.get(3, 0.0)
-            i4 = insts.get(4, 0.0)
-            installment_rows.append(
+        rows = []
+        for p in payments:
+            rows.append(
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(ft.Text(adm.admission_number, weight=ft.FontWeight.BOLD)),
-                        ft.DataCell(ft.Text(adm.course_name or "General Admission")),
-                        ft.DataCell(ft.Text(f"₹{adm.final_fee:,.2f}")),
-                        ft.DataCell(ft.Text(f"₹{i1:,.2f}" if i1 > 0 else "—", weight=ft.FontWeight.BOLD if i1 > 0 else ft.FontWeight.NORMAL)),
-                        ft.DataCell(ft.Text(f"₹{i2:,.2f}" if i2 > 0 else "—", weight=ft.FontWeight.BOLD if i2 > 0 else ft.FontWeight.NORMAL)),
-                        ft.DataCell(ft.Text(f"₹{i3:,.2f}" if i3 > 0 else "—", weight=ft.FontWeight.BOLD if i3 > 0 else ft.FontWeight.NORMAL)),
-                        ft.DataCell(ft.Text(f"₹{i4:,.2f}" if i4 > 0 else "—", weight=ft.FontWeight.BOLD if i4 > 0 else ft.FontWeight.NORMAL)),
-                        ft.DataCell(ft.Text(f"₹{adm.total_paid:,.2f}", color=AppTheme.SUCCESS, weight=ft.FontWeight.BOLD)),
-                        ft.DataCell(ft.Text(f"₹{adm.pending_amount:,.2f}", color=AppTheme.DANGER if adm.pending_amount > 0 else AppTheme.SUCCESS, weight=ft.FontWeight.BOLD)),
+                        ft.DataCell(ft.Text(f"#{p.get('id')}", weight=ft.FontWeight.BOLD)),
+                        ft.DataCell(ft.Text(f"Adm #{p.get('admission_id')}")),
+                        ft.DataCell(ft.Text(f"Installment #{p.get('installment_number')}", weight=ft.FontWeight.W_500)),
+                        ft.DataCell(ft.Text(f"₹{float(p.get('amount') or 0.0):,.2f}", color=AppTheme.SUCCESS, weight=ft.FontWeight.BOLD)),
+                        ft.DataCell(ft.Text(str(p.get("payment_mode") or "CASH"))),
+                        ft.DataCell(ft.Text(str(p.get("payment_date") or "")[:10])),
+                        ft.DataCell(ft.Text(str(p.get("collector_name") or "—"))),
+                        ft.DataCell(ft.Text(str(p.get("transaction_ref") or "—"))),
                     ]
                 )
             )
 
-        installment_table = ft.DataTable(
+        table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("Admission No", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Course Name", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Total Fee", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("1st Inst", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("2nd Inst", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("3rd Inst", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("4th Inst", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Total Paid", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Pending", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Payment ID", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Admission", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Installment", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Amount", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Mode", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Date", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Collector", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Tx Ref", weight=ft.FontWeight.BOLD)),
             ],
-            rows=installment_rows,
+            rows=rows,
             heading_row_color=AppTheme.SURFACE_VARIANT,
             column_spacing=16,
         )
 
         return ft.Container(
-            content=ft.ListView(
-                controls=[
-                    summary_row,
-                    ft.Text("Installment-Wise Breakdown (Grouped by Admission)", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
-                    installment_table,
-                ],
-                spacing=AppTheme.PAD_MD,
-                expand=True,
-            ),
+            content=ft.ListView(controls=[table], expand=True),
+            bgcolor=AppTheme.SURFACE,
+            padding=AppTheme.PAD_MD,
+            border_radius=AppTheme.RADIUS_MD,
+            border=ft.Border.all(1, AppTheme.BORDER),
             expand=True,
         )
 
-    # --- TAB 4: RECEIPTS ---
+    # ── TAB 4: RECEIPTS ──
     def _build_receipts_tab(self) -> ft.Container:
         receipts = self.workspace_data.receipts
 
@@ -594,14 +596,8 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                 content=ft.Column(
                     controls=[
                         ft.Icon(ft.Icons.RECEIPT_LONG_OUTLINED, size=54, color=AppTheme.TEXT_MUTED),
-                        ft.Text("No Receipts Issued", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
-                        ft.Text(
-                            "Receipts are immutable financial documents generated sequentially upon payment confirmation.\n"
-                            "Receipts for this student will appear here.",
-                            size=AppTheme.SIZE_BODY,
-                            color=AppTheme.TEXT_SECONDARY,
-                            text_align=ft.TextAlign.CENTER,
-                        ),
+                        ft.Text("No Receipts Generated", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
+                        ft.Text("Receipts are automatically created whenever payments are recorded.", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_SECONDARY),
                     ],
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     alignment=ft.MainAxisAlignment.CENTER,
@@ -613,52 +609,34 @@ class StudentWorkspaceDialog(ft.AlertDialog):
 
         rows = []
         for r in receipts:
-            rcp_no = r.get("receipt_number") or f"RCP-{r.get('id')}"
-            adm_no = f"{r.get('candidate_year')}-{r.get('candidate_sequence'):03d}" if r.get("candidate_year") and r.get("candidate_sequence") else f"#{r.get('admission_id')}"
-            pdf_path = r.get("pdf_path")
+            r_num = str(r.get("receipt_number") or "N/A")
+            r_amt = float(r.get("amount_paid") or 0.0)
+            r_pdf = str(r.get("pdf_path") or "")
 
-            def handle_view_pdf(_, path=pdf_path):
-                if path and Path(path).exists():
-                    p = self.safe_page
-                    if p:
-                        p.launch_url(f"file://{path}")
+            def open_pdf(e, pth=r_pdf):
+                if pth and Path(pth).exists():
+                    subprocess.Popen(["xdg-open", pth])
+                else:
+                    self.show_toast("PDF receipt file not found on disk.", is_error=True)
 
-            def handle_share_receipt_wa(_, rcp=r, path=pdf_path):
-                student = self.workspace_data.student
-                clean_num = "".join(c for c in (student.mobile_number or "") if c.isdigit())
-                if len(clean_num) == 10:
-                    clean_num = f"91{clean_num}"
-                p = self.safe_page
-                if p:
-                    p.launch_url(f"https://wa.me/{clean_num}")
+            def share_wa(e, rec=r):
+                stud_mobile = self.workspace_data.student.mobile_number
+                msg = f"Sudharm Infotech Receipt: {rec.get('receipt_number')}\nAmount Paid: ₹{float(rec.get('amount_paid') or 0.0):,.2f}\nCourse: {rec.get('course_name') or 'IT Training'}"
+                webbrowser.open(format_whatsapp_url(stud_mobile, msg))
 
             rows.append(
                 ft.DataRow(
                     cells=[
-                        ft.DataCell(ft.Text(rcp_no, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY)),
-                        ft.DataCell(ft.Text(str(r.get("created_at") or "")[:10])),
-                        ft.DataCell(ft.Text(adm_no)),
-                        ft.DataCell(ft.Text(str(r.get("course_name") or "General"))),
-                        ft.DataCell(ft.Text(f"Inst #{r.get('installment_number') or 1}")),
-                        ft.DataCell(ft.Text(f"₹{float(r.get('amount') or 0.0):,.2f}", color=AppTheme.SUCCESS, weight=ft.FontWeight.BOLD)),
-                        ft.DataCell(ft.Text(str(r.get("payment_mode") or "CASH"))),
+                        ft.DataCell(ft.Text(r_num, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY)),
+                        ft.DataCell(ft.Text(f"Installment #{r.get('installment_number')}")),
+                        ft.DataCell(ft.Text(f"₹{r_amt:,.2f}", color=AppTheme.SUCCESS, weight=ft.FontWeight.BOLD)),
+                        ft.DataCell(ft.Text(str(r.get("receipt_date") or "")[:10])),
+                        ft.DataCell(ft.Text(str(r.get("collector_name") or "—"))),
                         ft.DataCell(
                             ft.Row(
                                 controls=[
-                                    ft.IconButton(
-                                        icon=ft.Icons.PICTURE_AS_PDF,
-                                        icon_color=AppTheme.PRIMARY,
-                                        icon_size=18,
-                                        tooltip="View Vector PDF Receipt",
-                                        on_click=handle_view_pdf,
-                                    ),
-                                    ft.IconButton(
-                                        icon=ft.Icons.CHAT,
-                                        icon_color=AppTheme.SUCCESS,
-                                        icon_size=18,
-                                        tooltip="Share Receipt on WhatsApp",
-                                        on_click=handle_share_receipt_wa,
-                                    ),
+                                    ft.IconButton(icon=ft.Icons.PICTURE_AS_PDF, icon_color=AppTheme.PRIMARY, tooltip="Open PDF", on_click=open_pdf),
+                                    ft.IconButton(icon=ft.Icons.CHAT, icon_color=AppTheme.SUCCESS, tooltip="Share on WhatsApp", on_click=share_wa),
                                 ],
                                 spacing=2,
                             )
@@ -669,13 +647,11 @@ class StudentWorkspaceDialog(ft.AlertDialog):
 
         table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("Receipt No.", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Date", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Admission No", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Course", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Receipt No", weight=ft.FontWeight.BOLD)),
                 ft.DataColumn(ft.Text("Installment", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Amount Paid", weight=ft.FontWeight.BOLD)),
-                ft.DataColumn(ft.Text("Mode", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Amount", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Date", weight=ft.FontWeight.BOLD)),
+                ft.DataColumn(ft.Text("Collector", weight=ft.FontWeight.BOLD)),
                 ft.DataColumn(ft.Text("Actions", weight=ft.FontWeight.BOLD)),
             ],
             rows=rows,
@@ -692,30 +668,72 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             expand=True,
         )
 
-    # --- TAB 5: VILLAGE FRIENDS ---
+    # ── TAB 5: VILLAGE FRIENDS ──
     def _build_friends_tab(self) -> ft.Container:
         friends = self.workspace_data.friends
 
-        if not friends:
-            return ft.Container(
-                content=ft.Column(
-                    controls=[
-                        ft.Icon(ft.Icons.GROUP_OFF, size=54, color=AppTheme.TEXT_MUTED),
-                        ft.Text("No Village Friends Linked", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
-                        ft.Text(
-                            f"Students from {self.workspace_data.student.village or 'the same village'} who take admission together appear here.",
-                            size=AppTheme.SIZE_BODY,
-                            color=AppTheme.TEXT_SECONDARY,
-                            text_align=ft.TextAlign.CENTER,
+        # Add Friend Search / Selection Sub-Section
+        search_field = ft.TextField(
+            hint_text="Search student by name or mobile to link as friend...",
+            prefix_icon=ft.Icons.SEARCH,
+            border_radius=AppTheme.RADIUS_MD,
+            expand=True,
+        )
+        search_results_col = ft.Column(spacing=4, visible=False)
+
+        def do_search_friends(e):
+            q = (search_field.value or "").strip()
+            if len(q) < 2:
+                search_results_col.visible = False
+                self._safe_update()
+                return
+            res = self.controller.search_students(q)
+            ctrls = []
+            for s in res:
+                if s.id == self.student_id:
+                    continue
+                def add_f(_, fid=s.id, fn=s.display_name):
+                    try:
+                        self.controller.add_student_friend(self.student_id, fid)
+                        self.load_workspace_data()
+                        self.tab_content_area.content = self._build_active_tab_content()
+                        self.show_toast(f"Linked {fn} as village friend.", is_success=True)
+                    except Exception as ex:
+                        self.show_toast(str(ex), is_error=True)
+
+                ctrls.append(
+                    ft.Container(
+                        content=ft.Row(
+                            controls=[
+                                ft.Text(f"{s.display_name} ({s.mobile_number or 'No mobile'}) - {s.village or 'Chandwad'}", size=AppTheme.SIZE_BODY),
+                                ft.ElevatedButton(content=ft.Text("Link Friend"), icon=ft.Icons.PERSON_ADD, on_click=add_f),
+                            ],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                         ),
-                    ],
-                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                    alignment=ft.MainAxisAlignment.CENTER,
-                    spacing=AppTheme.PAD_SM,
-                ),
-                alignment=ft.Alignment.CENTER,
-                expand=True,
-            )
+                        bgcolor=AppTheme.SURFACE_VARIANT,
+                        padding=ft.Padding(10, 6, 10, 6),
+                        border_radius=AppTheme.RADIUS_SM,
+                    )
+                )
+            search_results_col.controls = ctrls or [ft.Text("No students found matching search.", color=AppTheme.TEXT_MUTED)]
+            search_results_col.visible = True
+            self._safe_update()
+
+        search_field.on_change = do_search_friends
+
+        top_add_bar = ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Row(controls=[search_field], spacing=AppTheme.PAD_SM),
+                    search_results_col,
+                ],
+                spacing=AppTheme.PAD_XS,
+            ),
+            bgcolor=AppTheme.SURFACE,
+            padding=AppTheme.PAD_SM,
+            border_radius=AppTheme.RADIUS_MD,
+            border=ft.Border.all(1, AppTheme.BORDER),
+        )
 
         rows = []
         for f in friends:
@@ -723,22 +741,22 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             f_mobile = f.get("mobile_number") or "N/A"
             f_id = f.get("id")
 
-            def handle_remove_friend(_, fid=f_id):
+            def handle_remove_friend(_, fid=f_id, fn=f_name):
                 try:
-                    from modules.admission.friendship_repository import FriendshipRepository
-                    FriendshipRepository().remove_friendship(self.student_id, fid)
+                    self.controller.remove_student_friend(self.student_id, fid)
                     self.load_workspace_data()
                     self.tab_content_area.content = self._build_active_tab_content()
-                    self._safe_update()
+                    self.show_toast(f"Removed friendship link with {fn}.", is_success=True)
                 except Exception as ex:
                     LogService.error(f"Error removing friend: {ex}", context="StudentWorkspace")
+                    self.show_toast(str(ex), is_error=True)
 
             rows.append(
                 ft.DataRow(
                     cells=[
                         ft.DataCell(ft.Text(f_name, weight=ft.FontWeight.BOLD)),
                         ft.DataCell(ft.Text(f_mobile)),
-                        ft.DataCell(ft.Text(f.get("village") or "Same Village")),
+                        ft.DataCell(ft.Text(f.get("village") or "Chandwad")),
                         ft.DataCell(ft.Text(str(f.get("friendship_date") or "")[:10])),
                         ft.DataCell(
                             ft.IconButton(
@@ -767,52 +785,125 @@ class StudentWorkspaceDialog(ft.AlertDialog):
         )
 
         return ft.Container(
-            content=ft.ListView(controls=[table], expand=True),
-            bgcolor=AppTheme.SURFACE,
-            padding=AppTheme.PAD_MD,
-            border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
+            content=ft.ListView(
+                controls=[
+                    top_add_bar,
+                    ft.Text(f"Confirmed Village Friends ({len(friends)})", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                    table if friends else ft.Text("No village friends linked yet. Search and link above.", color=AppTheme.TEXT_MUTED),
+                ],
+                spacing=AppTheme.PAD_MD,
+                expand=True,
+            ),
             expand=True,
         )
 
-    # --- TAB 6: DOCUMENTS ---
+    # ── TAB 6: DOCUMENTS (REAL FILE SELECTION & <= 100 KB VALIDATION) ──
     def _build_documents_tab(self) -> ft.Container:
         student = self.workspace_data.student
 
-        def doc_card(title: str, file_path: Optional[str], icon: str) -> ft.Container:
+        def trigger_upload(doc_type: str):
+            """Uses Zenity / file dialog to select real file and upload under <= 100 KB check."""
+            try:
+                result = subprocess.run(
+                    ["zenity", "--file-selection", f"--title=Select Student {doc_type.title()} (<= 100 KB)", "--file-filter=Images (*.jpg *.jpeg *.png) | *.jpg *.jpeg *.png *.JPG *.JPEG *.PNG"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                selected_path = result.stdout.strip()
+                if not selected_path or not Path(selected_path).is_file():
+                    return
+
+                p = Path(selected_path)
+                file_bytes = p.read_bytes()
+                max_bytes = 100 * 1024
+                if len(file_bytes) > max_bytes:
+                    self.show_toast(
+                        f"File size ({len(file_bytes) / 1024:.1f} KB) exceeds the maximum allowed limit of 100 KB.",
+                        is_error=True,
+                    )
+                    return
+
+                self.controller.upload_student_document(
+                    student_id=self.student_id,
+                    doc_type=doc_type,
+                    file_bytes=file_bytes,
+                    filename=p.name,
+                )
+                self.load_workspace_data()
+                self.tab_content_area.content = self._build_active_tab_content()
+                self.show_toast(f"{doc_type.title()} uploaded successfully ({format_file_size(len(file_bytes))}).", is_success=True)
+            except Exception as ex:
+                LogService.error(f"File upload error: {ex}", context="StudentWorkspace")
+                self.show_toast(f"Upload failed: {ex}", is_error=True)
+
+        def trigger_delete(doc_type: str):
+            try:
+                self.controller.delete_student_document(self.student_id, doc_type)
+                self.load_workspace_data()
+                self.tab_content_area.content = self._build_active_tab_content()
+                self.show_toast(f"{doc_type.title()} removed.", is_success=True)
+            except Exception as ex:
+                self.show_toast(str(ex), is_error=True)
+
+        def doc_card(title: str, doc_type: str, file_path: Optional[str], icon: str) -> ft.Container:
             has_file = bool(file_path and Path(file_path).exists())
-            status_txt = "Uploaded (Verified)" if has_file else "Not Uploaded"
+            size_str = format_file_size(Path(file_path).stat().st_size) if has_file else "Not Uploaded"
+
+            actions_row = ft.Row(
+                controls=[
+                    ft.ElevatedButton(
+                        content=ft.Text("Upload" if not has_file else "Replace"),
+                        icon=ft.Icons.UPLOAD_FILE,
+                        style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE),
+                        on_click=lambda _: trigger_upload(doc_type),
+                    ),
+                ],
+                alignment=ft.MainAxisAlignment.CENTER,
+            )
+            if has_file:
+                actions_row.controls.append(
+                    ft.IconButton(
+                        icon=ft.Icons.DELETE_OUTLINE,
+                        icon_color=AppTheme.DANGER,
+                        tooltip=f"Remove {title}",
+                        on_click=lambda _: trigger_delete(doc_type),
+                    )
+                )
+
             return ft.Container(
                 content=ft.Column(
                     controls=[
                         ft.Icon(icon, size=40, color=AppTheme.SUCCESS if has_file else AppTheme.PRIMARY),
                         ft.Text(title, size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
-                        ft.Text(status_txt, size=AppTheme.SIZE_CAPTION, color=AppTheme.SUCCESS if has_file else AppTheme.TEXT_SECONDARY),
+                        ft.Text(f"Status: {size_str}", size=AppTheme.SIZE_CAPTION, color=AppTheme.SUCCESS if has_file else AppTheme.TEXT_SECONDARY),
+                        ft.Container(height=6),
+                        actions_row,
                     ],
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    alignment=ft.MainAxisAlignment.CENTER,
                     spacing=4,
                 ),
                 bgcolor=AppTheme.SURFACE,
-                padding=AppTheme.PAD_LG,
+                padding=AppTheme.PAD_MD,
                 border_radius=AppTheme.RADIUS_MD,
                 border=ft.Border.all(1, AppTheme.SUCCESS if has_file else AppTheme.BORDER),
-                width=190,
+                width=240,
                 alignment=ft.Alignment.CENTER,
             )
 
         return ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Text("Student Documents & Identity Proofs (<= 100 KB)", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                    ft.Text("Student Documents & Identity Proofs (Strict Max: 100 KB)", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                    ft.Text("Click Upload to select files from file manager. Supported formats: JPG, JPEG, PNG.", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
                     ft.Divider(height=1, color=AppTheme.BORDER),
                     ft.Row(
                         controls=[
-                            doc_card("Student Photo", student.photo_path, ft.Icons.ACCOUNT_BOX),
-                            doc_card("Student Signature", student.signature_path, ft.Icons.DRAW),
-                            doc_card("Aadhaar Card", None, ft.Icons.BADGE),
-                            doc_card("Mark Sheet", None, ft.Icons.DESCRIPTION),
+                            doc_card("Student Photo", "PHOTO", student.photo_path, ft.Icons.ACCOUNT_BOX),
+                            doc_card("Student Signature", "SIGNATURE", student.signature_path, ft.Icons.DRAW),
                         ],
-                        spacing=AppTheme.PAD_MD,
+                        spacing=AppTheme.PAD_LG,
                     ),
                 ],
                 spacing=AppTheme.PAD_MD,
@@ -821,7 +912,7 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             expand=True,
         )
 
-    # --- TAB 7: HISTORY & ACTIVITY ---
+    # ── TAB 7: HISTORY & TIMELINE ──
     def _build_history_tab(self) -> ft.Container:
         timeline = self.workspace_data.timeline
 
@@ -848,14 +939,13 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                                     ft.Text(event.description, size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
                                 ],
                                 spacing=2,
-                                expand=True,
                             ),
-                            ft.Text(event.timestamp[:16], size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
+                            ft.Text(event.timestamp[:16] if event.timestamp else "", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
                         ],
-                        spacing=AppTheme.PAD_MD,
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     ),
-                    padding=ft.Padding(left=12, top=10, right=12, bottom=10),
                     bgcolor=AppTheme.SURFACE,
+                    padding=AppTheme.PAD_SM,
                     border_radius=AppTheme.RADIUS_SM,
                     border=ft.Border.all(1, AppTheme.BORDER),
                 )
@@ -863,56 +953,42 @@ class StudentWorkspaceDialog(ft.AlertDialog):
 
         return ft.Container(
             content=ft.ListView(controls=items, spacing=AppTheme.PAD_SM, expand=True),
+            padding=AppTheme.PAD_SM,
             expand=True,
         )
 
-    # --- FOOTER ACTIONS ---
     def _build_footer_actions(self) -> list[ft.Control]:
+        def handle_edit(_):
+            def on_saved():
+                self.load_workspace_data()
+                self.title = self._build_header()
+                self.tab_content_area.content = self._build_active_tab_content()
+                self._safe_update()
+                if self.on_refresh_required:
+                    self.on_refresh_required()
+
+            p = self.safe_page
+            if p:
+                dlg = StudentFormModal(
+                    controller=self.controller,
+                    on_saved=on_saved,
+                    student=self.workspace_data.student,
+                )
+                p.show_dialog(dlg)
+
         edit_btn = ft.ElevatedButton(
             content=ft.Text("Edit Profile"),
             icon=ft.Icons.EDIT,
-            style=ft.ButtonStyle(
-                bgcolor=AppTheme.PRIMARY,
-                color=AppTheme.SURFACE,
-                shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
-            ),
-            on_click=self._handle_edit,
+            style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE),
+            on_click=handle_edit,
         )
 
         close_btn = ft.TextButton(
             content=ft.Text("Close Workspace"),
-            style=ft.ButtonStyle(color=AppTheme.TEXT_SECONDARY),
             on_click=self.close_workspace,
         )
 
-        return [
-            ft.Row(controls=[edit_btn], spacing=AppTheme.PAD_SM),
-            close_btn,
-        ]
-
-    def _handle_edit(self, e: ft.ControlEvent) -> None:
-        student = self.workspace_data.student
-
-        def on_saved_refresh():
-            self.load_workspace_data()
-            self.title = self._build_header()
-            self.tab_buttons_row = self._build_tab_bar()
-            self.tab_content_area.content = self._build_active_tab_content()
-            self._safe_update()
-            if self.on_refresh_required:
-                self.on_refresh_required()
-
-        modal = StudentFormModal(
-            controller=self.controller,
-            on_saved=on_saved_refresh,
-            student=student,
-        )
-        p = self.safe_page
-        if p:
-            try:
-                p.show_dialog(modal)
-            except RuntimeError:
-                pass
+        return [edit_btn, close_btn]
 
     def close_workspace(self, e: Optional[ft.ControlEvent] = None) -> None:
         p = self.safe_page
@@ -921,5 +997,3 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                 p.pop_dialog()
             except RuntimeError:
                 pass
-        if self.on_refresh_required:
-            self.on_refresh_required()

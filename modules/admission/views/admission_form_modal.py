@@ -1,15 +1,15 @@
 # modules/admission/views/admission_form_modal.py
 
 from __future__ import annotations
-import os
-import re
 from datetime import datetime
+from pathlib import Path
+import re
+import subprocess
 from typing import Callable, Optional, Any
 import flet as ft
 
 from core.logger.service import LogService
 from core.exceptions import ValidationError, ConflictError, ServiceError
-from ui.themes.theme import AppTheme
 from modules.admission.controller import AdmissionController
 from modules.admission.constants import AdmissionStatus, Qualification, BloodGroup, Gender
 from modules.admission.dto import AdmissionDTO, FriendSuggestionDTO
@@ -19,20 +19,23 @@ from modules.student.controller import StudentController
 from modules.course.controller import CourseController
 from modules.batch.controller import BatchController
 from modules.receipts.controller import ReceiptController
+from shared.utils.formatting import format_title_case, format_file_size
+from ui.themes.theme import AppTheme
 
 __all__ = ["AdmissionFormModal"]
 
 
 class AdmissionFormModal(ft.AlertDialog):
     """
-    Official SIMS v2.2 Admission Form Modal.
-    Structured in exact logical sequence:
-    SECTION 1: Personal Information (Row 1: Names, Row 2: Mother/DOB/Gender, Row 3: Mobile/Parent/Aadhaar)
-    SECTION 2: Location (Village / Address - At least ONE required) & Village Friend Suggestions (Max 3)
-    SECTION 3: Qualification, School/College Master, and Blood Group
-    SECTION 4: Course Selection & Dynamic Batch Allocation
-    SECTION 5: Document Uploads (Photo <= 100KB, Signature <= 100KB with real file pickers)
-    SECTION 6: Fee Calculation & Confirmation Flow (Save Draft ₹0 vs Confirm >= ₹500)
+    Spacious Horizontal Rectangular Desktop Admission Workspace Modal.
+    Structured in clear logical sequence:
+    SECTION 1: Student Mode (Register New Student vs Select Existing Student with autofill)
+    SECTION 2: Personal Details (Names, Mother, DOB, Gender, Mobile, Parent, Aadhaar)
+    SECTION 3: Location (Village, Address) & Village Friend Suggestions (Max 3)
+    SECTION 4: Academic & Institution (Qualification, School/College Master, Blood Group)
+    SECTION 5: Course & Dynamic Batch Allocation
+    SECTION 6: Documents (Real File Pickers with <= 100KB validation)
+    SECTION 7: Fees & Actions (Save Draft ₹0 vs Confirm Admission & Continue to Payment >= ₹500)
     """
 
     MAX_FILE_SIZE_BYTES = 100 * 1024  # 100 KB limit
@@ -70,13 +73,13 @@ class AdmissionFormModal(ft.AlertDialog):
         self.signature_filename: Optional[str] = admission.signature_path if admission else None
 
         # Title Header
-        title_str = "Edit Admission Record" if self.is_edit_mode else "New Student Admission"
+        title_str = "Edit Admission Record" if self.is_edit_mode else "New Student Admission Workspace"
         self.title = ft.Row(
             controls=[
                 ft.Row(
                     controls=[
                         ft.Icon(ft.Icons.APP_REGISTRATION, color=AppTheme.PRIMARY, size=24),
-                        ft.Text(title_str, size=AppTheme.SIZE_H2, weight=ft.FontWeight.W_600),
+                        ft.Text(title_str, size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
                     ],
                     spacing=AppTheme.PAD_SM,
                 ),
@@ -91,47 +94,53 @@ class AdmissionFormModal(ft.AlertDialog):
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         )
 
-        # ── Mode Switcher ──
+        # ── Top AirDrop Notification Toast Banner ──
+        self.banner_text = ft.Text("", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.W_500)
+        self.banner_icon = ft.Icon(ft.Icons.INFO, size=18)
+        self.banner_container = ft.Container(
+            content=ft.Row([self.banner_icon, self.banner_text], spacing=AppTheme.PAD_SM, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+            padding=ft.Padding(14, 8, 14, 8),
+            border_radius=AppTheme.RADIUS_MD,
+            visible=False,
+        )
+
+        # ── Mode Switcher & Existing Student Search ──
         self.mode_segmented_btn = ft.SegmentedButton(
             selected=[self.enrollment_mode],
             allow_multiple_selection=False,
             segments=[
-                ft.Segment(value="new", label=ft.Text("Register New Student", size=AppTheme.SIZE_CAPTION), icon=ft.Icon(ft.Icons.PERSON_ADD, size=16)),
-                ft.Segment(value="existing", label=ft.Text("Select Existing Student", size=AppTheme.SIZE_CAPTION), icon=ft.Icon(ft.Icons.PERSON_SEARCH, size=16)),
+                ft.Segment(value="new", label=ft.Text("Register New Student", size=AppTheme.SIZE_BODY), icon=ft.Icon(ft.Icons.PERSON_ADD, size=16)),
+                ft.Segment(value="existing", label=ft.Text("Select Existing Student", size=AppTheme.SIZE_BODY), icon=ft.Icon(ft.Icons.PERSON_SEARCH, size=16)),
             ],
             on_change=self._on_mode_change,
             visible=not self.is_edit_mode,
         )
 
-        # ── Existing Student Search ──
         self.student_search_input = ft.TextField(
-            label="Search Student",
-            hint_text="Search by Name, Mobile, or Student ID...",
+            label="Search Existing Student Profile",
+            hint_text="Type student name, mobile number, or student ID...",
             prefix_icon=ft.Icons.SEARCH,
             border_radius=AppTheme.RADIUS_MD,
             visible=False,
             on_change=self._on_student_search_change,
+            expand=True,
         )
         self.student_search_results = ft.Column(spacing=2, scroll=ft.ScrollMode.AUTO, height=120, visible=False)
-        self.selected_student_badge = ft.Container(visible=bool(self.selected_student_id))
 
-        # ── SECTION 1: Personal Information ──
-        # Row 1: First Name *, Middle Name *, Surname *
+        # ── SECTION 1: Personal Details ──
         self.first_name_input = ft.TextField(
             label="First Name *",
             hint_text="e.g. Rahul",
             border_radius=AppTheme.RADIUS_MD,
             value=admission.first_name if admission else "",
             expand=True,
-            on_change=lambda e: self._format_input_title(e.control),
         )
         self.middle_name_input = ft.TextField(
-            label="Middle Name *",
-            hint_text="Father's / Husband's name",
+            label="Middle / Father's Name",
+            hint_text="e.g. Shashikant",
             border_radius=AppTheme.RADIUS_MD,
             value=admission.middle_name if admission else "",
             expand=True,
-            on_change=lambda e: self._format_input_title(e.control),
         )
         self.last_name_input = ft.TextField(
             label="Surname / Last Name *",
@@ -139,23 +148,20 @@ class AdmissionFormModal(ft.AlertDialog):
             border_radius=AppTheme.RADIUS_MD,
             value=admission.last_name if admission else "",
             expand=True,
-            on_change=lambda e: self._format_input_title(e.control),
         )
 
-        # Row 2: Mother's Name *, Date of Birth *, Gender *
         self.mother_name_input = ft.TextField(
             label="Mother's Name *",
             hint_text="e.g. Sunita",
             border_radius=AppTheme.RADIUS_MD,
             value=admission.mother_name if admission else "",
             expand=True,
-            on_change=lambda e: self._format_input_title(e.control),
         )
         self.dob_input = ft.TextField(
-            label="Date of Birth (YYYY-MM-DD) *",
-            hint_text="2005-08-15",
+            label="Date of Birth *",
+            hint_text="YYYY-MM-DD",
             border_radius=AppTheme.RADIUS_MD,
-            value=admission.dob if admission else "2006-01-01",
+            value=admission.dob if admission else "2005-01-01",
             expand=True,
         )
         self.gender_dropdown = ft.Dropdown(
@@ -168,87 +174,78 @@ class AdmissionFormModal(ft.AlertDialog):
             value=admission.gender.upper() if (admission and admission.gender) else "MALE",
             border_radius=AppTheme.RADIUS_MD,
             expand=True,
-            on_select=lambda _: self._load_friend_suggestions(),
         )
 
-        # Row 3: Mobile Number *, Parent/Guardian Name (optional), Aadhaar Number *
         self.mobile_input = ft.TextField(
             label="Mobile Number *",
             hint_text="10-digit mobile number",
-            keyboard_type=ft.KeyboardType.PHONE,
             border_radius=AppTheme.RADIUS_MD,
             value=admission.mobile_number if admission else "",
+            keyboard_type=ft.KeyboardType.PHONE,
+            prefix_icon=ft.Icons.PHONE,
             expand=True,
         )
         self.parent_name_input = ft.TextField(
-            label="Parent / Guardian Name (Optional)",
-            hint_text="e.g. Suresh Patil",
+            label="Parent / Guardian Name",
+            hint_text="e.g. Shashikant Patil",
             border_radius=AppTheme.RADIUS_MD,
             value=admission.parent_guardian_name if admission else "",
             expand=True,
-            on_change=lambda e: self._format_input_title(e.control),
         )
         self.aadhaar_input = ft.TextField(
-            label="Aadhaar Number *",
-            hint_text="12-digit Aadhaar number",
-            keyboard_type=ft.KeyboardType.NUMBER,
+            label="Aadhaar Number (12 digits) *",
+            hint_text="e.g. 1234 5678 9012",
             border_radius=AppTheme.RADIUS_MD,
             value=admission.aadhaar_number if admission else "",
+            keyboard_type=ft.KeyboardType.NUMBER,
+            prefix_icon=ft.Icons.FINGERPRINT,
             expand=True,
         )
 
-        # ── SECTION 2: Location & Friend System ──
+        # ── SECTION 2: Location Details & Friends ──
         self.village_input = ft.TextField(
-            label="Village / Town",
-            hint_text="e.g. Chandwad (Required if Address empty)",
+            label="Village / City *",
+            hint_text="e.g. Chandwad",
             border_radius=AppTheme.RADIUS_MD,
-            value=admission.village if admission else "",
-            expand=True,
+            value=admission.village if admission else "Chandwad",
             on_change=lambda _: self._on_village_changed(),
+            expand=True,
         )
         self.address_input = ft.TextField(
-            label="Full Address",
-            hint_text="Street, House No, Landmark (Required if Village empty)",
+            label="Residential Address",
+            hint_text="e.g. Near Jio Tower, Sawargaon Road",
             border_radius=AppTheme.RADIUS_MD,
             value=admission.address if admission else "",
             expand=True,
         )
 
-        # Friend suggestions container
-        self.friends_container = ft.Column(spacing=4)
+        self.friends_container = ft.Row(wrap=True, spacing=6)
         self.friends_card = ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Row(
-                        controls=[
-                            ft.Icon(ft.Icons.PEOPLE_ALT, size=16, color=AppTheme.PRIMARY),
-                            ft.Text("Suggested Friends from this Village (Select up to 3):", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
-                        ],
-                        spacing=4,
-                    ),
+                    ft.Text("Village Friend Matching (Same Village / Peer Suggestions - Max 3)", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
                     self.friends_container,
                 ],
-                spacing=6,
+                spacing=4,
             ),
             bgcolor=AppTheme.SURFACE_VARIANT,
-            padding=AppTheme.PAD_SM,
+            padding=ft.Padding(10, 8, 10, 8),
             border_radius=AppTheme.RADIUS_SM,
-            border=ft.Border.all(1, AppTheme.BORDER),
             visible=False,
         )
 
-        # ── SECTION 3: Qualification, School/College Master, Blood Group ──
+        # ── SECTION 3: Qualification & Institution ──
         qual_options = [ft.DropdownOption(key=q.value, text=q.value) for q in Qualification]
         self.qualification_dropdown = ft.Dropdown(
             label="Highest Qualification *",
             options=qual_options,
-            value=admission.qualification if (admission and admission.qualification) else Qualification.TENTH.value,
+            value=admission.qualification if admission else Qualification.HSC_12TH.value,
             border_radius=AppTheme.RADIUS_MD,
             expand=True,
             on_select=self._on_qualification_changed,
         )
         self.qual_other_input = ft.TextField(
-            label="Specify Qualification *",
+            label="Specify Qualification",
             border_radius=AppTheme.RADIUS_MD,
             visible=False,
             value=admission.qualification_other if admission else "",
@@ -267,14 +264,14 @@ class AdmissionFormModal(ft.AlertDialog):
 
         bg_options = [ft.DropdownOption(key=bg.value, text=bg.value) for bg in BloodGroup]
         self.blood_group_dropdown = ft.Dropdown(
-            label="Blood Group (Optional)",
+            label="Blood Group",
             options=bg_options,
             value=admission.blood_group if (admission and admission.blood_group) else "O+",
             width=130,
             border_radius=AppTheme.RADIUS_MD,
         )
 
-        # ── SECTION 4: Course & Batch Selection ──
+        # ── SECTION 4: Course & Batch ──
         courses, _ = self.course_controller.list_courses(status="ACTIVE", limit=200)
         self.course_dropdown = ft.Dropdown(
             label="Select Course *",
@@ -285,17 +282,17 @@ class AdmissionFormModal(ft.AlertDialog):
             on_select=self._on_course_selected,
         )
         self.batch_dropdown = ft.Dropdown(
-            label="Select Batch (Optional)",
+            label="Select Batch",
             options=[ft.DropdownOption(key="NONE", text="No Batch Assigned (Allocate Later)")],
             value=str(admission.batch_id) if (admission and admission.batch_id) else "NONE",
             border_radius=AppTheme.RADIUS_MD,
             expand=True,
         )
 
-        # ── SECTION 5: Documents (Photo & Signature File Pickers) ──
-        self.photo_info_text = ft.Text(self.photo_filename or "No photo chosen (Max 100 KB)", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY)
+        # ── SECTION 5: Documents (Real File Pickers & 100 KB validation) ──
+        self.photo_info_text = ft.Text(self.photo_filename or "No photo selected (Max 100 KB)", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY)
         self.photo_picker_btn = ft.OutlinedButton(
-            content=ft.Text("Choose Photo", size=AppTheme.SIZE_CAPTION),
+            content=ft.Text("Choose Photo (Explorer)"),
             icon=ft.Icons.ADD_A_PHOTO,
             on_click=self._trigger_photo_picker,
         )
@@ -308,9 +305,9 @@ class AdmissionFormModal(ft.AlertDialog):
             on_click=self._clear_photo,
         )
 
-        self.sig_info_text = ft.Text(self.signature_filename or "No signature chosen (Max 100 KB)", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY)
+        self.sig_info_text = ft.Text(self.signature_filename or "No signature selected (Max 100 KB)", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY)
         self.sig_picker_btn = ft.OutlinedButton(
-            content=ft.Text("Choose Signature", size=AppTheme.SIZE_CAPTION),
+            content=ft.Text("Choose Signature (Explorer)"),
             icon=ft.Icons.DRAW,
             on_click=self._trigger_signature_picker,
         )
@@ -323,7 +320,7 @@ class AdmissionFormModal(ft.AlertDialog):
             on_click=self._clear_signature,
         )
 
-        # ── SECTION 6: Fee Calculation & Confirmation ──
+        # ── SECTION 6: Fee Calculation & Actions ──
         self.base_fee_text = ft.Text(f"₹{self.base_course_fee:,.2f}", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD)
         self.discount_input = ft.TextField(
             label="Discount (₹)",
@@ -340,19 +337,7 @@ class AdmissionFormModal(ft.AlertDialog):
             color=AppTheme.PRIMARY,
         )
 
-        # Toast / Banner Notification Container (Top of Form)
-        self.banner_text = ft.Text("", color=AppTheme.DANGER, size=AppTheme.SIZE_BODY, weight=ft.FontWeight.W_500)
-        self.banner_icon = ft.Icon(ft.Icons.ERROR_OUTLINE, color=AppTheme.DANGER, size=18)
-        self.banner_container = ft.Container(
-            content=ft.Row([self.banner_icon, self.banner_text], spacing=AppTheme.PAD_SM, vertical_alignment=ft.CrossAxisAlignment.CENTER),
-            bgcolor=AppTheme.DANGER_LIGHT,
-            padding=ft.Padding(14, 10, 14, 10),
-            border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.DANGER),
-            visible=False,
-        )
-
-        # ── Action Buttons ──
+        # Buttons
         self.save_draft_btn = ft.OutlinedButton(
             content=ft.Text("Save Draft (₹0)"),
             icon=ft.Icons.SAVE_ALT,
@@ -366,158 +351,77 @@ class AdmissionFormModal(ft.AlertDialog):
         )
         self.cancel_btn = ft.TextButton(content=ft.Text("Cancel"), on_click=self.close_modal)
 
-        # Build Main Modal Layout
+        # Build Main Workspace Layout
         self._build_content_layout()
 
-    def _format_input_title(self, control: ft.TextField) -> None:
-        if control.value:
-            # Auto-capitalize words
-            capitalized = " ".join(part.capitalize() for part in control.value.split())
-            if capitalized != control.value and len(control.value) > len(capitalized):
-                pass
-            else:
-                control.value = capitalized
-
     def _build_content_layout(self) -> None:
-        # SECTION 1: Personal Information Group
-        sec1_personal = ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Text("SECTION 1: PERSONAL INFORMATION", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
-                    self.mode_segmented_btn,
-                    self.student_search_input,
-                    self.student_search_results,
-                    self.selected_student_badge,
-                    ft.Row([self.first_name_input, self.middle_name_input, self.last_name_input], spacing=AppTheme.PAD_SM),
-                    ft.Row([self.mother_name_input, self.dob_input, self.gender_dropdown], spacing=AppTheme.PAD_SM),
-                    ft.Row([self.mobile_input, self.parent_name_input, self.aadhaar_input], spacing=AppTheme.PAD_SM),
-                ],
-                spacing=AppTheme.PAD_SM,
-            ),
-            bgcolor=AppTheme.SURFACE,
-            padding=AppTheme.PAD_MD,
-            border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
-        )
-
-        # SECTION 2: Location Group
-        sec2_location = ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Text("SECTION 2: LOCATION & VILLAGE MATCHING", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
-                    ft.Row([self.village_input, self.address_input], spacing=AppTheme.PAD_SM),
-                    self.friends_card,
-                ],
-                spacing=AppTheme.PAD_SM,
-            ),
-            bgcolor=AppTheme.SURFACE,
-            padding=AppTheme.PAD_MD,
-            border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
-        )
-
-        # SECTION 3: Qualification & School/College
-        sec3_academic = ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Text("SECTION 3: QUALIFICATION & INSTITUTION", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
-                    ft.Row([self.qualification_dropdown, self.qual_other_input, self.institution_dropdown, self.blood_group_dropdown], spacing=AppTheme.PAD_SM),
-                ],
-                spacing=AppTheme.PAD_SM,
-            ),
-            bgcolor=AppTheme.SURFACE,
-            padding=AppTheme.PAD_MD,
-            border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
-        )
-
-        # SECTION 4: Course & Batch
-        sec4_course = ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Text("SECTION 4: COURSE & BATCH ALLOCATION", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
-                    ft.Row([self.course_dropdown, self.batch_dropdown], spacing=AppTheme.PAD_SM),
-                ],
-                spacing=AppTheme.PAD_SM,
-            ),
-            bgcolor=AppTheme.SURFACE,
-            padding=AppTheme.PAD_MD,
-            border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
-        )
-
-        # SECTION 5: Documents
-        photo_row = ft.Row(
+        # Left Column: Personal & Location
+        left_col = ft.Column(
             controls=[
-                self.photo_picker_btn,
-                self.photo_info_text,
-                self.photo_clear_btn,
+                ft.Text("1. PERSONAL DETAILS", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
+                ft.Row([self.first_name_input, self.middle_name_input, self.last_name_input], spacing=AppTheme.PAD_SM),
+                ft.Row([self.mother_name_input, self.dob_input, self.gender_dropdown], spacing=AppTheme.PAD_SM),
+                ft.Row([self.mobile_input, self.parent_name_input, self.aadhaar_input], spacing=AppTheme.PAD_SM),
+                ft.Divider(height=1, color=AppTheme.BORDER),
+                ft.Text("2. LOCATION & VILLAGE MATCHING", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
+                ft.Row([self.village_input, self.address_input], spacing=AppTheme.PAD_SM),
+                self.friends_card,
             ],
             spacing=AppTheme.PAD_SM,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            expand=True,
         )
 
-        sig_row = ft.Row(
+        # Right Column: Academic, Course, Documents & Fees
+        right_col = ft.Column(
             controls=[
-                self.sig_picker_btn,
-                self.sig_info_text,
-                self.sig_clear_btn,
+                ft.Text("3. ACADEMIC & INSTITUTION", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
+                ft.Row([self.qualification_dropdown, self.institution_dropdown, self.blood_group_dropdown], spacing=AppTheme.PAD_SM),
+                self.qual_other_input,
+                ft.Divider(height=1, color=AppTheme.BORDER),
+                ft.Text("4. COURSE & BATCH", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
+                ft.Row([self.course_dropdown, self.batch_dropdown], spacing=AppTheme.PAD_SM),
+                ft.Divider(height=1, color=AppTheme.BORDER),
+                ft.Text("5. DOCUMENTS (MAX: 100 KB)", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
+                ft.Row(
+                    controls=[
+                        ft.Column([ft.Text("Student Photo *", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD), ft.Row([self.photo_picker_btn, self.photo_clear_btn]), self.photo_info_text], spacing=2),
+                        ft.Column([ft.Text("Student Signature", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD), ft.Row([self.sig_picker_btn, self.sig_clear_btn]), self.sig_info_text], spacing=2),
+                    ],
+                    spacing=AppTheme.PAD_LG,
+                ),
+                ft.Divider(height=1, color=AppTheme.BORDER),
+                ft.Text("6. FEE SUMMARY", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
+                ft.Row(
+                    controls=[
+                        ft.Column([ft.Text("Course Fee", size=AppTheme.SIZE_CAPTION), self.base_fee_text], spacing=2),
+                        self.discount_input,
+                        ft.Column([ft.Text("Final Payable Fee", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD), self.final_fee_text], spacing=2),
+                    ],
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                ),
             ],
             spacing=AppTheme.PAD_SM,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        )
-
-        sec5_docs = ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Text("SECTION 5: DOCUMENTS (PHOTO & SIGNATURE)", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
-                    ft.Row([photo_row, ft.VerticalDivider(width=1, color=AppTheme.BORDER), sig_row], spacing=AppTheme.PAD_MD),
-                ],
-                spacing=AppTheme.PAD_SM,
-            ),
-            bgcolor=AppTheme.SURFACE,
-            padding=AppTheme.PAD_MD,
-            border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
-        )
-
-        # SECTION 6: Fee Section
-        sec6_fee = ft.Container(
-            content=ft.Row(
-                controls=[
-                    ft.Row([ft.Text("Course Fee:", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.W_600), self.base_fee_text], spacing=6),
-                    self.discount_input,
-                    ft.Row([ft.Text("Final Fee:", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.W_600), self.final_fee_text], spacing=6),
-                ],
-                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-            ),
-            bgcolor=AppTheme.SURFACE_VARIANT,
-            padding=AppTheme.PAD_MD,
-            border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
+            expand=True,
         )
 
         self.content = ft.Container(
-            width=860,
+            width=960,
+            height=660,
             content=ft.Column(
                 controls=[
                     self.banner_container,
-                    sec1_personal,
-                    sec2_location,
-                    sec3_academic,
-                    sec4_course,
-                    sec5_docs,
-                    sec6_fee,
+                    ft.Row(controls=[self.mode_segmented_btn, self.student_search_input], spacing=AppTheme.PAD_SM, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                    self.student_search_results,
+                    ft.Divider(height=1, color=AppTheme.BORDER),
+                    ft.Row(controls=[left_col, ft.VerticalDivider(width=1, color=AppTheme.BORDER), right_col], expand=True, spacing=AppTheme.PAD_MD),
                 ],
-                spacing=AppTheme.PAD_MD,
-                scroll=ft.ScrollMode.AUTO,
-                height=590,
+                spacing=AppTheme.PAD_SM,
+                expand=True,
             ),
         )
 
-        self.actions = [self.cancel_btn, self.save_draft_btn, self.confirm_pay_btn]
-        self.actions_alignment = ft.MainAxisAlignment.END
+        self.actions = [self.save_draft_btn, self.cancel_btn, self.confirm_pay_btn]
+        self.actions_alignment = ft.MainAxisAlignment.SPACE_BETWEEN
 
     @property
     def safe_page(self) -> Optional[ft.Page]:
@@ -548,18 +452,21 @@ class AdmissionFormModal(ft.AlertDialog):
             except RuntimeError:
                 pass
 
-    def _show_toast(self, msg: str, is_error: bool = False) -> None:
+    def _show_toast(self, msg: str, is_error: bool = False, is_success: bool = False) -> None:
         self.banner_text.value = msg
-        self.banner_text.color = AppTheme.DANGER if is_error else AppTheme.SUCCESS
-        self.banner_icon.name = ft.Icons.ERROR_OUTLINE if is_error else ft.Icons.CHECK_CIRCLE
-        self.banner_icon.color = AppTheme.DANGER if is_error else AppTheme.SUCCESS
-        self.banner_container.bgcolor = AppTheme.DANGER_LIGHT if is_error else AppTheme.SUCCESS_LIGHT
-        self.banner_container.border = ft.Border.all(1, AppTheme.DANGER if is_error else AppTheme.SUCCESS)
+        self.banner_text.color = AppTheme.DANGER if is_error else (AppTheme.SUCCESS if is_success else AppTheme.PRIMARY)
+        self.banner_icon.name = ft.Icons.ERROR_OUTLINE if is_error else (ft.Icons.CHECK_CIRCLE if is_success else ft.Icons.INFO)
+        self.banner_icon.color = AppTheme.DANGER if is_error else (AppTheme.SUCCESS if is_success else AppTheme.PRIMARY)
+        self.banner_container.bgcolor = AppTheme.DANGER_LIGHT if is_error else (AppTheme.SUCCESS_LIGHT if is_success else AppTheme.PRIMARY_LIGHT)
+        self.banner_container.border = ft.Border.all(1, AppTheme.DANGER if is_error else (AppTheme.SUCCESS if is_success else AppTheme.PRIMARY))
         self.banner_container.visible = True
         self._safe_update()
 
     def _show_error(self, msg: str) -> None:
         self._show_toast(msg, is_error=True)
+
+    def _show_success(self, msg: str) -> None:
+        self._show_toast(msg, is_success=True)
 
     def _on_mode_change(self, e: ft.ControlEvent) -> None:
         selected_list = list(e.control.selected)
@@ -568,6 +475,8 @@ class AdmissionFormModal(ft.AlertDialog):
         is_existing = (mode == "existing")
         self.student_search_input.visible = is_existing
         self.student_search_results.visible = is_existing
+        if not is_existing:
+            self.selected_student_id = None
         self._safe_update()
 
     def _on_student_search_change(self, e: ft.ControlEvent) -> None:
@@ -579,11 +488,11 @@ class AdmissionFormModal(ft.AlertDialog):
 
         results = self.student_controller.search_students(query)
         tiles = []
-        for s in results[:5]:
+        for s in results[:6]:
             tiles.append(
                 ft.ListTile(
                     title=ft.Text(s.display_name, size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
-                    subtitle=ft.Text(f"Mobile: {s.mobile_number or 'N/A'} • ID: #{s.id}", size=AppTheme.SIZE_CAPTION),
+                    subtitle=ft.Text(f"Mobile: {s.mobile_number or 'N/A'} • Village: {s.village or 'Chandwad'} • ID: #{s.id}", size=AppTheme.SIZE_CAPTION),
                     leading=ft.Icon(ft.Icons.PERSON, color=AppTheme.PRIMARY),
                     on_click=lambda _, sid=s.id: self._select_existing_student(sid),
                 )
@@ -605,26 +514,36 @@ class AdmissionFormModal(ft.AlertDialog):
         self.mobile_input.value = st.mobile_number or ""
         self.parent_name_input.value = st.parent_guardian_name or ""
         self.aadhaar_input.value = st.aadhaar_number or ""
-        self.village_input.value = st.village or ""
+        self.village_input.value = st.village or "Chandwad"
         self.address_input.value = st.address or ""
         if st.qualification:
             qual_keys = [q.value for q in Qualification]
             if st.qualification in qual_keys:
                 self.qualification_dropdown.value = st.qualification
-                self.qual_other_input.visible = (st.qualification == Qualification.OTHER.value)
             else:
                 self.qualification_dropdown.value = Qualification.OTHER.value
                 self.qual_other_input.value = st.qualification
                 self.qual_other_input.visible = True
         if st.blood_group:
             self.blood_group_dropdown.value = st.blood_group.upper()
+
+        if st.photo_path and Path(st.photo_path).exists():
+            self.photo_filename = st.photo_path
+            self.photo_info_text.value = f"Existing: {Path(st.photo_path).name}"
+            self.photo_clear_btn.visible = True
+
+        if st.signature_path and Path(st.signature_path).exists():
+            self.signature_filename = st.signature_path
+            self.sig_info_text.value = f"Existing: {Path(st.signature_path).name}"
+            self.sig_clear_btn.visible = True
+
         self.student_search_results.controls.clear()
+        self.student_search_input.value = f"{st.display_name} (ID: #{st.id})"
         self._load_friend_suggestions()
-        self._show_toast("✓ Existing student information loaded", is_error=False)
+        self._show_success("✓ Existing student information loaded")
         self._safe_update()
 
     def _on_village_changed(self) -> None:
-        self._format_input_title(self.village_input)
         self._load_friend_suggestions()
 
     def _on_course_selected(self, e: ft.ControlEvent) -> None:
@@ -652,41 +571,43 @@ class AdmissionFormModal(ft.AlertDialog):
 
     def _on_fee_calculation_change(self, e: Optional[ft.ControlEvent] = None) -> None:
         try:
-            disc = float(self.discount_input.value or 0.0)
+            discount = float(self.discount_input.value or 0.0)
         except ValueError:
-            disc = 0.0
-        final_fee = max(0.0, self.base_course_fee - disc)
+            discount = 0.0
+        final_fee = max(0.0, self.base_course_fee - discount)
         self.final_fee_text.value = f"₹{final_fee:,.2f}"
         self._safe_update()
 
     def _load_friend_suggestions(self) -> None:
         village = (self.village_input.value or "").strip()
-        gender = self.gender_dropdown.value or "MALE"
         if not village:
             self.friends_card.visible = False
-            self.friends_container.controls.clear()
             self._safe_update()
             return
 
-        suggestions = self.controller.get_suggested_friends(village, self.selected_student_id or 0, gender)
+        gender = self.gender_dropdown.value
+        suggestions = self.controller.get_suggested_friends(
+            village=village,
+            exclude_student_id=self.selected_student_id or 0,
+            gender=gender,
+        )
         self.suggested_friends = suggestions
         if not suggestions:
-            self.friends_container.controls = [
-                ft.Text("No recent admissions found from this village yet.", italic=True, size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY)
-            ]
-        else:
-            chips = []
-            for f in suggestions:
-                is_selected = f.student_id in self.selected_friend_ids
-                chips.append(
-                    ft.Checkbox(
-                        label=f"{f.display_name} ({f.gender or 'N/A'}, Course: {f.course_name or 'Enrolled'})",
-                        value=is_selected,
-                        on_change=lambda _, fid=f.student_id: self._toggle_friend(fid),
-                    )
-                )
-            self.friends_container.controls = chips
+            self.friends_card.visible = False
+            self._safe_update()
+            return
 
+        chips = []
+        for f in suggestions:
+            is_selected = f.student_id in self.selected_friend_ids
+            chips.append(
+                ft.Checkbox(
+                    label=f"{f.display_name} ({f.gender or 'N/A'}, Course: {f.course_name or 'Enrolled'})",
+                    value=is_selected,
+                    on_change=lambda _, fid=f.student_id: self._toggle_friend(fid),
+                )
+            )
+        self.friends_container.controls = chips
         self.friends_card.visible = True
         self._safe_update()
 
@@ -700,38 +621,76 @@ class AdmissionFormModal(ft.AlertDialog):
                 self._show_error("Maximum 3 suggested friends can be selected.")
         self._load_friend_suggestions()
 
-    # ── Document File Pickers ──
-
+    # ── Real File Pickers (<= 100 KB) ──
     def _trigger_photo_picker(self, e: ft.ControlEvent) -> None:
-        # Mock / Real Photo Selector
-        self.photo_filename = "uploads/photos/photo_selected.jpg"
-        self.photo_info_text.value = "Selected: photo_selected.jpg (45 KB)"
-        self.photo_clear_btn.visible = True
-        self._safe_update()
+        try:
+            result = subprocess.run(
+                ["zenity", "--file-selection", "--title=Select Student Photo (Max 100 KB)", "--file-filter=Images (*.jpg *.jpeg *.png) | *.jpg *.jpeg *.png *.JPG *.JPEG *.PNG"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            selected_path = result.stdout.strip()
+            if not selected_path or not Path(selected_path).is_file():
+                return
+
+            p = Path(selected_path)
+            raw_bytes = p.read_bytes()
+            if len(raw_bytes) > self.MAX_FILE_SIZE_BYTES:
+                self._show_error(f"Photo size ({len(raw_bytes) / 1024:.1f} KB) exceeds the maximum allowed limit of 100 KB.")
+                return
+
+            self.photo_bytes = raw_bytes
+            self.photo_filename = p.name
+            self.photo_info_text.value = f"Selected: {p.name} ({format_file_size(len(raw_bytes))})"
+            self.photo_clear_btn.visible = True
+            self._show_success(f"✓ Photo selected: {p.name} ({format_file_size(len(raw_bytes))})")
+        except Exception as ex:
+            LogService.error(f"Photo picker error: {ex}", context="AdmissionFormModal")
+            self._show_error(f"Photo picker error: {ex}")
 
     def _clear_photo(self, e: ft.ControlEvent) -> None:
         self.photo_bytes = None
         self.photo_filename = None
-        self.photo_info_text.value = "No photo chosen (Max 100 KB)"
+        self.photo_info_text.value = "No photo selected (Max 100 KB)"
         self.photo_clear_btn.visible = False
         self._safe_update()
 
     def _trigger_signature_picker(self, e: ft.ControlEvent) -> None:
-        # Mock / Real Signature Selector
-        self.signature_filename = "uploads/signatures/signature_selected.png"
-        self.sig_info_text.value = "Selected: signature_selected.png (30 KB)"
-        self.sig_clear_btn.visible = True
-        self._safe_update()
+        try:
+            result = subprocess.run(
+                ["zenity", "--file-selection", "--title=Select Student Signature (Max 100 KB)", "--file-filter=Images (*.jpg *.jpeg *.png) | *.jpg *.jpeg *.png *.JPG *.JPEG *.PNG"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            selected_path = result.stdout.strip()
+            if not selected_path or not Path(selected_path).is_file():
+                return
+
+            p = Path(selected_path)
+            raw_bytes = p.read_bytes()
+            if len(raw_bytes) > self.MAX_FILE_SIZE_BYTES:
+                self._show_error(f"Signature size ({len(raw_bytes) / 1024:.1f} KB) exceeds the maximum allowed limit of 100 KB.")
+                return
+
+            self.signature_bytes = raw_bytes
+            self.signature_filename = p.name
+            self.sig_info_text.value = f"Selected: {p.name} ({format_file_size(len(raw_bytes))})"
+            self.sig_clear_btn.visible = True
+            self._show_success(f"✓ Signature selected: {p.name} ({format_file_size(len(raw_bytes))})")
+        except Exception as ex:
+            LogService.error(f"Signature picker error: {ex}", context="AdmissionFormModal")
+            self._show_error(f"Signature picker error: {ex}")
 
     def _clear_signature(self, e: ft.ControlEvent) -> None:
         self.signature_bytes = None
         self.signature_filename = None
-        self.sig_info_text.value = "No signature chosen (Max 100 KB)"
+        self.sig_info_text.value = "No signature selected (Max 100 KB)"
         self.sig_clear_btn.visible = False
         self._safe_update()
 
     # ── Form Submission ──
-
     def _gather_form_payload(self, status: AdmissionStatus) -> dict[str, Any]:
         raw_cid = self.course_dropdown.value
         if not raw_cid:
@@ -748,24 +707,32 @@ class AdmissionFormModal(ft.AlertDialog):
         raw_inst = self.institution_dropdown.value
         institution_id = int(raw_inst) if raw_inst and raw_inst.isdigit() else None
 
+        first_name = format_title_case(self.first_name_input.value)
+        middle_name = format_title_case(self.middle_name_input.value)
+        last_name = format_title_case(self.last_name_input.value)
+        mother_name = format_title_case(self.mother_name_input.value)
+        parent_name = format_title_case(self.parent_name_input.value)
+        village = format_title_case(self.village_input.value)
+        address = format_title_case(self.address_input.value)
+
         return {
             "course_id": course_id,
             "batch_id": batch_id,
             "student_id": self.selected_student_id,
-            "first_name": (self.first_name_input.value or "").strip(),
-            "middle_name": (self.middle_name_input.value or "").strip(),
-            "last_name": (self.last_name_input.value or "").strip(),
-            "mother_name": (self.mother_name_input.value or "").strip(),
+            "first_name": first_name,
+            "middle_name": middle_name or None,
+            "last_name": last_name,
+            "mother_name": mother_name or None,
             "dob": (self.dob_input.value or "").strip(),
             "gender": self.gender_dropdown.value,
             "mobile_number": (self.mobile_input.value or "").strip(),
             "email": "",
             "aadhaar_number": (self.aadhaar_input.value or "").strip(),
-            "parent_guardian_name": (self.parent_name_input.value or "").strip(),
-            "village": (self.village_input.value or "").strip(),
-            "address": (self.address_input.value or "").strip(),
+            "parent_guardian_name": parent_name or None,
+            "village": village or "Chandwad",
+            "address": address or None,
             "qualification": self.qualification_dropdown.value,
-            "qualification_other": (self.qual_other_input.value or "").strip(),
+            "qualification_other": (self.qual_other_input.value or "").strip() if self.qual_other_input.visible else None,
             "institution_id": institution_id,
             "blood_group": self.blood_group_dropdown.value,
             "photo_path": self.photo_filename,
@@ -826,18 +793,6 @@ class AdmissionFormModal(ft.AlertDialog):
         except Exception as ex:
             LogService.error(f"Confirm admission flow error: {ex}", context=self.__class__.__name__)
             self._show_error("An unexpected error occurred during confirmation.")
-
-    def _show_error(self, message: str) -> None:
-        self.banner_text.value = message
-        self.banner_text.color = AppTheme.DANGER
-        self.banner_icon.name = ft.Icons.ERROR_OUTLINE
-        self.banner_icon.color = AppTheme.DANGER
-        self.banner_container.bgcolor = AppTheme.DANGER_LIGHT
-        self.banner_container.border = ft.Border.all(1, AppTheme.DANGER)
-        self.banner_container.visible = True
-        p = self.safe_page
-        if p:
-            p.update()
 
     def _open_receipt_dialog(self, admission_id: int) -> None:
         try:

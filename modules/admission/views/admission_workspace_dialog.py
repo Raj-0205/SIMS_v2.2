@@ -435,9 +435,7 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
                 candidate_number=self.workspace_dto.admission.admission_number,
                 course_name=self.workspace_dto.admission.course_name,
             )
-            p.dialog = dlg
-            dlg.open = True
-            p.update()
+            p.show_dialog(dlg)
 
     def _handle_collect_payment(self, _=None) -> None:
         adm = self.workspace_dto.admission
@@ -451,11 +449,9 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
                 total_fee=adm.final_fee,
                 already_paid=adm.total_paid,
                 default_amount=min(500.0, adm.pending_amount) if adm.pending_amount > 0 else 500.0,
-                on_payment_success=self._on_payment_collected,
+                on_payment_completed=self._on_payment_collected,
             )
-            p.dialog = dlg
-            dlg.open = True
-            p.update()
+            p.show_dialog(dlg)
 
     def _handle_cancel_admission(self, _=None) -> None:
         adm = self.workspace_dto.admission
@@ -479,28 +475,23 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
             if not r:
                 error_msg.value = "Cancellation reason cannot be empty."
                 error_msg.visible = True
-                p.update()
+                self._safe_update()
                 return
             try:
                 self.controller.cancel_admission(adm.id, reason=r)
-                cancel_dlg.open = False
-                p.dialog = self
-                self.open = True
+                p.pop_dialog()
                 self.load_data()
                 self.cancel_admission_btn.visible = False
                 self.pay_btn.visible = False
                 self.on_updated()
-                p.update()
+                self._safe_update()
             except Exception as ex:
                 error_msg.value = str(ex)
                 error_msg.visible = True
-                p.update()
+                self._safe_update()
 
         def do_close_cancel_dlg(e):
-            cancel_dlg.open = False
-            p.dialog = self
-            self.open = True
-            p.update()
+            p.pop_dialog()
 
         cancel_dlg = ft.AlertDialog(
             modal=True,
@@ -533,16 +524,16 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
             actions_alignment=ft.MainAxisAlignment.END,
         )
 
-        p.dialog = cancel_dlg
-        cancel_dlg.open = True
-        p.update()
+        p.show_dialog(cancel_dlg)
 
-    def _on_payment_collected(self) -> None:
+    def _on_payment_collected(self, payment_id: Optional[int] = None) -> None:
         self.load_data()
         self.on_updated()
 
     def close_dialog(self, _=None) -> None:
-        self.open = False
         p = self.safe_page
         if p:
-            p.update()
+            try:
+                p.pop_dialog()
+            except RuntimeError:
+                pass

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Any, Optional
 
 __all__ = [
     "StudentDTO",
@@ -13,26 +13,21 @@ __all__ = [
     "StudentAdmissionDTO",
     "StudentTimelineItemDTO",
     "StudentWorkspaceDTO",
+    "StudentNoteDTO",
 ]
 
 
 @dataclass(frozen=True)
 class StudentFilterDTO:
-    """Contract for advanced student directory filtering, sorting, and pagination.
-
-    Sorting:
-        - sort_keys: list of (field, direction) tuples for multi-column ORDER BY.
-          Example: [("name", "asc"), ("date", "desc")]
-        - sort_by / sort_dir: legacy single-sort fields. Used when sort_keys is empty.
-    """
+    """Contract for advanced student directory filtering, sorting, and pagination."""
     query: Optional[str] = None
     course_id: Optional[int] = None
     status: Optional[str] = None
     year: Optional[int] = None
     month: Optional[int] = None
-    sort_by: str = "id"         # "id", "name", "admission_id", "mobile", "course", "date", "status", "fee"
-    sort_dir: str = "desc"      # "asc", "desc"
-    sort_keys: tuple[tuple[str, str], ...] = ()  # Multi-sort: (("name", "asc"), ("date", "desc"))
+    sort_by: str = "id"
+    sort_dir: str = "desc"
+    sort_keys: tuple[tuple[str, str], ...] = ()
     limit: int = 50
     offset: int = 0
 
@@ -113,37 +108,58 @@ class StudentDTO:
 
     @property
     def paid_display(self) -> str:
-        """Paid amount display (Deferred until Finance Engine)."""
         if self.paid_amount is not None:
             return f"₹{self.paid_amount:,.2f}"
-        return "Pending Finance"
+        return "—"
 
     @property
     def pending_display(self) -> str:
-        """Pending amount display (Deferred until Finance Engine)."""
         if self.pending_amount is not None:
             return f"₹{self.pending_amount:,.2f}"
-        return "Pending Finance"
-
+        return "—"
 
 
 @dataclass(frozen=True)
 class StudentCreateDTO:
-    """Contract for creating a new student record."""
+    """Contract for creating a new student master record."""
     first_name: str
     last_name: str
     mobile_number: str
     email: Optional[str] = None
+    middle_name: Optional[str] = None
+    mother_name: Optional[str] = None
+    dob: Optional[str] = None
+    gender: Optional[str] = None
+    aadhaar_number: Optional[str] = None
+    parent_guardian_name: Optional[str] = None
+    village: Optional[str] = None
+    address: Optional[str] = None
+    qualification: Optional[str] = None
+    blood_group: Optional[str] = None
+    photo_path: Optional[str] = None
+    signature_path: Optional[str] = None
 
 
 @dataclass(frozen=True)
 class StudentUpdateDTO:
-    """Contract for updating an existing student record."""
+    """Contract for updating an existing student master record."""
     id: int
     first_name: str
     last_name: str
     mobile_number: str
     email: Optional[str] = None
+    middle_name: Optional[str] = None
+    mother_name: Optional[str] = None
+    dob: Optional[str] = None
+    gender: Optional[str] = None
+    aadhaar_number: Optional[str] = None
+    parent_guardian_name: Optional[str] = None
+    village: Optional[str] = None
+    address: Optional[str] = None
+    qualification: Optional[str] = None
+    blood_group: Optional[str] = None
+    photo_path: Optional[str] = None
+    signature_path: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -153,10 +169,11 @@ class StudentSearchResultDTO:
     first_name: str
     last_name: str
     mobile_number: Optional[str] = None
+    village: Optional[str] = None
+    current_course: Optional[str] = None
 
     @property
     def display_name(self) -> str:
-        """Helper for UI to display the full name easily."""
         return f"{self.first_name} {self.last_name}".strip()
 
 
@@ -202,7 +219,17 @@ class StudentTimelineItemDTO:
     timestamp: str
     title: str
     description: str
-    event_type: str  # "REGISTRATION", "ADMISSION", "PAYMENT", "UPDATE"
+    event_type: str  # "REGISTRATION", "ADMISSION", "PAYMENT", "UPDATE", "NOTE"
+
+
+@dataclass(frozen=True)
+class StudentNoteDTO:
+    """Contract for internal student notes."""
+    id: int
+    student_id: int
+    note_text: str
+    actor_name: str
+    created_at: str
 
 
 @dataclass(frozen=True)
@@ -214,3 +241,4 @@ class StudentWorkspaceDTO:
     payments: list[dict[str, Any]] = field(default_factory=list)
     receipts: list[dict[str, Any]] = field(default_factory=list)
     friends: list[dict[str, Any]] = field(default_factory=list)
+    notes: list[dict[str, Any]] = field(default_factory=list)

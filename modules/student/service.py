@@ -11,7 +11,10 @@ from core.service.base import BaseService
 from core.exceptions import ValidationError, ConflictError, ServiceError
 from infrastructure.excel import ExcelExporter
 from infrastructure.pdf import PDFExporter
+from shared.utils import format_title_case, normalize_indian_mobile
 from modules.student.repository import StudentRepository
+from modules.admission.friendship_repository import FriendshipRepository
+from modules.admission.activity_log_repository import ActivityLogRepository
 from modules.student.mapper import StudentMapper, StudentSearchMapper
 from modules.student.dto import (
     StudentDTO,
@@ -38,20 +41,15 @@ class StudentService(BaseService):
 
     def __init__(self) -> None:
         self.repository = StudentRepository()
+        self.friendship_repo = FriendshipRepository()
+        self.activity_log_repo = ActivityLogRepository()
 
     def _sanitize_string(self, value: Optional[str]) -> str:
         return str(value).strip() if value else ""
 
-    def _format_name_words(self, value: Optional[str]) -> str:
-        """Auto-capitalizes first letter of each word (e.g. 'john smith' -> 'John Smith')."""
-        if not value:
-            return ""
-        clean = " ".join(value.strip().split())
-        return clean.title()
-
     def _validate_names(self, first_name: str, last_name: str) -> tuple[str, str]:
-        clean_first = self._format_name_words(first_name)
-        clean_last = self._format_name_words(last_name)
+        clean_first = format_title_case(first_name)
+        clean_last = format_title_case(last_name)
 
         if not clean_first:
             raise ValidationError("First name is required and cannot be blank.")
@@ -69,13 +67,7 @@ class StudentService(BaseService):
         if not clean_mobile:
             raise ValidationError("Mobile number is required and cannot be blank.")
 
-        # Normalize by removing hyphens and spaces
-        normalized = re.sub(r"[\s\-]", "", clean_mobile)
-        if normalized.startswith("+91"):
-            normalized = normalized[3:]
-        elif normalized.startswith("+"):
-            normalized = normalized[1:]
-
+        normalized = normalize_indian_mobile(clean_mobile)
         if not self._MOBILE_REGEX.match(normalized):
             raise ValidationError("Invalid mobile number format. Must contain 10-15 digits.")
 
@@ -93,7 +85,7 @@ class StudentService(BaseService):
 
     def create_student(self, dto: StudentCreateDTO) -> int:
         """
-        Creates a new student record.
+        Creates a new student master record.
         HARD BLOCK: Rejects duplicate mobile numbers.
         """
         first_name, last_name = self._validate_names(dto.first_name, dto.last_name)
@@ -102,14 +94,24 @@ class StudentService(BaseService):
 
         data = {
             "first_name": first_name,
+            "middle_name": format_title_case(dto.middle_name) if dto.middle_name else None,
             "last_name": last_name,
-            "mobile_number": mobile_number,
+            "mother_name": format_title_case(dto.mother_name) if dto.mother_name else None,
+            "dob": self._sanitize_string(dto.dob) or None,
+            "gender": self._sanitize_string(dto.gender).upper() or None,
+            "aadhaar_number": self._sanitize_string(dto.aadhaar_number) or None,
+            "parent_guardian_name": format_title_case(dto.parent_guardian_name) if dto.parent_guardian_name else None,
+            "village": format_title_case(dto.village) if dto.village else None,
+            "address": format_title_case(dto.address) if dto.address else None,
+            "qualification": format_title_case(dto.qualification) if dto.qualification else None,
+            "blood_group": self._sanitize_string(dto.blood_group).upper() or None,
+            "photo_path": dto.photo_path,
+            "signature_path": dto.signature_path,
             "email": email,
+            "mobile_number": mobile_number,
         }
 
-        # Atomic Unit of Work
         with self.unit_of_work():
-            # 1. Pre-check duplicate mobile number (HARD BLOCK - required)
             existing_mobile = self.repository.get_by_mobile(mobile_number)
             if existing_mobile:
                 LogService.warning(
@@ -120,16 +122,22 @@ class StudentService(BaseService):
                     f"A student with mobile number '{mobile_number}' already exists."
                 )
 
-            # 2. Pre-check duplicate email (if provided)
             if email:
                 existing_email = self.repository.get_by_email(email)
                 if existing_email:
                     raise ConflictError(f"A student with email '{email}' already exists.")
 
-            # 3. Insert Record
             student_id = self.repository.insert(data)
             if not student_id or student_id <= 0:
                 raise ServiceError("Failed to insert student record.")
+
+            self.activity_log_repo.insert(
+                entity_type="STUDENT",
+                entity_id=student_id,
+                action="REGISTERED",
+                actor_name="SYSTEM",
+                details=f"Student profile created for {first_name} {last_name}."
+            )
 
             LogService.info(
                 f"Student created successfully with ID: {student_id}",
@@ -139,7 +147,7 @@ class StudentService(BaseService):
 
     def update_student(self, dto: StudentUpdateDTO) -> None:
         """
-        Updates an existing student record.
+        Updates an existing student master record completely.
         HARD BLOCK: Rejects duplicate mobile numbers assigned to other students.
         """
         if not dto.id or dto.id <= 0:
@@ -151,30 +159,38 @@ class StudentService(BaseService):
 
         data = {
             "first_name": first_name,
+            "middle_name": format_title_case(dto.middle_name) if dto.middle_name else None,
             "last_name": last_name,
-            "mobile_number": mobile_number,
+            "mother_name": format_title_case(dto.mother_name) if dto.mother_name else None,
+            "dob": self._sanitize_string(dto.dob) or None,
+            "gender": self._sanitize_string(dto.gender).upper() or None,
+            "aadhaar_number": self._sanitize_string(dto.aadhaar_number) or None,
+            "parent_guardian_name": format_title_case(dto.parent_guardian_name) if dto.parent_guardian_name else None,
+            "village": format_title_case(dto.village) if dto.village else None,
+            "address": format_title_case(dto.address) if dto.address else None,
+            "qualification": format_title_case(dto.qualification) if dto.qualification else None,
+            "blood_group": self._sanitize_string(dto.blood_group).upper() or None,
+            "photo_path": dto.photo_path,
+            "signature_path": dto.signature_path,
             "email": email,
+            "mobile_number": mobile_number,
         }
 
-        # Atomic Unit of Work
         with self.unit_of_work():
-            # 1. Verify existence
             existing_student = self.repository.get_by_id(dto.id)
             if not existing_student:
                 raise ValidationError(f"Student with ID {dto.id} does not exist.")
 
-            # 2. Check duplicate mobile against OTHER students (HARD BLOCK - required)
             mobile_owner = self.repository.get_by_mobile(mobile_number)
             if mobile_owner and int(mobile_owner["id"]) != int(dto.id):
                 LogService.warning(
-                    f"Student update rejected: Mobile '{mobile_number}' is owned by student ID {mobile_owner['id']}.",
+                    f"Student update rejected: Mobile '{mobile_number}' owned by ID {mobile_owner['id']}.",
                     context=self.__class__.__name__,
                 )
                 raise ConflictError(
                     f"Mobile number '{mobile_number}' is already registered to another student."
                 )
 
-            # 3. Check duplicate email against OTHER students (if provided)
             if email:
                 email_owner = self.repository.get_by_email(email)
                 if email_owner and int(email_owner["id"]) != int(dto.id):
@@ -182,21 +198,139 @@ class StudentService(BaseService):
                         f"Email address '{email}' is already registered to another student."
                     )
 
-            # 4. Execute Update
             rows_affected = self.repository.update(dto.id, data)
             if rows_affected <= 0:
                 raise ServiceError(f"Failed to update student record ID {dto.id}.")
+
+            self.activity_log_repo.insert(
+                entity_type="STUDENT",
+                entity_id=dto.id,
+                action="PROFILE_UPDATED",
+                actor_name="ADMIN",
+                details=f"Master profile updated for {first_name} {last_name}."
+            )
 
             LogService.info(
                 f"Student ID {dto.id} updated successfully.",
                 context=self.__class__.__name__,
             )
 
+    def add_student_note(self, student_id: int, note_text: str, actor_name: str = "ADMIN") -> None:
+        """Adds an internal note for a student enclosed in unit_of_work."""
+        if not student_id or student_id <= 0:
+            raise ValidationError("Valid student ID is required.")
+        clean_note = self._sanitize_string(note_text)
+        if not clean_note:
+            raise ValidationError("Note content cannot be empty.")
+
+        with self.unit_of_work():
+            self.activity_log_repo.insert(
+                entity_type="STUDENT",
+                entity_id=student_id,
+                action="NOTE_ADDED",
+                actor_name=actor_name,
+                details=clean_note,
+            )
+
+    def get_student_notes(self, student_id: int) -> list[dict[str, Any]]:
+        """Fetches internal notes for a student enclosed in unit_of_work."""
+        with self.unit_of_work():
+            return self.activity_log_repo.get_logs_for_entity("STUDENT", student_id)
+
+    def add_student_friend(self, student_id: int, friend_student_id: int, admission_id: Optional[int] = None) -> None:
+        """Adds a confirmed village/peer friend connection within unit_of_work."""
+        if student_id == friend_student_id:
+            raise ValidationError("Cannot add student as their own friend.")
+
+        with self.unit_of_work():
+            self.friendship_repo.add_friendship(student_id, friend_student_id, admission_id)
+            self.activity_log_repo.insert(
+                entity_type="STUDENT",
+                entity_id=student_id,
+                action="FRIEND_ADDED",
+                actor_name="ADMIN",
+                details=f"Added friend student ID #{friend_student_id}.",
+            )
+
+    def remove_student_friend(self, student_id: int, friend_student_id: int) -> None:
+        """Removes a friend connection within unit_of_work."""
+        with self.unit_of_work():
+            self.friendship_repo.remove_friendship(student_id, friend_student_id)
+            self.activity_log_repo.insert(
+                entity_type="STUDENT",
+                entity_id=student_id,
+                action="FRIEND_REMOVED",
+                actor_name="ADMIN",
+                details=f"Removed friend student ID #{friend_student_id}.",
+            )
+
+    def upload_student_document(
+        self,
+        student_id: int,
+        doc_type: str,
+        file_bytes: bytes,
+        original_filename: str,
+    ) -> str:
+        """
+        Validates and saves a student document (Photo or Signature).
+        Strictly enforces 100 KB limit and allowed extensions (.jpg, .jpeg, .png).
+        """
+        if not student_id or student_id <= 0:
+            raise ValidationError("Valid student ID is required for document upload.")
+
+        if not file_bytes:
+            raise ValidationError("No file content provided.")
+
+        max_bytes = 100 * 1024  # 100 KB
+        if len(file_bytes) > max_bytes:
+            size_kb = len(file_bytes) / 1024
+            raise ValidationError(
+                f"File size ({size_kb:.1f} KB) exceeds the maximum limit of 100 KB. "
+                "Please compress the image before uploading."
+            )
+
+        ext = Path(original_filename).suffix.lower()
+        if ext not in (".jpg", ".jpeg", ".png"):
+            raise ValidationError("Invalid file format. Only JPG, JPEG, and PNG images are allowed.")
+
+        doc_kind = "photos" if doc_type.lower() == "photo" else "signatures"
+        upload_dir = Path("uploads") / doc_kind
+        upload_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        target_filename = f"{doc_type.lower()}_{student_id}_{timestamp_str}{ext}"
+        target_path = upload_dir / target_filename
+
+        with open(target_path, "wb") as f:
+            f.write(file_bytes)
+
+        rel_path = str(target_path)
+
+        with self.unit_of_work():
+            self.repository.update_document_path(student_id, doc_type, rel_path)
+            self.activity_log_repo.insert(
+                entity_type="STUDENT",
+                entity_id=student_id,
+                action="DOCUMENT_UPLOADED",
+                actor_name="ADMIN",
+                details=f"Uploaded {doc_type} ({len(file_bytes)/1024:.1f} KB): {target_filename}",
+            )
+
+        return rel_path
+
+    def delete_student_document(self, student_id: int, doc_type: str) -> None:
+        """Clears a document path on the student record."""
+        with self.unit_of_work():
+            self.repository.update_document_path(student_id, doc_type, None)
+            self.activity_log_repo.insert(
+                entity_type="STUDENT",
+                entity_id=student_id,
+                action="DOCUMENT_REMOVED",
+                actor_name="ADMIN",
+                details=f"Removed {doc_type} document.",
+            )
+
     def delete_student(self, student_id: int) -> None:
-        """
-        Deletes a student profile.
-        ERP Business Rule: Restrict deletion if student has active or historical admissions.
-        """
         if not student_id or student_id <= 0:
             raise ValidationError("A valid student ID is required for deletion.")
 
@@ -218,7 +352,6 @@ class StudentService(BaseService):
             )
 
     def get_student(self, student_id: int) -> StudentDTO:
-        """Retrieves full student details by ID."""
         if not student_id or student_id <= 0:
             raise ValidationError("A valid student ID is required.")
 
@@ -229,19 +362,9 @@ class StudentService(BaseService):
             return StudentMapper.to_dto(row)
 
     def get_student_workspace(self, student_id: int) -> StudentWorkspaceDTO:
-        """
-        Aggregates complete Student Workspace data:
-        - Master Student profile
-        - All linked admissions (Student != Admission)
-        - Per-admission installment payments
-        - Issued receipts
-        - Linked village/peer friends
-        - Chronological history timeline
-        """
         student = self.get_student(student_id)
 
         with self.unit_of_work():
-            # 1. Fetch Admissions & their payment installments
             admission_rows = self.repository.get_student_admissions(student_id)
             admissions = []
             all_payments = []
@@ -261,7 +384,6 @@ class StudentService(BaseService):
                     tot_p += amt
                 admissions.append(StudentMapper.to_admission_dto(r, installments=inst_dict, total_paid=tot_p))
 
-            # 2. Fetch Receipts
             rcp_rows = self.repository.execute_fetchall(
                 """
                 SELECT r.*, p.installment_number, p.payment_mode, a.candidate_year, a.candidate_sequence, c.name AS course_name
@@ -276,20 +398,9 @@ class StudentService(BaseService):
                 (student_id,)
             )
 
-            # 3. Fetch Friends
-            friend_rows = self.repository.execute_fetchall(
-                """
-                SELECT s.id, s.first_name, s.last_name, s.mobile_number, s.village, sf.created_at AS friendship_date
-                FROM student_friendships sf
-                JOIN students s ON s.id = (CASE WHEN sf.student_id = ? THEN sf.friend_student_id ELSE sf.student_id END)
-                WHERE (sf.student_id = ? OR sf.friend_student_id = ?)
-                  AND sf.is_active = 1
-                ORDER BY sf.created_at DESC;
-                """,
-                (student_id, student_id, student_id)
-            )
+            friend_rows = self.friendship_repo.get_confirmed_friends(student_id)
+            note_rows = self.activity_log_repo.get_logs_for_entity("STUDENT", student_id)
 
-            # 4. Build Chronological Timeline Events
             timeline: list[StudentTimelineItemDTO] = []
 
             if student.created_at:
@@ -324,6 +435,17 @@ class StudentService(BaseService):
                     )
                 )
 
+            for log in note_rows:
+                if log.get("action") == "NOTE_ADDED":
+                    timeline.append(
+                        StudentTimelineItemDTO(
+                            timestamp=str(log.get("created_at") or ""),
+                            title=f"Internal Note ({log.get('actor_name') or 'Admin'})",
+                            description=str(log.get("details") or ""),
+                            event_type="NOTE",
+                        )
+                    )
+
             timeline.sort(key=lambda t: t.timestamp, reverse=True)
 
             return StudentWorkspaceDTO(
@@ -333,19 +455,14 @@ class StudentService(BaseService):
                 payments=all_payments,
                 receipts=rcp_rows,
                 friends=friend_rows,
+                notes=note_rows,
             )
 
     def filter_students(self, filter_dto: StudentFilterDTO) -> tuple[list[StudentDTO], int]:
-        """
-        Retrieves a paginated list of students based on multi-criteria search, course, status, year, and month filters
-        along with the total matching count. Uses database-level filtering, sorting, and pagination.
-        Supports multi-sort via sort_keys; falls back to sort_by/sort_dir when sort_keys is empty.
-        """
         clean_query = self._sanitize_string(filter_dto.query)
         safe_limit = max(1, min(filter_dto.limit, 200))
         safe_offset = max(0, filter_dto.offset)
 
-        # Resolve sort_keys: DTO tuple → list for repository
         resolved_sort_keys: list[tuple[str, str]] | None = None
         if filter_dto.sort_keys:
             resolved_sort_keys = list(filter_dto.sort_keys)
@@ -373,26 +490,18 @@ class StudentService(BaseService):
             return [StudentMapper.to_dto(r) for r in rows], total
 
     def list_students(self, limit: int = 50, offset: int = 0) -> tuple[list[StudentDTO], int]:
-        """Fetches a paginated list of students along with total count."""
         return self.filter_students(StudentFilterDTO(limit=limit, offset=offset))
 
     def search_students_paged(
         self, query: str, limit: int = 50, offset: int = 0
     ) -> tuple[list[StudentDTO], int]:
-        """
-        Searches students across fields with pagination and total count.
-        """
         return self.filter_students(StudentFilterDTO(query=query, limit=limit, offset=offset))
 
     def count_students(self) -> int:
-        """Returns total active student count."""
         with self.unit_of_work():
             return self.repository.count_all()
 
     def export_students_data(self, filter_dto: StudentFilterDTO) -> list[StudentDTO]:
-        """
-        Fetches the complete dataset matching the filter criteria without pagination for exports.
-        """
         clean_query = self._sanitize_string(filter_dto.query)
 
         resolved_sort_keys: list[tuple[str, str]] | None = None
@@ -415,9 +524,6 @@ class StudentService(BaseService):
     def export_students_csv(
         self, filter_dto: StudentFilterDTO, target_path: Optional[str | Path] = None
     ) -> Path:
-        """
-        Exports filtered student dataset to an Excel-compatible CSV file.
-        """
         students = self.export_students_data(filter_dto)
         default_dir = Path("exports/students")
         default_name = f"student_directory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
@@ -472,9 +578,6 @@ class StudentService(BaseService):
     def export_students_pdf(
         self, filter_dto: StudentFilterDTO, target_path: Optional[str | Path] = None
     ) -> Path:
-        """
-        Exports filtered student dataset into a professional multi-page PDF report.
-        """
         students = self.export_students_data(filter_dto)
         default_dir = Path("exports/students")
         default_name = f"student_directory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
@@ -526,10 +629,6 @@ class StudentService(BaseService):
         )
 
     def search_students(self, query: str, limit: int = 25) -> list[StudentSearchResultDTO]:
-        """
-        Backward-compatible search API consumed by AdmissionForm and SearchDialog.
-        Enforces minimum 2-character rule.
-        """
         clean_query = self._sanitize_string(query)
         if not clean_query or len(clean_query) < 2:
             return []
@@ -540,5 +639,4 @@ class StudentService(BaseService):
 
 
 class StudentSearchService(StudentService):
-    """Backward-compatible alias for existing search service references."""
     pass

@@ -7,6 +7,8 @@ from ui.layout.navigation import NavigationMenu
 from ui.layout.content_host import ContentHost
 from modules.student.views.student_home import StudentHome
 from modules.admission.views.admission_home import AdmissionHome
+from modules.reports.views.reports_home import ReportsHome
+from modules.settings.views.settings_home import SettingsHome
 
 __all__ = ["DashboardScreen"]
 
@@ -29,13 +31,6 @@ class DashboardScreen(ft.Row):
             on_nav_change=self.on_route_request
         )
 
-        self.route_map = {
-            "/dashboard": ft.Text(
-                "Dashboard Boot Successful",
-                size=24,
-            ),
-        }
-
         self.placeholder_view = ft.Text(
             "Module Under Construction",
             size=24,
@@ -57,11 +52,15 @@ class DashboardScreen(ft.Row):
             view = StudentHome()
         elif route == "/admissions":
             view = AdmissionHome()
+        elif route == "/fees":
+            view = ReportsHome()
+        elif route == "/settings":
+            view = SettingsHome()
+        elif route == "/dashboard":
+            view = ReportsHome()
         else:
-            view = self.route_map.get(
-                route,
-                self.placeholder_view,
-            )
+            view = self.placeholder_view
+
         self.content_host.mount(view)
         if hasattr(view, "load_data"):
             view.load_data()

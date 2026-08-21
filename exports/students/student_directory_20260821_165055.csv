@@ -1,0 +1,25 @@
+﻿# Module: SIMS v2.2 Student Management System
+# Export Timestamp: 2026-08-21 16:50:55
+# Total Records: 18
+# Search Query: None
+# Status Filter: All
+
+ID,Admission No,Student Name,Mobile Number,Email,Current Course,Admission Date,Status,Base Fee,Paid Amount,Pending Amount
+485,2026-023,Payment Tester,9877311010,—,KLiC Advanced Excel,2026-08-21,CONFIRMED,"₹4,000.00",—,—
+484,2026-022,Forensic Test Student,9987311009,—,KLiC Advanced Java,2026-08-21,DRAFT,"₹6,000.00",—,—
+483,2026-020,Forensic Test Student,9987310999,—,KLiC Advanced Java,2026-08-21,DRAFT,"₹6,000.00",—,—
+482,2026-018,Payment Tester,9876543219,—,KLiC Advanced Excel,2026-08-21,CONFIRMED,"₹4,000.00",—,—
+481,2026-017,Forensic Test Student,9988776655,—,KLiC Advanced Java,2026-08-21,DRAFT,"₹6,000.00",—,—
+480,—,Rohit Shinde,9823768958,—,—,2026-08-21,REGISTERED,—,—,—
+479,2026-015,Anuj Pagar,9822606496,anuj.pagar.606496@example.com,KLiC Advanced Java,2026-08-21,CANCELLED,"₹6,000.00",—,—
+478,—,Rohit Shinde,9823000017,—,—,2026-08-21,REGISTERED,—,—,—
+477,2026-013,Anuj Pagar,9822000017,anuj.pagar@example.com,KLiC Advanced Java,2026-08-21,CANCELLED,"₹6,000.00",—,—
+476,2026-011,Rahul Patil,8745856523,—,MS-CIT (Mastering IT),2026-08-21,CONFIRMED,"₹4,500.00",—,—
+471,2026-009,Aniket Kadam,9830654301,—,KLiC Advanced Excel,2026-08-21,DRAFT,"₹4,000.00",—,—
+392,2026-008,Soham Kokate,9822562319,—,KLiC Mobile App Development,2026-08-21,DRAFT,"₹6,000.00",—,—
+391,2026-007,Soham Kokate,9822562318,—,KLiC Mobile App Development,2026-08-21,REGISTERED,"₹6,000.00",—,—
+390,2026-004,Pooja Patil,9876543212,—,KLiC C / C++ / C#,2026-08-20,REGISTERED,"₹4,500.00",—,—
+360,2026-002,Aniket Kadam,9824225201,—,KLiC Advanced Excel,2026-08-20,DRAFT,"₹4,000.00",—,—
+359,2026-001,Aniket Kadam,9899000001,—,KLiC Advanced Excel,2026-08-20,DRAFT,"₹4,000.00",—,—
+184,2026-006,Hardik Pandya,9933121255,—,KLiC Mobile App Development,2026-08-20,CONFIRMED,"₹6,000.00",—,—
+110,2026-010,Anuj Raj Pagar,8010120768,—,KLiC Mobile App Development,2026-08-21,CONFIRMED,"₹6,000.00",—,—
