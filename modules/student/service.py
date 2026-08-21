@@ -233,19 +233,65 @@ class StudentService(BaseService):
         Aggregates complete Student Workspace data:
         - Master Student profile
         - All linked admissions (Student != Admission)
+        - Per-admission installment payments
+        - Issued receipts
+        - Linked village/peer friends
         - Chronological history timeline
         """
         student = self.get_student(student_id)
 
         with self.unit_of_work():
-            # 1. Fetch Admissions
+            # 1. Fetch Admissions & their payment installments
             admission_rows = self.repository.get_student_admissions(student_id)
-            admissions = [StudentMapper.to_admission_dto(r) for r in admission_rows]
+            admissions = []
+            all_payments = []
+            for r in admission_rows:
+                adm_id = int(r["admission_id"])
+                p_rows = self.repository.execute_fetchall(
+                    "SELECT * FROM payments WHERE admission_id = ? ORDER BY installment_number ASC, id ASC;",
+                    (adm_id,)
+                )
+                all_payments.extend(p_rows)
+                inst_dict: dict[int, float] = {}
+                tot_p = 0.0
+                for p in p_rows:
+                    inum = int(p.get("installment_number") or 1)
+                    amt = float(p.get("amount") or 0.0)
+                    inst_dict[inum] = inst_dict.get(inum, 0.0) + amt
+                    tot_p += amt
+                admissions.append(StudentMapper.to_admission_dto(r, installments=inst_dict, total_paid=tot_p))
 
-            # 2. Build Chronological Timeline Events
+            # 2. Fetch Receipts
+            rcp_rows = self.repository.execute_fetchall(
+                """
+                SELECT r.*, p.installment_number, p.payment_mode, a.candidate_year, a.candidate_sequence, c.name AS course_name
+                FROM receipts r
+                JOIN payments p ON p.id = r.payment_id
+                JOIN admissions a ON a.id = r.admission_id
+                LEFT JOIN admission_courses ac ON ac.admission_id = a.id
+                LEFT JOIN courses c ON c.id = ac.course_id
+                WHERE r.student_id = ?
+                ORDER BY r.id DESC;
+                """,
+                (student_id,)
+            )
+
+            # 3. Fetch Friends
+            friend_rows = self.repository.execute_fetchall(
+                """
+                SELECT s.id, s.first_name, s.last_name, s.mobile_number, s.village, sf.created_at AS friendship_date
+                FROM student_friendships sf
+                JOIN students s ON s.id = (CASE WHEN sf.student_id = ? THEN sf.friend_student_id ELSE sf.student_id END)
+                WHERE (sf.student_id = ? OR sf.friend_student_id = ?)
+                  AND sf.is_active = 1
+                ORDER BY sf.created_at DESC;
+                """,
+                (student_id, student_id, student_id)
+            )
+
+            # 4. Build Chronological Timeline Events
             timeline: list[StudentTimelineItemDTO] = []
 
-            # Registration Event
             if student.created_at:
                 timeline.append(
                     StudentTimelineItemDTO(
@@ -256,7 +302,6 @@ class StudentService(BaseService):
                     )
                 )
 
-            # Admission Events
             for adm in admissions:
                 course_text = f"Course: {adm.course_name} ({adm.course_code})" if adm.course_name else "Course Assignment Pending"
                 adm_display = adm.admission_number if getattr(adm, "admission_number", None) else f"#{adm.admission_id}"
@@ -264,18 +309,30 @@ class StudentService(BaseService):
                     StudentTimelineItemDTO(
                         timestamp=adm.admission_date or "N/A",
                         title=f"Admission {adm_display} - {adm.status}",
-                        description=f"Enrolled in {course_text}. Status: {adm.status}.",
+                        description=f"Enrolled in {course_text}. Agreed Fee: ₹{adm.agreed_fee:,.2f}, Paid: ₹{adm.total_paid:,.2f}.",
                         event_type="ADMISSION",
                     )
                 )
 
-            # Sort timeline newest first
+            for p in all_payments:
+                timeline.append(
+                    StudentTimelineItemDTO(
+                        timestamp=str(p.get("created_at") or ""),
+                        title=f"Payment Received: ₹{float(p.get('amount') or 0.0):,.2f}",
+                        description=f"Installment #{p.get('installment_number')} via {p.get('payment_mode')}. Collector: {p.get('collector_name') or 'N/A'}.",
+                        event_type="PAYMENT",
+                    )
+                )
+
             timeline.sort(key=lambda t: t.timestamp, reverse=True)
 
             return StudentWorkspaceDTO(
                 student=student,
                 admissions=admissions,
                 timeline=timeline,
+                payments=all_payments,
+                receipts=rcp_rows,
+                friends=friend_rows,
             )
 
     def filter_students(self, filter_dto: StudentFilterDTO) -> tuple[list[StudentDTO], int]:

@@ -77,3 +77,13 @@ class FriendshipRepository(BaseRepository):
         p1, p2 = min(student_id, friend_student_id), max(student_id, friend_student_id)
         sql = "UPDATE student_friendships SET is_active = 0 WHERE student_id = ? AND friend_student_id = ?;"
         return self.execute(sql, (p1, p2))
+
+    def get_friends_for_admission(self, admission_id: int) -> list[dict[str, Any]]:
+        sql = """
+            SELECT s.id, s.first_name, s.last_name, s.mobile_number, s.village
+            FROM student_friendships sf
+            JOIN students s ON s.id = sf.friend_student_id
+            WHERE sf.admission_id = ? AND sf.is_active = 1
+            ORDER BY sf.created_at ASC;
+        """
+        return self.execute_fetchall(sql, (admission_id,))

@@ -146,6 +146,10 @@ class AdmissionDTO:
         return " ".join(p.strip() for p in parts if p and p.strip())
 
     @property
+    def student_mobile(self) -> str:
+        return self.mobile_number or ""
+
+    @property
     def final_fee(self) -> float:
         fee = self.agreed_fee if self.agreed_fee > 0 else self.course_fee
         return max(0.0, fee - self.discount)
@@ -160,6 +164,10 @@ class AdmissionDTO:
         if self.candidate_year and self.candidate_sequence:
             return f"{self.candidate_year}-{self.candidate_sequence:03d}"
         return f"#{self.id}"
+
+    @property
+    def fee_display(self) -> str:
+        return f"₹{self.final_fee:,.2f}"
 
 
 @dataclass(frozen=True)
@@ -213,6 +221,7 @@ class AdmissionWorkspaceDTO:
     receipts: list[ReceiptDTO] = field(default_factory=list)
     confirmed_friends: list[dict[str, Any]] = field(default_factory=list)
     timeline: list[dict[str, Any]] = field(default_factory=list)
+    available_batches: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

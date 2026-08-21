@@ -126,6 +126,7 @@ class AdmissionHome(ft.Container):
             border_radius=AppTheme.RADIUS_MD,
             options=[
                 ft.DropdownOption(key="ALL", text="All Statuses"),
+                ft.DropdownOption(key="ACTIVE", text="Active Workflow"),
                 ft.DropdownOption(key="REGISTERED", text="Registered"),
                 ft.DropdownOption(key="CONFIRMED", text="Confirmed"),
                 ft.DropdownOption(key="DRAFT", text="Draft"),

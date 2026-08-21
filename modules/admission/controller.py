@@ -31,27 +31,28 @@ class AdmissionController:
     def create_admission(self, raw_data: Mapping[str, Any]) -> int:
         status_val = raw_data.get("status", AdmissionStatus.DRAFT.value)
         status_enum = AdmissionStatus(status_val) if isinstance(status_val, str) else status_val
+        nsd = raw_data.get("new_student_data") or {}
 
         dto = AdmissionCreateDTO(
             course_id=int(raw_data["course_id"]),
             student_id=int(raw_data["student_id"]) if raw_data.get("student_id") else None,
-            first_name=raw_data.get("first_name"),
-            middle_name=raw_data.get("middle_name"),
-            last_name=raw_data.get("last_name"),
-            mother_name=raw_data.get("mother_name"),
-            dob=raw_data.get("dob"),
-            gender=raw_data.get("gender"),
-            mobile_number=raw_data.get("mobile_number"),
-            email=raw_data.get("email"),
-            aadhaar_number=raw_data.get("aadhaar_number"),
-            parent_guardian_name=raw_data.get("parent_guardian_name"),
-            village=raw_data.get("village"),
-            address=raw_data.get("address"),
-            qualification=raw_data.get("qualification"),
-            qualification_other=raw_data.get("qualification_other"),
+            first_name=raw_data.get("first_name") or nsd.get("first_name"),
+            middle_name=raw_data.get("middle_name") or nsd.get("middle_name"),
+            last_name=raw_data.get("last_name") or nsd.get("last_name"),
+            mother_name=raw_data.get("mother_name") or nsd.get("mother_name"),
+            dob=raw_data.get("dob") or nsd.get("dob"),
+            gender=raw_data.get("gender") or nsd.get("gender"),
+            mobile_number=raw_data.get("mobile_number") or nsd.get("mobile_number"),
+            email=raw_data.get("email") or nsd.get("email"),
+            aadhaar_number=raw_data.get("aadhaar_number") or nsd.get("aadhaar_number"),
+            parent_guardian_name=raw_data.get("parent_guardian_name") or nsd.get("parent_guardian_name"),
+            village=raw_data.get("village") or nsd.get("village"),
+            address=raw_data.get("address") or nsd.get("address"),
+            qualification=raw_data.get("qualification") or nsd.get("qualification"),
+            qualification_other=raw_data.get("qualification_other") or nsd.get("qualification_other"),
             institution_id=int(raw_data["institution_id"]) if raw_data.get("institution_id") else None,
             institution_name=raw_data.get("institution_name"),
-            blood_group=raw_data.get("blood_group"),
+            blood_group=raw_data.get("blood_group") or nsd.get("blood_group"),
             photo_path=raw_data.get("photo_path"),
             signature_path=raw_data.get("signature_path"),
             photo_bytes=raw_data.get("photo_bytes"),
@@ -126,6 +127,9 @@ class AdmissionController:
     def get_summary_statistics(self) -> AdmissionSummaryDTO:
         return self.service.get_summary_statistics()
 
+    def get_summary_stats(self) -> AdmissionSummaryDTO:
+        return self.service.get_summary_statistics()
+
     def get_suggested_friends(self, village: str, exclude_student_id: int = 0, gender: Optional[str] = None) -> list[FriendSuggestionDTO]:
         return self.service.get_suggested_friends(village, exclude_student_id, gender)
 
@@ -166,6 +170,9 @@ class AdmissionController:
             transaction_ref=transaction_ref,
             actor_id=actor_id,
         )
+
+    def cancel_admission(self, admission_id: int, reason: str, actor_id: Optional[int] = None) -> bool:
+        return self.service.cancel_admission(admission_id=admission_id, reason=reason, actor_id=actor_id)
 
     def export_admissions_csv(self, raw_filter: Mapping[str, Any], target_path: Optional[str] = None) -> str:
         raw_sorts = raw_filter.get("sorts") or raw_filter.get("sort_keys") or [("id", "desc")]

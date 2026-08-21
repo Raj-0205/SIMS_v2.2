@@ -22,11 +22,27 @@ class AdmissionRepository(BaseRepository):
         "date": "a.created_at",
         "agreed_fee": "a.agreed_fee",
         "status": "a.status",
+        "total_fee": "(a.agreed_fee - a.discount)",
+        "total_paid": "total_paid",
+        "pending": "(a.agreed_fee - a.discount - total_paid)",
     }
 
     def has_admission_in_state(self, student_id: int, status: str) -> bool:
         query = "SELECT 1 FROM admissions WHERE student_id = ? AND status = ? LIMIT 1;"
         return self.exists(query, (student_id, status))
+
+    def has_active_admission_for_course(self, student_id: int, course_id: int) -> bool:
+        """Checks if a student already has an active unfinalized admission for a specific course."""
+        query = """
+            SELECT 1
+            FROM admissions a
+            JOIN admission_courses ac ON ac.admission_id = a.id
+            WHERE a.student_id = ?
+              AND ac.course_id = ?
+              AND a.status IN ('DRAFT', 'REGISTERED')
+            LIMIT 1;
+        """
+        return self.exists(query, (student_id, course_id))
 
     def get_next_sequence_for_year(self, year: int) -> int:
         sql = """
@@ -184,8 +200,12 @@ class AdmissionRepository(BaseRepository):
             params.append(dto.course_id)
 
         if dto.status and dto.status.strip() and dto.status.strip().upper() != "ALL":
-            clauses.append("a.status = ?")
-            params.append(dto.status.strip().upper())
+            st = dto.status.strip().upper()
+            if st == "ACTIVE":
+                clauses.append("a.status IN ('DRAFT', 'REGISTERED')")
+            else:
+                clauses.append("a.status = ?")
+                params.append(st)
 
         if dto.year and dto.year > 0 and dto.month and 1 <= dto.month <= 12:
             clauses.append("( (a.candidate_year = ? OR CAST(strftime('%Y', a.created_at) AS INTEGER) = ?) AND CAST(strftime('%m', a.created_at) AS INTEGER) = ? )")

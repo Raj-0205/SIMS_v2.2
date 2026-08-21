@@ -1,0 +1,8 @@
+﻿# Module: SIMS v2.2 Admission Management System
+# Export Timestamp: 2026-08-21 15:20:56
+# Total Records: 2
+# Status Filter: All
+
+SR.NO,COURSE NAME,ADMISSION DATE,ADMISSION ID,NAME,MOB NO,ADMISSION STATUS,TOTAL FEES,1ST INSTALLMENT,2ND INSTALLMENT,3RD INSTALLMENT,4TH INSTALLMENT,TOTAL FEES PAID,PENDING FEES,ADDRESS,FRIEND NAME,FRIEND CONTACT NO
+1,Forensic Full Stack Web,2026-08-21,2026-010,Rohan Suresh Patil,9823456789,CANCELLED,"Rs. 20,000.00",—,—,—,—,Rs. 0.00,"Rs. 20,000.00","Opposite Market Yard, Chandwad",—,—
+2,Forensic Python Pro,2026-08-21,2026-009,Rohan Suresh Patil,9823456789,CONFIRMED,"Rs. 14,000.00",Rs. 500.00,"Rs. 2,500.00",—,—,"Rs. 3,000.00","Rs. 11,000.00","Opposite Market Yard, Chandwad",—,—

@@ -18,6 +18,15 @@ from core.logger.service import LogService
 __all__ = ["DatabaseEngine"]
 
 
+def _convert_date_safe(val: bytes) -> str:
+    s = val.decode("utf-8", errors="replace").strip()
+    return s.replace("/", "-")
+
+
+sqlite3.register_converter("date", _convert_date_safe)
+sqlite3.register_converter("DATE", _convert_date_safe)
+
+
 class DatabaseEngine:
     """
     Enterprise SQLite Database Engine (v1.0).

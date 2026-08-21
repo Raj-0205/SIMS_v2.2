@@ -38,9 +38,22 @@ class StudentRepository(BaseRepository):
             s.id,
             s.first_name,
             s.last_name,
+            s.middle_name,
+            s.mother_name,
+            s.dob,
+            s.gender,
+            s.aadhaar_number,
+            s.parent_guardian_name,
+            s.village,
+            s.address,
+            s.qualification,
+            s.blood_group,
+            s.photo_path,
+            s.signature_path,
             s.email,
             s.mobile_number,
             s.created_at,
+            s.updated_at,
             (SELECT COUNT(*) FROM admissions a WHERE a.student_id = s.id) AS admissions_count,
             (
                 SELECT c.id
@@ -581,12 +594,18 @@ class StudentRepository(BaseRepository):
                 a.created_at AS admission_date,
                 a.candidate_year,
                 a.candidate_sequence,
+                COALESCE(a.agreed_fee, 0.0) AS agreed_fee,
+                COALESCE(a.discount, 0.0) AS discount,
+                a.batch_id,
+                b.batch_name,
+                b.timing AS batch_timing,
                 c.id AS course_id,
                 c.code AS course_code,
                 c.name AS course_name
             FROM admissions a
             LEFT JOIN admission_courses ac ON ac.admission_id = a.id
             LEFT JOIN courses c ON c.id = ac.course_id
+            LEFT JOIN batches b ON b.id = a.batch_id
             WHERE a.student_id = ?
             ORDER BY a.id DESC;
         """

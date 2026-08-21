@@ -86,13 +86,8 @@ class AdmissionService(BaseService):
 
     def _validate_personal_info(self, dto: AdmissionCreateDTO) -> tuple[int, dict[str, Any]]:
         """Validates personal information and resolves or creates the student profile."""
-        has_village = bool(dto.village and dto.village.strip())
-        has_address = bool(dto.address and dto.address.strip())
-        if not has_village and not has_address:
-            raise ValidationError("Location requirement: At least Village OR Address must be provided.")
-
-        clean_village = dto.village.strip() if has_village else None
-        clean_address = dto.address.strip() if has_address else None
+        clean_village = dto.village.strip() if dto.village and dto.village.strip() else None
+        clean_address = dto.address.strip() if dto.address and dto.address.strip() else None
 
         # Existing Student Resolution
         if dto.student_id and dto.student_id > 0:
@@ -101,13 +96,16 @@ class AdmissionService(BaseService):
                 raise ValidationError(f"Student with ID {dto.student_id} not found.")
 
             student_id = dto.student_id
+            effective_village = clean_village or student.get("village")
+            effective_address = clean_address or student.get("address")
+
             update_data = {}
             if dto.middle_name:
                 update_data["middle_name"] = self._format_name(dto.middle_name)
             if dto.mother_name:
                 update_data["mother_name"] = self._format_name(dto.mother_name)
             if dto.dob:
-                update_data["dob"] = dto.dob.strip()
+                update_data["dob"] = dto.dob.strip().replace("/", "-")
             if dto.gender:
                 update_data["gender"] = dto.gender.strip().upper()
             if dto.aadhaar_number:
@@ -134,9 +132,13 @@ class AdmissionService(BaseService):
                 "first_name": student["first_name"],
                 "last_name": student["last_name"],
                 "mobile_number": student["mobile_number"],
-                "village": clean_village or student.get("village"),
-                "address": clean_address or student.get("address"),
+                "village": effective_village,
+                "address": effective_address,
             }
+
+        # Location requirement for new student registrations
+        if not clean_village and not clean_address:
+            raise ValidationError("Location requirement: At least Village OR Address must be provided.")
 
         # New Student Inline Creation
         first_name = self._format_name(dto.first_name)
@@ -225,6 +227,15 @@ class AdmissionService(BaseService):
             dest.write_bytes(dto.signature_bytes)
             signature_path = str(dest)
 
+        if not photo_path and student_id:
+            st = self.student_repo.get_by_id(student_id)
+            if st and st.get("photo_path"):
+                photo_path = st["photo_path"]
+        if not signature_path and student_id:
+            st = self.student_repo.get_by_id(student_id)
+            if st and st.get("signature_path"):
+                signature_path = st["signature_path"]
+
         # Settings checks - only enforced for non-draft admissions
         if dto.status != AdmissionStatus.DRAFT:
             req_photo = (self.settings_repo.get("require_photo") or "false").lower() == "true"
@@ -292,10 +303,10 @@ class AdmissionService(BaseService):
             # 4. Document Validation
             photo_path, signature_path = self._validate_documents(dto, student_id)
 
-            # 5. State Restriction: One Active Draft / Registered per Student
+            # 5. State Restriction: Prevent duplicate concurrent active draft/registered for the SAME course
             if target_status in (AdmissionStatus.DRAFT, AdmissionStatus.REGISTERED):
-                if self.repository.has_admission_in_state(student_id, target_status.value):
-                    raise ConflictError(f"Student already has an active admission in '{target_status.value}' state.")
+                if self.repository.has_active_admission_for_course(student_id, dto.course_id):
+                    raise ConflictError(f"Student already has an active '{target_status.value}' admission for course '{course['name']}'.")
 
             # 6. Determine Candidate Year & Sequence (YYYY-NNN)
             admission_year = dto.candidate_year or datetime.now().year
@@ -498,12 +509,21 @@ class AdmissionService(BaseService):
             confirmed_friends = self.friendship_repo.get_confirmed_friends(adm.student_id)
 
             timeline = []
-            timeline.append({
-                "timestamp": adm.created_at,
-                "title": "Admission Registered",
-                "description": f"Admission candidate profile {adm.admission_number} created.",
-                "event_type": "REGISTRATION",
-            })
+            logs = self.activity_repo.get_logs_for_entity("ADMISSION", admission_id)
+            for l in logs:
+                timeline.append({
+                    "timestamp": l["created_at"],
+                    "title": f"Admission {l['action'].capitalize()}",
+                    "description": l.get("details") or f"Admission was {l['action'].lower()}.",
+                    "event_type": l["action"],
+                })
+            if not timeline:
+                timeline.append({
+                    "timestamp": adm.created_at,
+                    "title": "Admission Registered",
+                    "description": f"Admission candidate profile {adm.admission_number} created.",
+                    "event_type": "REGISTRATION",
+                })
             for p in payments:
                 timeline.append({
                     "timestamp": p.payment_date,
@@ -518,7 +538,9 @@ class AdmissionService(BaseService):
                     "description": f"Official receipt issued for ₹{r.amount_paid:,.2f}.",
                     "event_type": "RECEIPT",
                 })
-            timeline.sort(key=lambda x: x["timestamp"], reverse=True)
+            timeline.sort(key=lambda x: str(x["timestamp"]), reverse=True)
+
+            batches = self.batch_repo.list(course_id=adm.course_id, limit=50)
 
             return AdmissionWorkspaceDTO(
                 admission=adm,
@@ -526,6 +548,7 @@ class AdmissionService(BaseService):
                 receipts=receipts,
                 confirmed_friends=confirmed_friends,
                 timeline=timeline,
+                available_batches=batches,
             )
 
     def filter_admissions(self, dto: AdmissionFilterDTO) -> tuple[list[AdmissionDTO], int]:
@@ -674,8 +697,59 @@ class AdmissionService(BaseService):
             )
             return payment_id
 
+    def cancel_admission(self, admission_id: int, reason: str, actor_id: Optional[int] = None) -> bool:
+        """
+        Cancels an admission in an audited lifecycle operation.
+        Preserves all financial records (payments, receipts) and historical data.
+        """
+        if not reason or not reason.strip():
+            raise ValidationError("A cancellation reason is required.")
+
+        adm = self.get_admission(admission_id)
+        if not adm:
+            raise NotFoundError(f"Admission #{admission_id} not found.")
+
+        if adm.status == AdmissionStatus.CANCELLED.value:
+            raise ValidationError("This admission has already been cancelled.")
+
+        with self.unit_of_work():
+            new_remarks = (adm.remarks + f"\n[CANCELLED]: {reason.strip()}") if adm.remarks else f"[CANCELLED]: {reason.strip()}"
+            self.repository.update(admission_id, {
+                "batch_id": adm.batch_id,
+                "agreed_fee": adm.agreed_fee,
+                "discount": adm.discount,
+                "status": AdmissionStatus.CANCELLED.value,
+                "remarks": new_remarks,
+                "institution_id": adm.institution_id,
+                "institution_name": adm.institution_name,
+                "qualification": adm.qualification,
+                "qualification_other": adm.qualification_other,
+                "blood_group": adm.blood_group,
+                "village": adm.village,
+                "address": adm.address,
+                "aadhaar_number": adm.aadhaar_number,
+                "mother_name": adm.mother_name,
+                "parent_guardian_name": adm.parent_guardian_name,
+                "dob": adm.dob,
+                "gender": adm.gender,
+                "middle_name": adm.middle_name,
+                "photo_path": adm.photo_path,
+                "signature_path": adm.signature_path,
+            })
+
+            self.activity_repo.insert(
+                "ADMISSION",
+                admission_id,
+                "CANCELLED",
+                actor_name="OPERATOR",
+                actor_id=actor_id,
+                details=f"Admission {adm.admission_number} ({adm.course_name}) cancelled. Reason: {reason.strip()}",
+            )
+            LogService.info(f"Admission #{adm.admission_number} cancelled. Reason: {reason.strip()}", context="AdmissionService")
+            return True
+
     def export_admissions_csv(self, dto: AdmissionFilterDTO, target_path: Optional[str | Path] = None) -> Path:
-        """Exports filtered admissions into Excel-compatible CSV."""
+        """Exports filtered admissions into Excel-compatible CSV with installment breakdown."""
         from infrastructure.excel.exporter import ExcelExporter
         
         filter_all = AdmissionFilterDTO(
@@ -695,26 +769,66 @@ class AdmissionService(BaseService):
         path = Path(target_path) if target_path else default_dir / default_name
 
         headers = [
-            "Admission ID", "Candidate No", "Student Name", "Mobile", "Course",
-            "Batch", "Date", "Status", "Total Fee", "Discount", "Paid", "Pending",
+            "SR.NO",
+            "COURSE NAME",
+            "ADMISSION DATE",
+            "ADMISSION ID",
+            "NAME",
+            "MOB NO",
+            "ADMISSION STATUS",
+            "TOTAL FEES",
+            "1ST INSTALLMENT",
+            "2ND INSTALLMENT",
+            "3RD INSTALLMENT",
+            "4TH INSTALLMENT",
+            "TOTAL FEES PAID",
+            "PENDING FEES",
+            "ADDRESS",
+            "FRIEND NAME",
+            "FRIEND CONTACT NO",
         ]
-        rows = [
-            [
-                a.id,
-                a.admission_number,
-                a.student_name,
-                a.mobile_number or "—",
-                a.course_name,
-                a.batch_name or "Unassigned",
-                a.created_at[:10],
-                a.status,
-                f"Rs. {a.agreed_fee:,.2f}",
-                f"Rs. {a.discount:,.2f}",
-                f"Rs. {a.total_paid:,.2f}",
-                f"Rs. {a.pending_amount:,.2f}",
-            ]
-            for a in admissions
-        ]
+        rows = []
+        with self.unit_of_work():
+            for idx, a in enumerate(admissions, start=1):
+                payments = self.payment_repo.get_by_admission_id(a.id)
+                inst_map = {}
+                for p in payments:
+                    inst_num = p.get("installment_number") or 1
+                    inst_map[inst_num] = inst_map.get(inst_num, 0.0) + float(p.get("amount") or 0.0)
+
+                inst1 = inst_map.get(1, 0.0)
+                inst2 = inst_map.get(2, 0.0)
+                inst3 = inst_map.get(3, 0.0)
+                inst4 = inst_map.get(4, 0.0)
+                total_paid = sum(inst_map.values())
+                final_fee = a.agreed_fee - a.discount
+                pending = max(0.0, final_fee - total_paid)
+
+                friends = self.friendship_repo.get_friends_for_admission(a.id)
+                if not friends:
+                    friends = self.friendship_repo.get_confirmed_friends(a.student_id)
+                friend_name = f"{friends[0]['first_name']} {friends[0]['last_name']}".strip() if friends else "—"
+                friend_mobile = friends[0].get("mobile_number") or "—" if friends else "—"
+
+                rows.append([
+                    idx,
+                    a.course_name,
+                    a.created_at[:10],
+                    a.admission_number,
+                    a.student_name,
+                    a.mobile_number or "—",
+                    a.status,
+                    f"Rs. {final_fee:,.2f}",
+                    f"Rs. {inst1:,.2f}" if inst1 > 0 else "—",
+                    f"Rs. {inst2:,.2f}" if inst2 > 0 else "—",
+                    f"Rs. {inst3:,.2f}" if inst3 > 0 else "—",
+                    f"Rs. {inst4:,.2f}" if inst4 > 0 else "—",
+                    f"Rs. {total_paid:,.2f}",
+                    f"Rs. {pending:,.2f}",
+                    a.address or a.village or "—",
+                    friend_name,
+                    friend_mobile,
+                ])
 
         metadata = {
             "Module": "SIMS v2.2 Admission Management System",

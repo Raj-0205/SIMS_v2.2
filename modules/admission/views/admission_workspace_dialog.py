@@ -33,7 +33,10 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
         self.on_updated = on_updated or (lambda: None)
         self.controller = AdmissionController()
         self.receipt_controller = ReceiptController()
-        self.workspace_dto: Optional[AdmissionWorkspaceDTO] = None
+        try:
+            self.workspace_dto = self.controller.get_admission_workspace(self.admission_id)
+        except Exception:
+            self.workspace_dto = None
         self.active_tab_index: int = 0
 
         # Title Controls
@@ -68,16 +71,25 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
         )
 
         # Action Buttons
+        is_cancelled = (self.workspace_dto.admission.status == "CANCELLED") if self.workspace_dto else False
+        self.cancel_admission_btn = ft.OutlinedButton(
+            content=ft.Text("Cancel Admission", color=AppTheme.DANGER),
+            icon=ft.Icons.CANCEL_OUTLINED,
+            style=ft.ButtonStyle(color=AppTheme.DANGER),
+            on_click=self._handle_cancel_admission,
+            visible=not is_cancelled,
+        )
         self.pay_btn = ft.ElevatedButton(
             content=ft.Text("Collect Payment"),
             icon=ft.Icons.PAYMENTS,
             style=ft.ButtonStyle(bgcolor=AppTheme.SUCCESS, color=AppTheme.SURFACE),
             on_click=self._handle_collect_payment,
+            visible=not is_cancelled,
         )
         self.close_btn = ft.TextButton(content=ft.Text("Close"), on_click=self.close_dialog)
 
         self.content = ft.Container(
-            width=800,
+            width=840,
             height=560,
             content=ft.Column(
                 controls=[
@@ -90,7 +102,16 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
             ),
         )
 
-        self.actions = [self.pay_btn, self.close_btn]
+        self.actions = [
+            ft.Row(
+                controls=[
+                    self.cancel_admission_btn,
+                    ft.Row(controls=[self.pay_btn, self.close_btn], spacing=AppTheme.PAD_SM),
+                ],
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                expand=True,
+            )
+        ]
         self.actions_alignment = ft.MainAxisAlignment.SPACE_BETWEEN
 
         self.load_data()
@@ -435,6 +456,86 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
             p.dialog = dlg
             dlg.open = True
             p.update()
+
+    def _handle_cancel_admission(self, _=None) -> None:
+        adm = self.workspace_dto.admission
+        p = self.safe_page
+        if not p:
+            return
+
+        reason_field = ft.TextField(
+            label="Cancellation Reason *",
+            hint_text="e.g. Personal reasons / student withdrawal",
+            multiline=True,
+            min_lines=2,
+            max_lines=3,
+            border_radius=AppTheme.RADIUS_MD,
+            expand=True,
+        )
+        error_msg = ft.Text("", color=AppTheme.DANGER, size=AppTheme.SIZE_CAPTION, visible=False)
+
+        def do_confirm_cancel(e):
+            r = (reason_field.value or "").strip()
+            if not r:
+                error_msg.value = "Cancellation reason cannot be empty."
+                error_msg.visible = True
+                p.update()
+                return
+            try:
+                self.controller.cancel_admission(adm.id, reason=r)
+                cancel_dlg.open = False
+                p.dialog = self
+                self.open = True
+                self.load_data()
+                self.cancel_admission_btn.visible = False
+                self.pay_btn.visible = False
+                self.on_updated()
+                p.update()
+            except Exception as ex:
+                error_msg.value = str(ex)
+                error_msg.visible = True
+                p.update()
+
+        def do_close_cancel_dlg(e):
+            cancel_dlg.open = False
+            p.dialog = self
+            self.open = True
+            p.update()
+
+        cancel_dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Cancel Admission", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.DANGER),
+            content=ft.Container(
+                width=450,
+                content=ft.Column(
+                    controls=[
+                        ft.Text(
+                            f"Are you sure you want to cancel admission {adm.admission_number} ({adm.course_name}) for {adm.student_name}?\n\n"
+                            "All recorded payments and receipts will be permanently preserved in the financial audit log.",
+                            size=AppTheme.SIZE_BODY,
+                            color=AppTheme.TEXT_SECONDARY,
+                        ),
+                        reason_field,
+                        error_msg,
+                    ],
+                    spacing=AppTheme.PAD_SM,
+                    tight=True,
+                ),
+            ),
+            actions=[
+                ft.TextButton("Keep Admission", on_click=do_close_cancel_dlg),
+                ft.ElevatedButton(
+                    "Confirm Cancellation",
+                    style=ft.ButtonStyle(bgcolor=AppTheme.DANGER, color=AppTheme.SURFACE),
+                    on_click=do_confirm_cancel,
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+
+        p.dialog = cancel_dlg
+        cancel_dlg.open = True
+        p.update()
 
     def _on_payment_collected(self) -> None:
         self.load_data()

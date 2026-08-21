@@ -340,13 +340,15 @@ class AdmissionFormModal(ft.AlertDialog):
             color=AppTheme.PRIMARY,
         )
 
-        # Error Banner
-        self.error_text = ft.Text("", color=AppTheme.DANGER, size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.W_500)
-        self.error_container = ft.Container(
-            content=ft.Row([ft.Icon(ft.Icons.ERROR_OUTLINE, color=AppTheme.DANGER, size=16), self.error_text], spacing=AppTheme.PAD_SM),
+        # Toast / Banner Notification Container (Top of Form)
+        self.banner_text = ft.Text("", color=AppTheme.DANGER, size=AppTheme.SIZE_BODY, weight=ft.FontWeight.W_500)
+        self.banner_icon = ft.Icon(ft.Icons.ERROR_OUTLINE, color=AppTheme.DANGER, size=18)
+        self.banner_container = ft.Container(
+            content=ft.Row([self.banner_icon, self.banner_text], spacing=AppTheme.PAD_SM, vertical_alignment=ft.CrossAxisAlignment.CENTER),
             bgcolor=AppTheme.DANGER_LIGHT,
-            padding=ft.Padding(12, 8, 12, 8),
-            border_radius=AppTheme.RADIUS_SM,
+            padding=ft.Padding(14, 10, 14, 10),
+            border_radius=AppTheme.RADIUS_MD,
+            border=ft.Border.all(1, AppTheme.DANGER),
             visible=False,
         )
 
@@ -497,10 +499,10 @@ class AdmissionFormModal(ft.AlertDialog):
         )
 
         self.content = ft.Container(
-            width=800,
+            width=860,
             content=ft.Column(
                 controls=[
-                    self.error_container,
+                    self.banner_container,
                     sec1_personal,
                     sec2_location,
                     sec3_academic,
@@ -510,7 +512,7 @@ class AdmissionFormModal(ft.AlertDialog):
                 ],
                 spacing=AppTheme.PAD_MD,
                 scroll=ft.ScrollMode.AUTO,
-                height=580,
+                height=590,
             ),
         )
 
@@ -546,10 +548,18 @@ class AdmissionFormModal(ft.AlertDialog):
             except RuntimeError:
                 pass
 
-    def _show_error(self, msg: str) -> None:
-        self.error_text.value = msg
-        self.error_container.visible = True
+    def _show_toast(self, msg: str, is_error: bool = False) -> None:
+        self.banner_text.value = msg
+        self.banner_text.color = AppTheme.DANGER if is_error else AppTheme.SUCCESS
+        self.banner_icon.name = ft.Icons.ERROR_OUTLINE if is_error else ft.Icons.CHECK_CIRCLE
+        self.banner_icon.color = AppTheme.DANGER if is_error else AppTheme.SUCCESS
+        self.banner_container.bgcolor = AppTheme.DANGER_LIGHT if is_error else AppTheme.SUCCESS_LIGHT
+        self.banner_container.border = ft.Border.all(1, AppTheme.DANGER if is_error else AppTheme.SUCCESS)
+        self.banner_container.visible = True
         self._safe_update()
+
+    def _show_error(self, msg: str) -> None:
+        self._show_toast(msg, is_error=True)
 
     def _on_mode_change(self, e: ft.ControlEvent) -> None:
         selected_list = list(e.control.selected)
@@ -584,15 +594,33 @@ class AdmissionFormModal(ft.AlertDialog):
     def _select_existing_student(self, student_id: int) -> None:
         st = self.student_controller.get_student(student_id)
         self.selected_student_id = st.id
-        self.first_name_input.value = st.first_name
-        self.last_name_input.value = st.last_name
+        self.first_name_input.value = st.first_name or ""
+        self.middle_name_input.value = st.middle_name or ""
+        self.last_name_input.value = st.last_name or ""
+        self.mother_name_input.value = st.mother_name or ""
+        if st.dob:
+            self.dob_input.value = st.dob
+        if st.gender:
+            self.gender_dropdown.value = st.gender.upper()
         self.mobile_input.value = st.mobile_number or ""
-        self.email_input = getattr(self, "email_input", None)
-        if hasattr(self, "email_input") and self.email_input:
-            self.email_input.value = st.email or ""
+        self.parent_name_input.value = st.parent_guardian_name or ""
+        self.aadhaar_input.value = st.aadhaar_number or ""
         self.village_input.value = st.village or ""
+        self.address_input.value = st.address or ""
+        if st.qualification:
+            qual_keys = [q.value for q in Qualification]
+            if st.qualification in qual_keys:
+                self.qualification_dropdown.value = st.qualification
+                self.qual_other_input.visible = (st.qualification == Qualification.OTHER.value)
+            else:
+                self.qualification_dropdown.value = Qualification.OTHER.value
+                self.qual_other_input.value = st.qualification
+                self.qual_other_input.visible = True
+        if st.blood_group:
+            self.blood_group_dropdown.value = st.blood_group.upper()
         self.student_search_results.controls.clear()
         self._load_friend_suggestions()
+        self._show_toast("✓ Existing student information loaded", is_error=False)
         self._safe_update()
 
     def _on_village_changed(self) -> None:
@@ -752,7 +780,7 @@ class AdmissionFormModal(ft.AlertDialog):
 
     def handle_save_draft(self, e: ft.ControlEvent) -> None:
         """Saves admission as a draft (allowed with ₹0 payment)."""
-        self.error_container.visible = False
+        self.banner_container.visible = False
         try:
             payload = self._gather_form_payload(AdmissionStatus.DRAFT)
             adm_id = self.controller.create_admission(payload)
@@ -769,7 +797,7 @@ class AdmissionFormModal(ft.AlertDialog):
         Confirmation Flow: Validates form data, saves in REGISTERED state,
         and prompts the user to complete payment (>= ₹500) in PaymentDialog.
         """
-        self.error_container.visible = False
+        self.banner_container.visible = False
         try:
             payload = self._gather_form_payload(AdmissionStatus.REGISTERED)
             adm_id = self.controller.create_admission(payload)
@@ -798,6 +826,18 @@ class AdmissionFormModal(ft.AlertDialog):
         except Exception as ex:
             LogService.error(f"Confirm admission flow error: {ex}", context=self.__class__.__name__)
             self._show_error("An unexpected error occurred during confirmation.")
+
+    def _show_error(self, message: str) -> None:
+        self.banner_text.value = message
+        self.banner_text.color = AppTheme.DANGER
+        self.banner_icon.name = ft.Icons.ERROR_OUTLINE
+        self.banner_icon.color = AppTheme.DANGER
+        self.banner_container.bgcolor = AppTheme.DANGER_LIGHT
+        self.banner_container.border = ft.Border.all(1, AppTheme.DANGER)
+        self.banner_container.visible = True
+        p = self.safe_page
+        if p:
+            p.update()
 
     def _open_receipt_dialog(self, admission_id: int) -> None:
         try:

@@ -43,10 +43,22 @@ class StudentDTO:
     id: int
     first_name: str
     last_name: str
+    middle_name: Optional[str] = None
+    mother_name: Optional[str] = None
+    dob: Optional[str] = None
+    gender: Optional[str] = None
+    aadhaar_number: Optional[str] = None
+    parent_guardian_name: Optional[str] = None
+    village: Optional[str] = None
+    address: Optional[str] = None
+    qualification: Optional[str] = None
+    blood_group: Optional[str] = None
+    photo_path: Optional[str] = None
+    signature_path: Optional[str] = None
     mobile_number: Optional[str] = None
     email: Optional[str] = None
-    address: Optional[str] = None
     created_at: str = ""
+    updated_at: Optional[str] = None
     admissions_count: int = 0
     course_id: Optional[int] = None
     current_course: Optional[str] = None
@@ -62,7 +74,12 @@ class StudentDTO:
     @property
     def display_name(self) -> str:
         """Helper for UI to display the full name cleanly."""
-        return f"{self.first_name} {self.last_name}".strip()
+        parts = [self.first_name]
+        if self.middle_name:
+            parts.append(self.middle_name)
+        if self.last_name:
+            parts.append(self.last_name)
+        return " ".join(p for p in parts if p).strip()
 
     @property
     def latest_admission_number(self) -> Optional[str]:
@@ -155,6 +172,21 @@ class StudentAdmissionDTO:
     course_id: Optional[int] = None
     course_code: Optional[str] = None
     course_name: Optional[str] = None
+    batch_id: Optional[int] = None
+    batch_name: Optional[str] = None
+    batch_timing: Optional[str] = None
+    agreed_fee: float = 0.0
+    discount: float = 0.0
+    total_paid: float = 0.0
+    installments: dict[int, float] = field(default_factory=dict)
+
+    @property
+    def final_fee(self) -> float:
+        return max(0.0, self.agreed_fee - self.discount)
+
+    @property
+    def pending_amount(self) -> float:
+        return max(0.0, self.final_fee - self.total_paid)
 
     @property
     def admission_number(self) -> str:
@@ -179,3 +211,6 @@ class StudentWorkspaceDTO:
     student: StudentDTO
     admissions: list[StudentAdmissionDTO] = field(default_factory=list)
     timeline: list[StudentTimelineItemDTO] = field(default_factory=list)
+    payments: list[dict[str, Any]] = field(default_factory=list)
+    receipts: list[dict[str, Any]] = field(default_factory=list)
+    friends: list[dict[str, Any]] = field(default_factory=list)
