@@ -207,19 +207,28 @@ class PaymentDialog(ft.AlertDialog):
         self.verify_btn_text.value = "Verify & Confirm Payment"
         self._safe_update()
 
-    def _safe_update(self) -> None:
+    @property
+    def safe_page(self) -> Optional[ft.Page]:
         try:
-            if self.page:
+            return self.page
+        except (RuntimeError, AttributeError):
+            return getattr(self, "_page", None)
+
+    def _safe_update(self) -> None:
+        p = self.safe_page
+        if p:
+            try:
                 self.update()
-        except RuntimeError:
-            pass
+            except RuntimeError:
+                pass
 
     def close_modal(self, e: Optional[ft.ControlEvent] = None) -> None:
-        try:
-            if self.page:
-                self.page.pop_dialog()
-        except RuntimeError:
-            pass
+        p = self.safe_page
+        if p:
+            try:
+                p.pop_dialog()
+            except RuntimeError:
+                pass
 
     def handle_confirm_payment(self, e: ft.ControlEvent) -> None:
         self.error_container.visible = False

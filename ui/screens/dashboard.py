@@ -6,6 +6,7 @@ from typing import Callable
 from ui.layout.navigation import NavigationMenu
 from ui.layout.content_host import ContentHost
 from modules.student.views.student_home import StudentHome
+from modules.admission.views.admission_home import AdmissionHome
 
 __all__ = ["DashboardScreen"]
 
@@ -54,6 +55,8 @@ class DashboardScreen(ft.Row):
         self.nav_menu.set_route(route)
         if route == "/students":
             view = StudentHome()
+        elif route == "/admissions":
+            view = AdmissionHome()
         else:
             view = self.route_map.get(
                 route,

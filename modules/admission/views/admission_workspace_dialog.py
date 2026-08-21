@@ -133,12 +133,20 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
         self.content.content.controls[0] = self.tab_buttons_row
         self._safe_update()
 
-    def _safe_update(self) -> None:
+    @property
+    def safe_page(self) -> Optional[ft.Page]:
         try:
-            if self.page:
+            return self.page
+        except (RuntimeError, AttributeError):
+            return getattr(self, "_page", None)
+
+    def _safe_update(self) -> None:
+        p = self.safe_page
+        if p:
+            try:
                 self.update()
-        except Exception:
-            pass
+            except Exception:
+                pass
 
     def load_data(self) -> None:
         try:
@@ -223,7 +231,7 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
                 self._info_row("Discount Applied", f"₹{adm.discount:,.2f}"),
                 self._info_row("Final Payable Fee", f"₹{adm.final_fee:,.2f}"),
                 self._info_row("Total Paid", f"₹{adm.total_paid:,.2f}", is_bold=True, val_color=AppTheme.SUCCESS),
-                self._info_row("Pending Balance", f"₹{adm.pending_amount:,.2f}", is_bold=True, val_color=AppTheme.ERROR if adm.pending_amount > 0 else AppTheme.SUCCESS),
+                self._info_row("Pending Balance", f"₹{adm.pending_amount:,.2f}", is_bold=True, val_color=AppTheme.DANGER if adm.pending_amount > 0 else AppTheme.SUCCESS),
             ],
             spacing=AppTheme.PAD_XS,
             expand=True,
@@ -398,20 +406,22 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
         return ft.Column(controls=rows, spacing=AppTheme.PAD_MD, scroll=ft.ScrollMode.AUTO)
 
     def _open_receipt_dialog(self, receipt) -> None:
-        if self.page:
+        p = self.safe_page
+        if p:
             dlg = ReceiptDialog(
                 receipt=receipt,
                 student_name=self.workspace_dto.admission.student_name,
                 candidate_number=self.workspace_dto.admission.admission_number,
                 course_name=self.workspace_dto.admission.course_name,
             )
-            self.page.dialog = dlg
+            p.dialog = dlg
             dlg.open = True
-            self.page.update()
+            p.update()
 
     def _handle_collect_payment(self, _=None) -> None:
         adm = self.workspace_dto.admission
-        if self.page:
+        p = self.safe_page
+        if p:
             dlg = PaymentDialog(
                 admission_id=adm.id,
                 student_name=adm.student_name,
@@ -422,9 +432,9 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
                 default_amount=min(500.0, adm.pending_amount) if adm.pending_amount > 0 else 500.0,
                 on_payment_success=self._on_payment_collected,
             )
-            self.page.dialog = dlg
+            p.dialog = dlg
             dlg.open = True
-            self.page.update()
+            p.update()
 
     def _on_payment_collected(self) -> None:
         self.load_data()
@@ -432,5 +442,6 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
 
     def close_dialog(self, _=None) -> None:
         self.open = False
-        if self.page:
-            self.page.update()
+        p = self.safe_page
+        if p:
+            p.update()

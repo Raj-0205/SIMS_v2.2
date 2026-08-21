@@ -172,12 +172,20 @@ class ReceiptDialog(ft.AlertDialog):
             )
         ]
 
-    def close_modal(self, e: Optional[ft.ControlEvent] = None) -> None:
+    @property
+    def safe_page(self) -> Optional[ft.Page]:
         try:
-            if self.page:
-                self.page.pop_dialog()
-        except RuntimeError:
-            pass
+            return self.page
+        except (RuntimeError, AttributeError):
+            return getattr(self, "_page", None)
+
+    def close_modal(self, e: Optional[ft.ControlEvent] = None) -> None:
+        p = self.safe_page
+        if p:
+            try:
+                p.pop_dialog()
+            except RuntimeError:
+                pass
 
     def handle_print(self, e: ft.ControlEvent) -> None:
         """Opens receipt PDF with system print / viewer."""
