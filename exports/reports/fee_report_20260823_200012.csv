@@ -1,0 +1,43 @@
+﻿# Module: SIMS v2.2 Admission & Fee Reporting System
+# Export Timestamp: 2026-08-23 20:00:12
+# Total Records: 38
+
+SR.NO,COURSE NAME,ADMISSION DATE,ADMISSION ID,NAME,MOB NO,ADMISSION STATUS,TOTAL FEES,1ST INSTALLMENT,2ND INSTALLMENT,3RD INSTALLMENT,4TH INSTALLMENT,TOTAL FEES PAID,PENDING FEES,ADDRESS,FRIEND NAME,FRIEND CONTACT NO
+1,KLiC Advanced Java,2026-08-23,2026-129,Forensic Student,9987492069,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+2,KLiC Advanced Java,2026-08-23,2026-127,Pooja Shinde,9822066978,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+3,KLiC Advanced Java,2026-08-23,2026-122,Forensic Student,9987492053,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+4,KLiC Advanced Java,2026-08-23,2026-118,Forensic Student,9987492033,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+5,KLiC Advanced Java,2026-08-23,2026-114,Forensic Student,9987491980,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+6,KLiC Advanced Java,2026-08-23,2026-111,Forensic Student,9987491961,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+7,KLiC Advanced Java,2026-08-23,2026-109,Anuj Pagar,9822904713,CANCELLED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,Rohit Shinde,9823904714
+8,KLiC Advanced Java,2026-08-23,2026-106,Forensic Student,9987491880,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+9,KLiC Advanced Java,2026-08-23,2026-104,Pooja Shinde,9821877580,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+10,KLiC Advanced Java,2026-08-23,2026-101,Pooja Shinde,9821863467,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+11,KLiC Advanced Java,2026-08-23,2026-098,Pooja Shinde,9821706897,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+12,KLiC Advanced Java,2026-08-23,2026-095,Pooja Shinde,9821673002,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+13,KLiC Advanced Java,2026-08-23,2026-091,Forensic Student,9987490926,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+14,KLiC Advanced Java,2026-08-23,2026-089,Pooja Shinde,9820922006,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+15,KLiC Advanced Java,2026-08-23,2026-085,Forensic Student,9987487074,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+16,KLiC Advanced Java,2026-08-23,2026-081,Multiadm Student,9147070256,REGISTERED,"Rs. 5,000.00",—,—,—,—,Rs. 0.00,"Rs. 5,000.00",—,—,—
+17,KLiC Advanced Java,2026-08-23,2026-075,Forensic Student,9987486959,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+18,KLiC Advanced Java,2026-08-23,2026-071,Multiadm Student,9146955273,REGISTERED,"Rs. 5,000.00",—,—,—,—,Rs. 0.00,"Rs. 5,000.00",—,—,—
+19,KLiC Advanced Java,2026-08-23,2026-065,Forensic Student,9987486895,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+20,KLiC Advanced Java,2026-08-23,2026-062,Multiadm Student,9146892583,REGISTERED,"Rs. 5,000.00",—,—,—,—,Rs. 0.00,"Rs. 5,000.00",—,—,—
+21,KLiC Advanced Java,2026-08-23,2026-056,Forensic Student,9987486811,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+22,KLiC Advanced Java,2026-08-23,2026-053,Forensic Student,9987486674,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+23,KLiC Advanced Java,2026-08-23,2026-051,Anuj Pagar,9822468020,CANCELLED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,Rohit Shinde,9823468021
+24,KLiC Advanced Java,2026-08-23,2026-048,Forensic Student,9987485454,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+25,KLiC Advanced Java,2026-08-23,2026-046,Pooja Shinde,9825451531,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+26,KLiC Advanced Java,2026-08-21,2026-042,Forensic Student,9987316379,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+27,KLiC Advanced Java,2026-08-21,2026-040,Pooja Shinde,9826379519,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+28,KLiC Advanced Java,2026-08-21,2026-037,Anuj Pagar,9822368150,CANCELLED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,Rohit Shinde,9823368151
+29,KLiC Advanced Java,2026-08-21,2026-035,Anuj Pagar,9822351163,CANCELLED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,Rohit Shinde,9823351164
+30,KLiC Advanced Java,2026-08-21,2026-033,Anuj Pagar,9822324510,REGISTERED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,Rohit Shinde,9823324511
+31,KLiC Advanced Java,2026-08-21,2026-030,Forensic Student,9987316252,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+32,KLiC Advanced Java,2026-08-21,2026-028,Pooja Shinde,9826246225,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+33,KLiC Advanced Java,2026-08-21,2026-025,Pooja Shinde,9826212647,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+34,KLiC Advanced Java,2026-08-21,2026-022,Forensic Student,9987311009,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+35,KLiC Advanced Java,2026-08-21,2026-020,Forensic Student,9987310999,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+36,KLiC Advanced Java,2026-08-21,2026-017,Forensic Student,9988776655,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+37,KLiC Advanced Java,2026-08-21,2026-015,Anuj Pagar,9822606496,CANCELLED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,Rohit Shinde,9823768958
+38,KLiC Advanced Java,2026-08-21,2026-013,Anuj Pagar,9822000017,CANCELLED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,Rohit Shinde,9823000017

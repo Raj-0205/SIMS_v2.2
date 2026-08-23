@@ -256,15 +256,21 @@ class BatchService(BaseService):
 
     def get_capacity_summary(self, batch_id: int) -> BatchCapacityDTO:
         """
-        Returns capacity summary for a batch.
-        Note: Exact enrolled count calculation depends on Admission/Batch linkage when implemented.
+        Returns capacity summary for a batch with dynamic active enrollment count.
+        Enrolled count includes CONFIRMED and REGISTERED admissions.
+        Excludes CANCELLED, DRAFT, and COMPLETED.
         """
         batch = self.get_batch(batch_id)
-        return BatchCapacityDTO(
-            batch_id=batch.id,
-            batch_name=batch.batch_name,
-            max_capacity=batch.max_capacity,
-            enrolled_count=0,
-            available_capacity=batch.max_capacity,
-            status=batch.status,
-        )
+        with self.unit_of_work():
+            enrolled_count = self.repository.get_active_enrolled_count(batch_id)
+            available_capacity = max(0, batch.max_capacity - enrolled_count)
+            status_val = BatchStatus.FULL if (batch.max_capacity > 0 and enrolled_count >= batch.max_capacity) else batch.status
+            return BatchCapacityDTO(
+                batch_id=batch.id,
+                batch_name=batch.batch_name,
+                max_capacity=batch.max_capacity,
+                enrolled_count=enrolled_count,
+                available_capacity=available_capacity,
+                status=status_val,
+            )
+

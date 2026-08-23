@@ -203,3 +203,19 @@ class BatchRepository(BaseRepository):
             return False
         except Exception:
             return False
+
+    def get_active_enrolled_count(self, batch_id: int) -> int:
+        """
+        Returns count of active admissions allocated to this batch.
+        Includes CONFIRMED and REGISTERED admissions.
+        Excludes CANCELLED, DRAFT, and COMPLETED.
+        """
+        sql = """
+            SELECT COUNT(*) AS active_count
+            FROM admissions
+            WHERE batch_id = ?
+              AND status IN ('CONFIRMED', 'REGISTERED');
+        """
+        row = self.execute_fetchone(sql, (batch_id,))
+        return int(row["active_count"]) if row and row["active_count"] is not None else 0
+

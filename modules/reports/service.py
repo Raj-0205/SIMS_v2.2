@@ -54,6 +54,7 @@ class ReportsService(BaseService):
 
             where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
 
+            # Single aggregated SQL query eliminating N+1 loop queries (SIMS-PERF-01)
             sql = f"""
                 SELECT a.id AS admission_id,
                        a.candidate_year,
@@ -69,7 +70,26 @@ class ReportsService(BaseService):
                        s.last_name,
                        s.mobile_number,
                        c.id AS course_id,
-                       c.name AS course_name
+                       c.name AS course_name,
+                       COALESCE((SELECT SUM(amount) FROM payments WHERE admission_id = a.id AND installment_number = 1), 0.0) AS inst1,
+                       COALESCE((SELECT SUM(amount) FROM payments WHERE admission_id = a.id AND installment_number = 2), 0.0) AS inst2,
+                       COALESCE((SELECT SUM(amount) FROM payments WHERE admission_id = a.id AND installment_number = 3), 0.0) AS inst3,
+                       COALESCE((SELECT SUM(amount) FROM payments WHERE admission_id = a.id AND installment_number = 4), 0.0) AS inst4,
+                       COALESCE((SELECT SUM(amount) FROM payments WHERE admission_id = a.id), 0.0) AS total_paid,
+                       (
+                           SELECT TRIM(s_f.first_name || ' ' || s_f.last_name)
+                           FROM student_friendships sf
+                           JOIN students s_f ON s_f.id = (CASE WHEN sf.student_id = s.id THEN sf.friend_student_id ELSE sf.student_id END)
+                           WHERE (sf.student_id = s.id OR sf.friend_student_id = s.id) AND sf.is_active = 1
+                           LIMIT 1
+                       ) AS friend_name,
+                       (
+                           SELECT s_f.mobile_number
+                           FROM student_friendships sf
+                           JOIN students s_f ON s_f.id = (CASE WHEN sf.student_id = s.id THEN sf.friend_student_id ELSE sf.student_id END)
+                           WHERE (sf.student_id = s.id OR sf.friend_student_id = s.id) AND sf.is_active = 1
+                           LIMIT 1
+                       ) AS friend_mobile
                 FROM admissions a
                 JOIN students s ON s.id = a.student_id
                 LEFT JOIN admission_courses ac ON ac.admission_id = a.id
@@ -83,36 +103,17 @@ class ReportsService(BaseService):
 
             for idx, adm in enumerate(raw_admissions, start=1):
                 adm_id = adm["admission_id"]
-                stud_id = adm["student_id"]
-
-                # Payments grouped by installment
-                pay_sql = "SELECT installment_number, amount FROM payments WHERE admission_id = ? ORDER BY installment_number ASC;"
-                pay_rows = self.repo.execute_fetchall(pay_sql, (adm_id,))
-                inst_map = {}
-                for p in pay_rows:
-                    num = p.get("installment_number") or 1
-                    inst_map[num] = inst_map.get(num, 0.0) + float(p.get("amount") or 0.0)
-
-                inst1 = inst_map.get(1, 0.0)
-                inst2 = inst_map.get(2, 0.0)
-                inst3 = inst_map.get(3, 0.0)
-                inst4 = inst_map.get(4, 0.0)
-                total_paid = sum(inst_map.values())
+                inst1 = float(adm.get("inst1") or 0.0)
+                inst2 = float(adm.get("inst2") or 0.0)
+                inst3 = float(adm.get("inst3") or 0.0)
+                inst4 = float(adm.get("inst4") or 0.0)
+                total_paid = float(adm.get("total_paid") or 0.0)
 
                 total_fees = float(adm.get("agreed_fee") or 0.0) - float(adm.get("discount") or 0.0)
                 pending_fees = max(0.0, total_fees - total_paid)
 
-                # Village friends
-                f_sql = """
-                    SELECT s.first_name, s.last_name, s.mobile_number
-                    FROM student_friendships sf
-                    JOIN students s ON s.id = (CASE WHEN sf.student_id = ? THEN sf.friend_student_id ELSE sf.student_id END)
-                    WHERE (sf.student_id = ? OR sf.friend_student_id = ?) AND sf.is_active = 1
-                    LIMIT 1;
-                """
-                friend = self.repo.execute_fetchone(f_sql, (stud_id, stud_id, stud_id))
-                friend_name = f"{friend['first_name']} {friend['last_name']}".strip() if friend else "—"
-                friend_mobile = friend.get("mobile_number") or "—" if friend else "—"
+                friend_name = (adm.get("friend_name") or "").strip() or "—"
+                friend_mobile = adm.get("friend_mobile") or "—"
 
                 c_year = adm.get("candidate_year") or 2026
                 c_seq = adm.get("candidate_sequence") or adm_id
@@ -153,6 +154,7 @@ class ReportsService(BaseService):
                     results.sort(key=lambda x: x["pending_fees"], reverse=True)
 
             return results
+
 
     def filter_payments_by_amount(self, target_amount: float, search: Optional[str] = None) -> list[dict[str, Any]]:
         """Filters payments matching exact amount (e.g. ₹500, ₹1000)."""

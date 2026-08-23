@@ -11,7 +11,7 @@ from core.exceptions import ValidationError, ServiceError
 from modules.receipts.dto import ReceiptCreateDTO, ReceiptDTO
 from modules.receipts.mapper import ReceiptMapper
 from modules.receipts.repository import ReceiptRepository
-from modules.settings.service import SettingsService
+from modules.settings.repository import SettingsRepository
 from infrastructure.pdf.receipt_generator import ReceiptPDFGenerator
 
 __all__ = ["ReceiptService"]
@@ -22,7 +22,7 @@ class ReceiptService(BaseService):
 
     def __init__(self) -> None:
         self.repository = ReceiptRepository()
-        self.settings_service = SettingsService()
+        self.settings_repo = SettingsRepository()
 
     def generate_receipt_number(self, year: Optional[int] = None) -> str:
         """Generates atomic, non-reusable sequential receipt number format: RCP-YYYY-XXXXX."""
@@ -73,13 +73,24 @@ class ReceiptService(BaseService):
             "collector_name": dto.collector_name,
         }
 
+        # Safe repository read without nested unit_of_work transaction
+        profile = ctx.get("institute_profile")
+        if not profile:
+            settings_dict = self.settings_repo.get_all()
+            profile = {
+                "institute_name": settings_dict.get("institute_name", "Sudharm Infotech") or "Sudharm Infotech",
+                "contact_person": settings_dict.get("contact_person", "Hemant Mahale") or "Hemant Mahale",
+                "contact_mobile": settings_dict.get("contact_mobile", "9271226772") or "9271226772",
+                "alc_code": settings_dict.get("alc_code", "57210242") or "57210242",
+                "address_line1": settings_dict.get("address_line1", "Renuka Complex, 3rd Floor,") or "Renuka Complex, 3rd Floor,",
+                "address_line2": settings_dict.get("address_line2", "Opp. Market Yard, Chandwad - 423101") or "Opp. Market Yard, Chandwad - 423101",
+            }
+
         try:
-            profile = self.settings_service.get_institute_profile()
             ReceiptPDFGenerator.generate_receipt_pdf(render_payload, pdf_path, profile)
         except Exception as ex:
-            LogService.warning(f"Receipt PDF rendering note: {ex}", context=self.__class__.__name__)
-            # Fallback path if rendering fails
-            pdf_path = None
+            LogService.error(f"Receipt PDF rendering failed: {ex}", context=self.__class__.__name__)
+            raise ServiceError(f"Failed to generate required receipt PDF: {ex}") from ex
 
         data = {
             "payment_id": dto.payment_id,
@@ -93,7 +104,7 @@ class ReceiptService(BaseService):
             "installment_number": dto.installment_number,
             "payment_mode": dto.payment_mode,
             "collector_name": dto.collector_name,
-            "pdf_path": str(pdf_path) if pdf_path else None,
+            "pdf_path": str(pdf_path),
             "generated_by": dto.generated_by,
         }
 

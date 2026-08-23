@@ -19,14 +19,15 @@ class PaymentController:
             admission_id=int(raw_data["admission_id"]),
             student_id=int(raw_data["student_id"]),
             amount=float(raw_data["amount"]),
-            payment_mode=str(raw_data["payment_mode"]),
-            collector_name=str(raw_data["collector_name"]),
+            payment_mode=str(raw_data.get("payment_mode") or "CASH"),
+            collector_name=str(raw_data.get("collector_name") or "Hemant Mahale (Sir)"),
             collector_id=int(raw_data["collector_id"]) if raw_data.get("collector_id") else None,
             transaction_ref=str(raw_data["transaction_ref"]) if raw_data.get("transaction_ref") else None,
             remarks=str(raw_data["remarks"]) if raw_data.get("remarks") else None,
             created_by=int(raw_data["created_by"]) if raw_data.get("created_by") else None,
         )
         return self.service.record_payment(dto)
+
 
     def get_payments_for_admission(self, admission_id: int) -> list[PaymentDTO]:
         return self.service.get_payments_for_admission(admission_id)

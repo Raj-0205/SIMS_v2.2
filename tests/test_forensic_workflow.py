@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from pathlib import Path
 
 # Add workspace to sys.path
@@ -51,7 +52,8 @@ def run_test():
     print(f"Using Course 1 ID: {c1_id}, Course 2 ID: {c2_id}")
 
     # 2. Test Student Master Profile Creation
-    mobile_test = f"9822{os.getpid() % 1000000:06d}"
+    ts = int(time.time() * 1000) % 10000000
+    mobile_test = f"9822{ts % 1000000:06d}"
     print(f"Creating Student Master Profile with mobile: {mobile_test}")
 
     student_payload = {
@@ -63,8 +65,8 @@ def run_test():
         "dob": "2004-05-15",
         "gender": "MALE",
         "mobile_number": mobile_test,
-        "email": "anuj.pagar@example.com",
-        "aadhaar_number": "123456789012",
+        "email": f"anuj.pagar.{ts}@example.com",
+        "aadhaar_number": f"123456{ts % 1000000:06d}",
         "village": "chandwad",
         "address": "near jio tower, sawargaon road",
         "qualification": "12th Standard (HSC)",
@@ -88,7 +90,7 @@ def run_test():
     assert len(notes) >= 2, "Notes failed to save"
 
     print("Testing Village Friends Link...")
-    mobile_friend = f"9823{os.getpid() % 1000000:06d}"
+    mobile_friend = f"9823{(ts + 1) % 1000000:06d}"
     friend_id = student_ctrl.create_student({
         "first_name": "rohit",
         "last_name": "shinde",
@@ -96,7 +98,7 @@ def run_test():
         "dob": "2004-08-20",
         "gender": "MALE",
         "mobile_number": mobile_friend,
-        "aadhaar_number": "987654321098",
+        "aadhaar_number": f"987654{(ts + 1) % 1000000:06d}",
         "village": "chandwad",
     })
     student_ctrl.add_student_friend(stud_id, friend_id)
@@ -234,7 +236,7 @@ def run_test():
 
     # 10. Test Educational Institutions Master (Settings)
     print("Testing Educational Institutions in Settings...")
-    inst_name = f"SNJB College of Engineering {os.getpid()}"
+    inst_name = f"SNJB College of Engineering {ts}"
     inst_id = settings_ctrl.create_institution(inst_name, "COLLEGE", "Chandwad")
     print(f"✓ Created Institution ID: {inst_id}")
     insts = settings_ctrl.list_institutions()

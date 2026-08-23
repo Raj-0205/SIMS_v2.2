@@ -33,6 +33,8 @@ class PaymentDialog(ft.AlertDialog):
         default_amount: float = 500.0,
         on_payment_completed: Optional[Callable[[int], None]] = None,
         on_payment_success: Optional[Callable[[int], None]] = None,
+        page: Optional[ft.Page] = None,
+        current_status: Optional[str] = None,
     ) -> None:
         super().__init__(modal=True)
 
@@ -44,6 +46,8 @@ class PaymentDialog(ft.AlertDialog):
         self.already_paid = already_paid
         self.pending_balance = max(0.0, total_fee - already_paid)
         self.on_payment_completed = on_payment_completed or on_payment_success or (lambda pid: None)
+        self._root_page = page
+        self.current_status = current_status
 
         self.controller = AdmissionController()
 
@@ -95,6 +99,7 @@ class PaymentDialog(ft.AlertDialog):
 
         # Amount Input
         calc_default = min(default_amount, self.pending_balance) if self.pending_balance > 0 else default_amount
+        hint_str = "Enter installment payment amount" if (self.already_paid > 0 or self.current_status == "CONFIRMED") else "Minimum ₹500 required for confirmation"
         self.amount_input = ft.TextField(
             label="Amount Paying Now (₹) *",
             value=f"{calc_default:.0f}",
@@ -102,7 +107,7 @@ class PaymentDialog(ft.AlertDialog):
             border_radius=AppTheme.RADIUS_MD,
             text_size=AppTheme.SIZE_H3,
             prefix_icon=ft.Icons.CURRENCY_RUPEE,
-            hint_text="Minimum ₹500 required for confirmation",
+            hint_text=hint_str,
         )
 
         # Payment Mode Dropdown
@@ -211,9 +216,9 @@ class PaymentDialog(ft.AlertDialog):
     @property
     def safe_page(self) -> Optional[ft.Page]:
         try:
-            return self.page
+            return self._root_page or self.page
         except (RuntimeError, AttributeError):
-            return getattr(self, "_page", None)
+            return self._root_page or getattr(self, "_page", None)
 
     def _safe_update(self) -> None:
         p = self.safe_page
@@ -245,9 +250,21 @@ class PaymentDialog(ft.AlertDialog):
             self._show_error("Please enter a valid numeric payment amount.")
             return
 
-        if amount < 500.0:
-            self._show_error("Minimum payment of ₹500 is required to confirm admission.")
+        if amount <= 0.0:
+            self._show_error("Payment amount must be greater than zero.")
             return
+
+        if amount > self.pending_balance:
+            self._show_error(f"Payment amount (₹{amount:,.2f}) cannot exceed pending balance (₹{self.pending_balance:,.2f}).")
+            return
+
+        # Differentiate floor requirement: initial vs subsequent payment (SIMS-FIN-01)
+        is_subsequent = (self.already_paid > 0.0 or self.current_status == "CONFIRMED")
+        if not is_subsequent:
+            if self.pending_balance >= 500.0 and amount < 500.0:
+                self._show_error("Minimum payment of ₹500 is required to confirm admission.")
+                return
+
         if not pin:
             self._show_error("Admin authorization PIN is required.")
             return
@@ -274,3 +291,4 @@ class PaymentDialog(ft.AlertDialog):
         except Exception as ex:
             LogService.error(f"Payment dialog confirmation error: {ex}", context=self.__class__.__name__)
             self._show_error("An unexpected error occurred during payment processing.")
+

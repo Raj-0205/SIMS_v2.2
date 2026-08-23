@@ -2,7 +2,8 @@
 
 import flet as ft
 from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError
+from argon2.exceptions import VerifyMismatchError, InvalidHashError
+
 
 from core.database.transaction import TransactionManager
 from core.logger.service import LogService
@@ -38,8 +39,9 @@ class AuthService:
         """Return True when the supplied password matches the stored hash."""
         try:
             return cls._password_hasher.verify(password_hash, password)
-        except VerifyMismatchError:
+        except (VerifyMismatchError, InvalidHashError, Exception):
             return False
+
 
     @classmethod
     def authenticate(

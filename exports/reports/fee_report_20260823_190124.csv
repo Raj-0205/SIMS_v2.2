@@ -1,0 +1,112 @@
+﻿# Module: SIMS v2.2 Admission & Fee Reporting System
+# Export Timestamp: 2026-08-23 19:01:24
+# Total Records: 107
+
+SR.NO,COURSE NAME,ADMISSION DATE,ADMISSION ID,NAME,MOB NO,ADMISSION STATUS,TOTAL FEES,1ST INSTALLMENT,2ND INSTALLMENT,3RD INSTALLMENT,4TH INSTALLMENT,TOTAL FEES PAID,PENDING FEES,ADDRESS,FRIEND NAME,FRIEND CONTACT NO
+1,KLiC Advanced Excel,2026-08-23,2026-107,Payment Tester,9877491882,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00",—,—,—,"Rs. 1,500.00","Rs. 3,000.00",Chandwad,—,—
+2,KLiC Advanced Java,2026-08-23,2026-106,Forensic Student,9987491880,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+3,KLiC Advanced Excel,2026-08-23,2026-105,Forensic Student,9987491880,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,—,—
+4,KLiC Advanced Java,2026-08-23,2026-104,Pooja Shinde,9821877580,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+5,KLiC Advanced Excel,2026-08-23,2026-103,Pooja Shinde,9821877580,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",—,—,—
+6,KLiC Advanced Excel,2026-08-23,2026-102,Saurabh Deshmukh,9761876076,CONFIRMED,"Rs. 4,000.00","Rs. 1,000.00",—,—,—,"Rs. 1,000.00","Rs. 3,000.00",Chandwad,—,—
+7,KLiC Advanced Java,2026-08-23,2026-101,Pooja Shinde,9821863467,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+8,KLiC Advanced Excel,2026-08-23,2026-100,Pooja Shinde,9821863467,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",—,—,—
+9,KLiC Advanced Excel,2026-08-23,2026-099,Saurabh Deshmukh,9761862209,CONFIRMED,"Rs. 4,000.00","Rs. 1,000.00",—,—,—,"Rs. 1,000.00","Rs. 3,000.00",Chandwad,—,—
+10,KLiC Advanced Java,2026-08-23,2026-098,Pooja Shinde,9821706897,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+11,KLiC Advanced Excel,2026-08-23,2026-097,Pooja Shinde,9821706897,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",—,—,—
+12,KLiC Advanced Excel,2026-08-23,2026-096,Saurabh Deshmukh,9761706153,REGISTERED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,—,—
+13,KLiC Advanced Java,2026-08-23,2026-095,Pooja Shinde,9821673002,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+14,KLiC Advanced Excel,2026-08-23,2026-094,Pooja Shinde,9821673002,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",—,—,—
+15,KLiC Advanced Excel,2026-08-23,2026-093,Saurabh Deshmukh,9761672253,REGISTERED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,—,—
+16,KLiC Advanced Excel,2026-08-23,2026-092,Payment Tester,9877490928,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00",—,—,—,"Rs. 1,500.00","Rs. 3,000.00",Chandwad,—,—
+17,KLiC Advanced Java,2026-08-23,2026-091,Forensic Student,9987490926,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+18,KLiC Advanced Excel,2026-08-23,2026-090,Forensic Student,9987490926,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,—,—
+19,KLiC Advanced Java,2026-08-23,2026-089,Pooja Shinde,9820922006,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+20,KLiC Advanced Excel,2026-08-23,2026-088,Pooja Shinde,9820922006,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",—,—,—
+21,KLiC Advanced Excel,2026-08-23,2026-087,Saurabh Deshmukh,9760920524,CONFIRMED,"Rs. 4,000.00","Rs. 1,000.00",—,—,—,"Rs. 1,000.00","Rs. 3,000.00",Chandwad,—,—
+22,KLiC Advanced Excel,2026-08-23,2026-086,Payment Tester,9877487076,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00",—,—,—,"Rs. 1,500.00","Rs. 3,000.00",Chandwad,—,—
+23,KLiC Advanced Java,2026-08-23,2026-085,Forensic Student,9987487074,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+24,KLiC Advanced Excel,2026-08-23,2026-084,Forensic Student,9987487074,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,—,—
+25,KLiC Advanced Excel,2026-08-23,2026-083,Batchs2 Test,9167071618,CONFIRMED,"Rs. 4,000.00",Rs. 500.00,—,—,—,Rs. 500.00,"Rs. 3,500.00",—,—,—
+26,KLiC Advanced Excel,2026-08-23,2026-082,Batchs1 Test,9157071618,CANCELLED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",—,—,—
+27,KLiC Advanced Java,2026-08-23,2026-081,Multiadm Student,9147070256,REGISTERED,"Rs. 5,000.00",—,—,—,—,Rs. 0.00,"Rs. 5,000.00",—,—,—
+28,KLiC Advanced Excel,2026-08-23,2026-080,Multiadm Student,9147070256,CONFIRMED,"Rs. 4,500.00","Rs. 2,000.00",—,—,—,"Rs. 2,000.00","Rs. 2,500.00",—,—,—
+29,KLiC Advanced Excel,2026-08-23,2026-079,Overpaytester Student,9137069157,CONFIRMED,"Rs. 1,000.00",Rs. 500.00,—,—,—,Rs. 500.00,Rs. 500.00,—,—,—
+30,KLiC Advanced Excel,2026-08-23,2026-078,Completetester Student,9127067766,COMPLETED,Rs. 800.00,Rs. 500.00,Rs. 300.00,—,—,Rs. 800.00,Rs. 0.00,—,—,—
+31,KLiC Advanced Excel,2026-08-23,2026-077,Floortester Student,9117066434,CONFIRMED,"Rs. 5,000.00",Rs. 500.00,—,—,—,Rs. 500.00,"Rs. 4,500.00",—,—,—
+32,KLiC Advanced Excel,2026-08-23,2026-076,Payment Tester,9877486961,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00",—,—,—,"Rs. 1,500.00","Rs. 3,000.00",Chandwad,—,—
+33,KLiC Advanced Java,2026-08-23,2026-075,Forensic Student,9987486959,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+34,KLiC Advanced Excel,2026-08-23,2026-074,Forensic Student,9987486959,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,—,—
+35,KLiC Advanced Excel,2026-08-23,2026-073,Batchs2 Test,9166956715,CONFIRMED,"Rs. 4,000.00",Rs. 500.00,—,—,—,Rs. 500.00,"Rs. 3,500.00",—,—,—
+36,KLiC Advanced Excel,2026-08-23,2026-072,Batchs1 Test,9156956715,CANCELLED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",—,—,—
+37,KLiC Advanced Java,2026-08-23,2026-071,Multiadm Student,9146955273,REGISTERED,"Rs. 5,000.00",—,—,—,—,Rs. 0.00,"Rs. 5,000.00",—,—,—
+38,KLiC Advanced Excel,2026-08-23,2026-070,Multiadm Student,9146955273,CONFIRMED,"Rs. 4,500.00","Rs. 2,000.00",—,—,—,"Rs. 2,000.00","Rs. 2,500.00",—,—,—
+39,KLiC Advanced Excel,2026-08-23,2026-069,Overpaytester Student,9136954209,CONFIRMED,"Rs. 1,000.00",Rs. 500.00,—,—,—,Rs. 500.00,Rs. 500.00,—,—,—
+40,KLiC Advanced Excel,2026-08-23,2026-068,Completetester Student,9126952853,COMPLETED,Rs. 800.00,Rs. 500.00,Rs. 300.00,—,—,Rs. 800.00,Rs. 0.00,—,—,—
+41,KLiC Advanced Excel,2026-08-23,2026-067,Floortester Student,9116951602,CONFIRMED,"Rs. 5,000.00",Rs. 500.00,—,—,—,Rs. 500.00,"Rs. 4,500.00",—,—,—
+42,KLiC Advanced Excel,2026-08-23,2026-066,Payment Tester,9877486897,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00",—,—,—,"Rs. 1,500.00","Rs. 3,000.00",Chandwad,—,—
+43,KLiC Advanced Java,2026-08-23,2026-065,Forensic Student,9987486895,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+44,KLiC Advanced Excel,2026-08-23,2026-064,Forensic Student,9987486895,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,—,—
+45,KLiC Advanced Excel,2026-08-23,2026-063,Batchs1 Test,9156893860,REGISTERED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",—,—,—
+46,KLiC Advanced Java,2026-08-23,2026-062,Multiadm Student,9146892583,REGISTERED,"Rs. 5,000.00",—,—,—,—,Rs. 0.00,"Rs. 5,000.00",—,—,—
+47,KLiC Advanced Excel,2026-08-23,2026-061,Multiadm Student,9146892583,CONFIRMED,"Rs. 4,500.00","Rs. 2,000.00",—,—,—,"Rs. 2,000.00","Rs. 2,500.00",—,—,—
+48,KLiC Advanced Excel,2026-08-23,2026-060,Overpaytester Student,9136891591,CONFIRMED,"Rs. 1,000.00",Rs. 500.00,—,—,—,Rs. 500.00,Rs. 500.00,—,—,—
+49,KLiC Advanced Excel,2026-08-23,2026-059,Completetester Student,9126890323,COMPLETED,Rs. 800.00,Rs. 500.00,Rs. 300.00,—,—,Rs. 800.00,Rs. 0.00,—,—,—
+50,KLiC Advanced Excel,2026-08-23,2026-058,Floortester Student,9116889205,CONFIRMED,"Rs. 5,000.00",Rs. 500.00,—,—,—,Rs. 500.00,"Rs. 4,500.00",—,—,—
+51,KLiC Advanced Excel,2026-08-23,2026-057,Payment Tester,9877486813,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00",—,—,—,"Rs. 1,500.00","Rs. 3,000.00",Chandwad,—,—
+52,KLiC Advanced Java,2026-08-23,2026-056,Forensic Student,9987486811,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+53,KLiC Advanced Excel,2026-08-23,2026-055,Forensic Student,9987486811,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,—,—
+54,KLiC Advanced Excel,2026-08-23,2026-054,Payment Tester,9877486675,REGISTERED,"Rs. 4,500.00",—,—,—,—,Rs. 0.00,"Rs. 4,500.00",Chandwad,—,—
+55,KLiC Advanced Java,2026-08-23,2026-053,Forensic Student,9987486674,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+56,KLiC Advanced Excel,2026-08-23,2026-052,Forensic Student,9987486674,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,—,—
+57,KLiC Advanced Java,2026-08-23,2026-051,Anuj Pagar,9822468020,CANCELLED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,Rohit Shinde,9823468021
+58,KLiC Advanced Excel,2026-08-23,2026-050,Anuj Pagar,9822468020,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00","Rs. 1,000.00",—,—,"Rs. 2,500.00","Rs. 2,000.00",Chandwad,Rohit Shinde,9823468021
+59,KLiC Advanced Excel,2026-08-23,2026-049,Payment Tester,9877485456,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00",—,—,—,"Rs. 1,500.00","Rs. 3,000.00",Chandwad,—,—
+60,KLiC Advanced Java,2026-08-23,2026-048,Forensic Student,9987485454,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+61,KLiC Advanced Excel,2026-08-23,2026-047,Forensic Student,9987485454,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,—,—
+62,KLiC Advanced Java,2026-08-23,2026-046,Pooja Shinde,9825451531,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+63,KLiC Advanced Excel,2026-08-23,2026-045,Pooja Shinde,9825451531,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",—,—,—
+64,KLiC Advanced Excel,2026-08-23,2026-044,Saurabh Deshmukh,9765450284,CONFIRMED,"Rs. 4,000.00","Rs. 1,000.00",—,—,—,"Rs. 1,000.00","Rs. 3,000.00",Chandwad,—,—
+65,KLiC Advanced Excel,2026-08-21,2026-043,Payment Tester,9877316380,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00","Rs. 1,000.00",—,—,"Rs. 2,500.00","Rs. 2,000.00",Chandwad,—,—
+66,KLiC Advanced Java,2026-08-21,2026-042,Forensic Student,9987316379,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+67,KLiC Advanced Excel,2026-08-21,2026-041,Forensic Student,9987316379,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,—,—
+68,KLiC Advanced Java,2026-08-21,2026-040,Pooja Shinde,9826379519,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+69,KLiC Advanced Excel,2026-08-21,2026-039,Pooja Shinde,9826379519,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",—,—,—
+70,KLiC Advanced Excel,2026-08-21,2026-038,Saurabh Deshmukh,9766379250,CONFIRMED,"Rs. 4,000.00","Rs. 1,000.00",—,—,—,"Rs. 1,000.00","Rs. 3,000.00",Chandwad,—,—
+71,KLiC Advanced Java,2026-08-21,2026-037,Anuj Pagar,9822368150,CANCELLED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,Rohit Shinde,9823368151
+72,KLiC Advanced Excel,2026-08-21,2026-036,Anuj Pagar,9822368150,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00","Rs. 1,000.00",—,—,"Rs. 2,500.00","Rs. 2,000.00",Chandwad,Rohit Shinde,9823368151
+73,KLiC Advanced Java,2026-08-21,2026-035,Anuj Pagar,9822351163,CANCELLED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,Rohit Shinde,9823351164
+74,KLiC Advanced Excel,2026-08-21,2026-034,Anuj Pagar,9822351163,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00","Rs. 1,000.00",—,—,"Rs. 2,500.00","Rs. 2,000.00",Chandwad,Rohit Shinde,9823351164
+75,KLiC Advanced Java,2026-08-21,2026-033,Anuj Pagar,9822324510,REGISTERED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,Rohit Shinde,9823324511
+76,KLiC Advanced Excel,2026-08-21,2026-032,Anuj Pagar,9822324510,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00",—,—,—,"Rs. 1,500.00","Rs. 3,000.00",Chandwad,Rohit Shinde,9823324511
+77,KLiC Advanced Excel,2026-08-21,2026-031,Payment Tester,9877316253,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00",—,—,—,"Rs. 1,500.00","Rs. 3,000.00",Chandwad,—,—
+78,KLiC Advanced Java,2026-08-21,2026-030,Forensic Student,9987316252,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+79,KLiC Advanced Excel,2026-08-21,2026-029,Forensic Student,9987316252,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,—,—
+80,KLiC Advanced Java,2026-08-21,2026-028,Pooja Shinde,9826246225,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+81,KLiC Advanced Excel,2026-08-21,2026-027,Pooja Shinde,9826246225,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",—,—,—
+82,KLiC Advanced Excel,2026-08-21,2026-026,Saurabh Deshmukh,9766245779,CONFIRMED,"Rs. 4,000.00","Rs. 1,000.00",—,—,—,"Rs. 1,000.00","Rs. 3,000.00",Chandwad,—,—
+83,KLiC Advanced Java,2026-08-21,2026-025,Pooja Shinde,9826212647,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",—,—,—
+84,KLiC Advanced Excel,2026-08-21,2026-024,Pooja Shinde,9826212647,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",—,—,—
+85,KLiC Advanced Excel,2026-08-21,2026-023,Payment Tester,9877311010,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00","Rs. 2,500.00",—,—,"Rs. 4,000.00",Rs. 500.00,Chandwad,—,—
+86,KLiC Advanced Java,2026-08-21,2026-022,Forensic Student,9987311009,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+87,KLiC Advanced Excel,2026-08-21,2026-021,Forensic Student,9987311009,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,—,—
+88,KLiC Advanced Java,2026-08-21,2026-020,Forensic Student,9987310999,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+89,KLiC Advanced Excel,2026-08-21,2026-019,Forensic Student,9987310999,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,—,—
+90,KLiC Advanced Excel,2026-08-21,2026-018,Payment Tester,9876543219,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00",—,—,—,"Rs. 1,500.00","Rs. 3,000.00",Chandwad,—,—
+91,KLiC Advanced Java,2026-08-21,2026-017,Forensic Student,9988776655,DRAFT,"Rs. 6,000.00",—,—,—,—,Rs. 0.00,"Rs. 6,000.00",Chandwad,—,—
+92,KLiC Advanced Excel,2026-08-21,2026-016,Forensic Student,9988776655,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,—,—
+93,KLiC Advanced Java,2026-08-21,2026-015,Anuj Pagar,9822606496,CANCELLED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,Rohit Shinde,9823768958
+94,KLiC Advanced Excel,2026-08-21,2026-014,Anuj Pagar,9822606496,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00","Rs. 1,000.00",—,—,"Rs. 2,500.00","Rs. 2,000.00",Chandwad,Rohit Shinde,9823768958
+95,KLiC Advanced Java,2026-08-21,2026-013,Anuj Pagar,9822000017,CANCELLED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,Rohit Shinde,9823000017
+96,KLiC Advanced Excel,2026-08-21,2026-012,Anuj Pagar,9822000017,CONFIRMED,"Rs. 4,500.00","Rs. 1,500.00","Rs. 1,000.00",—,—,"Rs. 2,500.00","Rs. 2,000.00",Chandwad,Rohit Shinde,9823000017
+97,MS-CIT (Mastering IT),2026-08-21,2026-011,Rahul Patil,8745856523,CONFIRMED,"Rs. 4,000.00","Rs. 4,500.00",—,—,—,"Rs. 4,500.00",Rs. 0.00,near evi boilers,—,—
+98,KLiC Mobile App Development,2026-08-21,2026-010,Anuj Raj Pagar,8010120768,CONFIRMED,"Rs. 5,200.00","Rs. 3,500.00",—,—,—,"Rs. 3,500.00","Rs. 1,700.00",Khadak Ozar,Pooja Patil,9876543212
+99,KLiC Advanced Excel,2026-08-21,2026-009,Aniket Kadam,9830654301,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,—,—
+100,KLiC Mobile App Development,2026-08-21,2026-008,Soham Kokate,9822562319,DRAFT,"Rs. 5,900.00",—,—,—,—,Rs. 0.00,"Rs. 5,900.00",Phule Nagar,—,—
+101,KLiC Mobile App Development,2026-08-21,2026-007,Soham Kokate,9822562318,REGISTERED,"Rs. 5,900.00",—,—,—,—,Rs. 0.00,"Rs. 5,900.00",Phule Nagar,—,—
+102,KLiC Mobile App Development,2026-08-20,2026-006,Hardik Pandya,9933121255,CONFIRMED,"Rs. 6,000.00",Rs. 500.00,—,—,—,Rs. 500.00,"Rs. 5,500.00",Chandwad,Aniket Kadam,9824225201
+103,KLiC Advanced Excel,2026-08-20,2026-005,Anuj Raj Pagar,8010120768,REGISTERED,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Khadak Ozar,Pooja Patil,9876543212
+104,KLiC C / C++ / C#,2026-08-20,2026-004,Pooja Patil,9876543212,REGISTERED,"Rs. 4,500.00",—,—,—,—,Rs. 0.00,"Rs. 4,500.00",Khadak Ozar,Anuj Raj Pagar,8010120768
+105,MS-CIT (Mastering IT),2026-08-20,2026-003,Anuj Raj Pagar,8010120768,CONFIRMED,"Rs. 4,000.00","Rs. 2,500.00",—,—,—,"Rs. 2,500.00","Rs. 1,500.00","near jio tower, sawargaon road",Pooja Patil,9876543212
+106,KLiC Advanced Excel,2026-08-20,2026-002,Aniket Kadam,9824225201,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,Hardik Pandya,9933121255
+107,KLiC Advanced Excel,2026-08-20,2026-001,Aniket Kadam,9899000001,DRAFT,"Rs. 4,000.00",—,—,—,—,Rs. 0.00,"Rs. 4,000.00",Chandwad,Hardik Pandya,9933121255

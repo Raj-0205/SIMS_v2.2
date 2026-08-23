@@ -1,11 +1,12 @@
-# modules/admission/dto.py
-
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Optional, Any
+from typing import Optional, Any, TYPE_CHECKING
 from modules.admission.constants import AdmissionStatus
-from modules.payments.dto import PaymentDTO
-from modules.receipts.dto import ReceiptDTO
+
+if TYPE_CHECKING:
+    from modules.payments.dto import PaymentDTO
+    from modules.receipts.dto import ReceiptDTO
+
 
 __all__ = [
     "AdmissionCreateDTO",

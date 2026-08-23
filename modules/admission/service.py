@@ -34,8 +34,12 @@ from modules.course.repository import CourseRepository
 from modules.batch.repository import BatchRepository
 from modules.payments.repository import PaymentRepository
 from modules.payments.mapper import PaymentMapper
+from modules.payments.dto import PaymentCreateDTO
+from modules.payments.service import PaymentService
 from modules.receipts.repository import ReceiptRepository
 from modules.receipts.mapper import ReceiptMapper
+from modules.receipts.dto import ReceiptCreateDTO
+from modules.receipts.service import ReceiptService
 from modules.settings.repository import SettingsRepository
 from infrastructure.pdf.receipt_generator import ReceiptPDFGenerator
 
@@ -67,6 +71,8 @@ class AdmissionService(BaseService):
         self.payment_repo = PaymentRepository()
         self.receipt_repo = ReceiptRepository()
         self.settings_repo = SettingsRepository()
+        self.payment_service = PaymentService()
+        self.receipt_service = ReceiptService()
 
     @staticmethod
     def _format_name(val: Optional[str]) -> str:
@@ -78,11 +84,14 @@ class AdmissionService(BaseService):
         if not pin or not pin.strip():
             return False
         clean = pin.strip()
-        stored_hash = self.settings_repo.get("admin_pin_hash")
-        if stored_hash:
-            return AuthService.verify_password(stored_hash, clean)
+        with self.unit_of_work():
+            stored_hash = self.settings_repo.get("admin_pin_hash")
+        if stored_hash and AuthService.verify_password(stored_hash, clean):
+            return True
         default_hash = AuthService.hash_password(self.DEFAULT_ADMIN_PIN)
         return AuthService.verify_password(default_hash, clean)
+
+
 
     def _validate_personal_info(self, dto: AdmissionCreateDTO) -> tuple[int, dict[str, Any]]:
         """Validates personal information and resolves or creates the student profile."""
@@ -375,60 +384,27 @@ class AdmissionService(BaseService):
                 }
                 payment_id = self.payment_repo.insert(pay_data)
 
-                # Generate Official Receipt
-                receipt_seq = self.receipt_repo.get_next_sequence_for_year(admission_year)
-                receipt_number = f"RCP-{admission_year}-{receipt_seq:05d}"
+                receipt_dto = ReceiptCreateDTO(
+                    payment_id=payment_id,
+                    admission_id=admission_id,
+                    student_id=student_id,
+                    total_course_fee=final_fee,
+                    amount_paid=init_amount,
+                    total_paid_till_now=init_amount,
+                    pending_amount=max(0.0, final_fee - init_amount),
+                    installment_number=next_inst,
+                    payment_mode=pay_mode,
+                    collector_name=collector,
+                    generated_by=dto.created_by,
+                )
 
-                project_root = Path(__file__).resolve().parent.parent.parent
-                pdf_path = project_root / "exports" / "receipts" / f"receipt_{receipt_number.lower().replace('-', '_')}.pdf"
-
-                render_payload = {
-                    "receipt_number": receipt_number,
-                    "receipt_date": datetime.now().strftime("%d-%b-%Y %I:%M %p"),
-                    "student_name": f"{student_info.get('first_name', '')} {student_info.get('last_name', '')}".strip(),
-                    "student_id": student_id,
+                context_data = {
+                    "student_name": f"{student_info.get('first_name', '')} {student_info.get('last_name', '')}".strip() or "Student",
                     "candidate_number": candidate_number,
-                    "admission_id": admission_id,
                     "course_name": course["name"],
-                    "installment_number": next_inst,
-                    "amount_paid": init_amount,
-                    "total_course_fee": final_fee,
-                    "total_paid_till_now": init_amount,
-                    "pending_amount": max(0.0, final_fee - init_amount),
-                    "payment_mode": pay_mode,
-                    "collector_name": collector,
                 }
 
-                try:
-                    profile = {
-                        "institute_name": self.settings_repo.get("institute_name") or "Sudharm Infotech",
-                        "contact_person": self.settings_repo.get("contact_person") or "Hemant Mahale",
-                        "contact_mobile": self.settings_repo.get("contact_mobile") or "9271226772",
-                        "alc_code": self.settings_repo.get("alc_code") or "57210242",
-                        "address_line1": self.settings_repo.get("address_line1") or "Renuka Complex, 3rd Floor,",
-                        "address_line2": self.settings_repo.get("address_line2") or "Opp. Market Yard, Chandwad - 423101",
-                    }
-                    ReceiptPDFGenerator.generate_receipt_pdf(render_payload, pdf_path, profile)
-                except Exception as ex:
-                    LogService.warning(f"Receipt PDF rendering note: {ex}", context=self.__class__.__name__)
-                    pdf_path = None
-
-                rcp_data = {
-                    "payment_id": payment_id,
-                    "admission_id": admission_id,
-                    "student_id": student_id,
-                    "receipt_number": receipt_number,
-                    "total_course_fee": final_fee,
-                    "amount_paid": init_amount,
-                    "total_paid_till_now": init_amount,
-                    "pending_amount": max(0.0, final_fee - init_amount),
-                    "installment_number": next_inst,
-                    "payment_mode": pay_mode,
-                    "collector_name": collector,
-                    "pdf_path": str(pdf_path) if pdf_path else None,
-                    "generated_by": dto.created_by,
-                }
-                self.receipt_repo.insert(rcp_data)
+                self.receipt_service.create_receipt(receipt_dto, context_data=context_data)
 
             # 11. Explicit Friendship Linking (B2, B24)
             if dto.selected_friend_ids:
@@ -580,6 +556,26 @@ class AdmissionService(BaseService):
             self.friendship_repo.add_friendship(student_id, friend_student_id, admission_id)
             self.activity_repo.insert("STUDENT", student_id, "FRIEND_ADDED", details=f"Linked friend ID {friend_student_id}")
 
+    def get_active_institutions(self) -> list[dict[str, Any]]:
+        with self.unit_of_work():
+            return self.institution_repo.get_active_institutions()
+
+    def add_institution(self, name: str, institution_type: str = "COLLEGE", address: Optional[str] = None) -> int:
+        if not name or not name.strip():
+            raise ValidationError("Institution name is required.")
+        with self.unit_of_work():
+            return self.institution_repo.insert(name.strip(), institution_type, address)
+
+    def get_active_collectors(self) -> list[dict[str, Any]]:
+        with self.unit_of_work():
+            return self.collector_repo.get_active_collectors()
+
+    def add_collector(self, name: str, role_title: Optional[str] = None) -> int:
+        if not name or not name.strip():
+            raise ValidationError("Collector name is required.")
+        with self.unit_of_work():
+            return self.collector_repo.insert(name.strip(), role_title)
+
     def confirm_admission_with_payment(
         self,
         admission_id: int,
@@ -593,109 +589,31 @@ class AdmissionService(BaseService):
     ) -> int:
         """
         Transitions an existing DRAFT or REGISTERED admission to CONFIRMED
-        with an atomic payment transaction of at least ₹500 and verified Admin PIN.
+        with an atomic payment transaction and verified Admin PIN.
+        Delegates financial mutations to centralized PaymentService.
         """
-        if amount < self.MIN_CONFIRMATION_AMOUNT:
-            raise ValidationError(
-                f"Admission confirmation requires a minimum initial payment of ₹{self.MIN_CONFIRMATION_AMOUNT:,.2f}. "
-                f"Provided payment was ₹{amount:,.2f}."
-            )
+        if not admin_pin or not self._verify_pin_hash(admin_pin):
+            raise ValidationError("Invalid Admin authorization PIN. Payment rejected.")
 
         with self.unit_of_work():
-            if not admin_pin or not self._verify_pin_hash(admin_pin):
-                raise ValidationError("Invalid Admin authorization PIN. Payment rejected.")
-
             adm_row = self.repository.get_by_id(admission_id)
             if not adm_row:
                 raise ValidationError(f"Admission with ID {admission_id} not found.")
             adm = AdmissionMapper.to_dto(adm_row)
 
-            # 1. Update Status to CONFIRMED
-            self.repository.update_status(admission_id, AdmissionStatus.CONFIRMED.value)
 
-            # 2. Record Payment
-            next_inst = self.payment_repo.get_next_installment_number(admission_id)
-            pay_data = {
-                "admission_id": admission_id,
-                "student_id": adm.student_id,
-                "installment_number": next_inst,
-                "amount": float(amount),
-                "payment_mode": payment_mode.upper(),
-                "collector_id": collector_id,
-                "collector_name": collector_name,
-                "transaction_ref": transaction_ref.strip() if transaction_ref else None,
-                "remarks": f"Confirmation payment for admission {adm.admission_number}",
-                "created_by": actor_id,
-            }
-            payment_id = self.payment_repo.insert(pay_data)
+        pay_dto = PaymentCreateDTO(
+            admission_id=admission_id,
+            student_id=adm.student_id,
+            amount=amount,
+            payment_mode=payment_mode,
+            collector_id=collector_id,
+            collector_name=collector_name,
+            transaction_ref=transaction_ref.strip() if transaction_ref else None,
+            created_by=actor_id,
+        )
 
-            # 3. Issue Receipt & PDF
-            total_paid_now = adm.total_paid + amount
-            receipt_year = adm.candidate_year or datetime.now().year
-            receipt_seq = self.receipt_repo.get_next_sequence_for_year(receipt_year)
-            receipt_number = f"RCP-{receipt_year}-{receipt_seq:05d}"
-
-            project_root = Path(__file__).resolve().parent.parent.parent
-            pdf_path = project_root / "exports" / "receipts" / f"receipt_{receipt_number.lower().replace('-', '_')}.pdf"
-
-            render_payload = {
-                "receipt_number": receipt_number,
-                "receipt_date": datetime.now().strftime("%d-%b-%Y %I:%M %p"),
-                "student_name": adm.student_name,
-                "student_id": adm.student_id,
-                "candidate_number": adm.admission_number,
-                "admission_id": admission_id,
-                "course_name": adm.course_name,
-                "installment_number": next_inst,
-                "amount_paid": amount,
-                "total_course_fee": adm.final_fee,
-                "total_paid_till_now": total_paid_now,
-                "pending_amount": max(0.0, adm.final_fee - total_paid_now),
-                "payment_mode": payment_mode.upper(),
-                "collector_name": collector_name,
-            }
-
-            try:
-                profile = {
-                    "institute_name": self.settings_repo.get("institute_name") or "Sudharm Infotech",
-                    "contact_person": self.settings_repo.get("contact_person") or "Hemant Mahale",
-                    "contact_mobile": self.settings_repo.get("contact_mobile") or "9271226772",
-                    "alc_code": self.settings_repo.get("alc_code") or "57210242",
-                    "address_line1": self.settings_repo.get("address_line1") or "Renuka Complex, 3rd Floor,",
-                    "address_line2": self.settings_repo.get("address_line2") or "Opp. Market Yard, Chandwad - 423101",
-                }
-                ReceiptPDFGenerator.generate_receipt_pdf(render_payload, pdf_path, profile)
-            except Exception as ex:
-                LogService.warning(f"Receipt PDF rendering note: {ex}", context=self.__class__.__name__)
-                pdf_path = None
-
-            rcp_data = {
-                "payment_id": payment_id,
-                "admission_id": admission_id,
-                "student_id": adm.student_id,
-                "receipt_number": receipt_number,
-                "total_course_fee": adm.final_fee,
-                "amount_paid": amount,
-                "total_paid_till_now": total_paid_now,
-                "pending_amount": max(0.0, adm.final_fee - total_paid_now),
-                "installment_number": next_inst,
-                "payment_mode": payment_mode.upper(),
-                "collector_name": collector_name,
-                "pdf_path": str(pdf_path) if pdf_path else None,
-                "generated_by": actor_id,
-            }
-            self.receipt_repo.insert(rcp_data)
-
-            # 4. Activity Log
-            self.activity_repo.insert(
-                "ADMISSION",
-                admission_id,
-                "CONFIRMED",
-                actor_name="OPERATOR",
-                actor_id=actor_id,
-                details=f"Confirmed admission {adm.admission_number} with payment ₹{amount:,.2f} (Receipt #{receipt_number})",
-            )
-            return payment_id
+        return self.payment_service.record_payment(pay_dto)
 
     def cancel_admission(self, admission_id: int, reason: str, actor_id: Optional[int] = None) -> bool:
         """

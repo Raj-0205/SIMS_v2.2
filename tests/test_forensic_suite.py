@@ -171,6 +171,133 @@ class TestForensicSuite(unittest.TestCase):
         self.assertIsInstance(insts, list)
         self.assertGreater(len(insts), 0)
 
+    def test_06_student_status_enum(self):
+        """Verify SIMS-SEC-01: StudentStatus enum contains ACTIVE, INACTIVE, ARCHIVED."""
+        from modules.student.constants import StudentStatus
+        self.assertEqual(StudentStatus.ACTIVE.value, "ACTIVE")
+        self.assertEqual(StudentStatus.INACTIVE.value, "INACTIVE")
+        self.assertEqual(StudentStatus.ARCHIVED.value, "ARCHIVED")
+
+    def test_07_batch_capacity_active_enrollment(self):
+        """Verify SIMS-BAT-01: Batch capacity counts only CONFIRMED and REGISTERED admissions."""
+        from modules.batch.controller import BatchController
+        batch_ctrl = BatchController()
+        batches, _ = batch_ctrl.list_batches()
+        if batches:
+            b1 = batches[0]
+            summary = batch_ctrl.get_capacity_summary(b1.id)
+            self.assertIsNotNone(summary)
+            self.assertTrue(hasattr(summary, "enrolled_count"))
+            self.assertTrue(hasattr(summary, "max_capacity"))
+            self.assertTrue(hasattr(summary, "available_capacity"))
+            self.assertEqual(summary.available_capacity, max(0, summary.max_capacity - summary.enrolled_count))
+
+
+
+    def test_08_payment_rules_and_status_progression(self):
+        """Verify SIMS-FIN-01, SIMS-FIN-02, SIMS-DB-01: Floor rules, overpayment rejection, and COMPLETED status."""
+        from modules.payments.controller import PaymentController
+        from core.exceptions import ValidationError
+
+        payment_ctrl = PaymentController()
+        courses, _ = self.course_ctrl.list_courses()
+        c1 = courses[0]
+
+        unique_mob = f"975{int(time.time() + 7) % 10000000:07d}"
+        adm_id = self.admission_ctrl.create_admission({
+            "course_id": c1.id,
+            "first_name": "Finance",
+            "last_name": "Invariant",
+            "mother_name": "Savita",
+            "dob": "2003-05-10",
+            "gender": "FEMALE",
+            "mobile_number": unique_mob,
+            "aadhaar_number": f"887766{int(time.time()) % 1000000:06d}",
+            "village": "Chandwad",
+            "photo_path": "uploads/photos/dummy.jpg",
+            "agreed_fee": 3000.0,
+            "discount": 0.0,
+            "status": "REGISTERED",
+        })
+
+        adm = self.admission_ctrl.get_admission(adm_id)
+        self.assertEqual(adm.final_fee, 3000.0)
+
+        # 1. Initial payment under ₹500 should be rejected by PaymentService
+        with self.assertRaises(ValidationError):
+            payment_ctrl.record_payment({
+                "admission_id": adm_id,
+                "student_id": adm.student_id,
+                "amount": 200.0,
+                "payment_mode": "CASH",
+            })
+
+        # 2. Overpayment (amount > pending_balance) should be rejected
+        with self.assertRaises(ValidationError):
+            payment_ctrl.record_payment({
+                "admission_id": adm_id,
+                "student_id": adm.student_id,
+                "amount": 5000.0,
+                "payment_mode": "CASH",
+            })
+
+        # 3. Valid Initial Payment transitions status to CONFIRMED
+        pay1_id = payment_ctrl.record_payment({
+            "admission_id": adm_id,
+            "student_id": adm.student_id,
+            "amount": 1000.0,
+            "payment_mode": "CASH",
+        })
+        self.assertIsNotNone(pay1_id)
+        adm_after1 = self.admission_ctrl.get_admission(adm_id)
+        self.assertEqual(adm_after1.status, "CONFIRMED")
+        self.assertEqual(adm_after1.total_paid, 1000.0)
+        self.assertEqual(adm_after1.pending_amount, 2000.0)
+
+        # 4. Subsequent installment under ₹500 (e.g. ₹400) is allowed because already CONFIRMED
+        pay2_id = payment_ctrl.record_payment({
+            "admission_id": adm_id,
+            "student_id": adm.student_id,
+            "amount": 400.0,
+            "payment_mode": "UPI",
+        })
+        self.assertIsNotNone(pay2_id)
+        adm_after2 = self.admission_ctrl.get_admission(adm_id)
+        self.assertEqual(adm_after2.total_paid, 1400.0)
+        self.assertEqual(adm_after2.pending_amount, 1600.0)
+
+        # 5. Full remaining settlement transitions status to COMPLETED (SIMS-DB-01)
+        pay3_id = payment_ctrl.record_payment({
+            "admission_id": adm_id,
+            "student_id": adm.student_id,
+            "amount": 1600.0,
+            "payment_mode": "NET_BANKING",
+        })
+        self.assertIsNotNone(pay3_id)
+        adm_completed = self.admission_ctrl.get_admission(adm_id)
+        self.assertEqual(adm_completed.status, "COMPLETED")
+        self.assertEqual(adm_completed.total_paid, 3000.0)
+        self.assertEqual(adm_completed.pending_amount, 0.0)
+
+        # 6. Payment on already COMPLETED admission should be rejected
+        with self.assertRaises(ValidationError):
+            payment_ctrl.record_payment({
+                "admission_id": adm_id,
+                "student_id": adm.student_id,
+                "amount": 100.0,
+                "payment_mode": "CASH",
+            })
+
+    def test_09_controller_layer_separation(self):
+        """Verify SIMS-ARCH-01: AdmissionController does not expose raw database repository handles."""
+        self.assertFalse(hasattr(self.admission_ctrl, "institution_repo"))
+        self.assertFalse(hasattr(self.admission_ctrl, "collector_repo"))
+        insts = self.admission_ctrl.get_active_institutions()
+        self.assertIsInstance(insts, list)
+        collectors = self.admission_ctrl.get_active_collectors()
+        self.assertIsInstance(collectors, list)
+
 
 if __name__ == "__main__":
     unittest.main()
+

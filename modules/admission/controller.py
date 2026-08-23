@@ -14,8 +14,6 @@ from modules.admission.dto import (
     AdmissionWorkspaceDTO,
     FriendSuggestionDTO,
 )
-from modules.admission.institution_repository import EducationalInstitutionRepository
-from modules.admission.collector_repository import PaymentCollectorRepository
 
 __all__ = ["AdmissionController"]
 
@@ -25,8 +23,6 @@ class AdmissionController:
 
     def __init__(self) -> None:
         self.service = AdmissionService()
-        self.institution_repo = EducationalInstitutionRepository()
-        self.collector_repo = PaymentCollectorRepository()
 
     def create_admission(self, raw_data: Mapping[str, Any]) -> int:
         status_val = raw_data.get("status", AdmissionStatus.DRAFT.value)
@@ -134,20 +130,17 @@ class AdmissionController:
         return self.service.get_suggested_friends(village, exclude_student_id, gender)
 
     def get_active_institutions(self) -> list[dict[str, Any]]:
-        with self.service.unit_of_work():
-            return self.institution_repo.get_active_institutions()
+        return self.service.get_active_institutions()
 
     def add_institution(self, name: str, institution_type: str = "COLLEGE", address: Optional[str] = None) -> int:
-        with self.service.unit_of_work():
-            return self.institution_repo.insert(name, institution_type, address)
+        return self.service.add_institution(name, institution_type, address)
 
     def get_active_collectors(self) -> list[dict[str, Any]]:
-        with self.service.unit_of_work():
-            return self.collector_repo.get_active_collectors()
+        return self.service.get_active_collectors()
 
     def add_collector(self, name: str, role_title: Optional[str] = None) -> int:
-        with self.service.unit_of_work():
-            return self.collector_repo.insert(name, role_title)
+        return self.service.add_collector(name, role_title)
+
 
     def confirm_admission_with_payment(
         self,

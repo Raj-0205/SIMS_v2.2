@@ -235,7 +235,8 @@ class StudentService(BaseService):
     def get_student_notes(self, student_id: int) -> list[dict[str, Any]]:
         """Fetches internal notes for a student enclosed in unit_of_work."""
         with self.unit_of_work():
-            return self.activity_log_repo.get_logs_for_entity("STUDENT", student_id)
+            all_logs = self.activity_log_repo.get_logs_for_entity("STUDENT", student_id)
+            return [log for log in all_logs if log.get("action") == "NOTE_ADDED"]
 
     def add_student_friend(self, student_id: int, friend_student_id: int, admission_id: Optional[int] = None) -> None:
         """Adds a confirmed village/peer friend connection within unit_of_work."""
@@ -399,7 +400,8 @@ class StudentService(BaseService):
             )
 
             friend_rows = self.friendship_repo.get_confirmed_friends(student_id)
-            note_rows = self.activity_log_repo.get_logs_for_entity("STUDENT", student_id)
+            all_logs = self.activity_log_repo.get_logs_for_entity("STUDENT", student_id)
+            note_rows = [l for l in all_logs if l.get("action") == "NOTE_ADDED"]
 
             timeline: list[StudentTimelineItemDTO] = []
 

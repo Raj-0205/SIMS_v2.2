@@ -815,6 +815,10 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                     return
 
                 p = Path(selected_path)
+                if p.suffix.lower() not in (".jpg", ".jpeg", ".png"):
+                    self.show_toast("Invalid file format. Only JPG, JPEG, and PNG images are allowed.", is_error=True)
+                    return
+
                 file_bytes = p.read_bytes()
                 max_bytes = 100 * 1024
                 if len(file_bytes) > max_bytes:

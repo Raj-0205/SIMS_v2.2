@@ -99,7 +99,7 @@ class AdmissionFormModal(ft.AlertDialog):
         self.banner_icon = ft.Icon(ft.Icons.INFO, size=18)
         self.banner_container = ft.Container(
             content=ft.Row([self.banner_icon, self.banner_text], spacing=AppTheme.PAD_SM, vertical_alignment=ft.CrossAxisAlignment.CENTER),
-            padding=ft.Padding(14, 8, 14, 8),
+            padding=ft.Padding(21, 12, 21, 12),
             border_radius=AppTheme.RADIUS_MD,
             visible=False,
         )
@@ -130,14 +130,14 @@ class AdmissionFormModal(ft.AlertDialog):
         # ── SECTION 1: Personal Details ──
         self.first_name_input = ft.TextField(
             label="First Name *",
-            hint_text="e.g. Rahul",
+            hint_text="e.g. Keshav",
             border_radius=AppTheme.RADIUS_MD,
             value=admission.first_name if admission else "",
             expand=True,
         )
         self.middle_name_input = ft.TextField(
             label="Middle / Father's Name",
-            hint_text="e.g. Shashikant",
+            hint_text="e.g. Bharat",
             border_radius=AppTheme.RADIUS_MD,
             value=admission.middle_name if admission else "",
             expand=True,
@@ -187,7 +187,7 @@ class AdmissionFormModal(ft.AlertDialog):
         )
         self.parent_name_input = ft.TextField(
             label="Parent / Guardian Name",
-            hint_text="e.g. Shashikant Patil",
+            hint_text="e.g. Bharat Patil",
             border_radius=AppTheme.RADIUS_MD,
             value=admission.parent_guardian_name if admission else "",
             expand=True,
@@ -213,7 +213,7 @@ class AdmissionFormModal(ft.AlertDialog):
         )
         self.address_input = ft.TextField(
             label="Residential Address",
-            hint_text="e.g. Near Jio Tower, Sawargaon Road",
+            hint_text="e.g. Near Ganesh Temple, Phule Nagar",
             border_radius=AppTheme.RADIUS_MD,
             value=admission.address if admission else "",
             expand=True,
@@ -239,7 +239,7 @@ class AdmissionFormModal(ft.AlertDialog):
         self.qualification_dropdown = ft.Dropdown(
             label="Highest Qualification *",
             options=qual_options,
-            value=admission.qualification if admission else Qualification.HSC_12TH.value,
+            value=admission.qualification if admission else Qualification.TWELFTH.value,
             border_radius=AppTheme.RADIUS_MD,
             expand=True,
             on_select=self._on_qualification_changed,
@@ -266,7 +266,7 @@ class AdmissionFormModal(ft.AlertDialog):
         self.blood_group_dropdown = ft.Dropdown(
             label="Blood Group",
             options=bg_options,
-            value=admission.blood_group if (admission and admission.blood_group) else "O+",
+            value=admission.blood_group if (admission and admission.blood_group) else "B+",
             width=130,
             border_radius=AppTheme.RADIUS_MD,
         )
@@ -292,7 +292,7 @@ class AdmissionFormModal(ft.AlertDialog):
         # ── SECTION 5: Documents (Real File Pickers & 100 KB validation) ──
         self.photo_info_text = ft.Text(self.photo_filename or "No photo selected (Max 100 KB)", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY)
         self.photo_picker_btn = ft.OutlinedButton(
-            content=ft.Text("Choose Photo (Explorer)"),
+            content=ft.Text("Choose Photo"),
             icon=ft.Icons.ADD_A_PHOTO,
             on_click=self._trigger_photo_picker,
         )
@@ -307,7 +307,7 @@ class AdmissionFormModal(ft.AlertDialog):
 
         self.sig_info_text = ft.Text(self.signature_filename or "No signature selected (Max 100 KB)", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY)
         self.sig_picker_btn = ft.OutlinedButton(
-            content=ft.Text("Choose Signature (Explorer)"),
+            content=ft.Text("Choose Signature"),
             icon=ft.Icons.DRAW,
             on_click=self._trigger_signature_picker,
         )
@@ -323,7 +323,7 @@ class AdmissionFormModal(ft.AlertDialog):
         # ── SECTION 6: Fee Calculation & Actions ──
         self.base_fee_text = ft.Text(f"₹{self.base_course_fee:,.2f}", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD)
         self.discount_input = ft.TextField(
-            label="Discount (₹)",
+            label="Disc(₹)",
             value=f"{admission.discount:.0f}" if (admission and admission.discount) else "0",
             keyboard_type=ft.KeyboardType.NUMBER,
             border_radius=AppTheme.RADIUS_MD,
@@ -540,7 +540,7 @@ class AdmissionFormModal(ft.AlertDialog):
         self.student_search_results.controls.clear()
         self.student_search_input.value = f"{st.display_name} (ID: #{st.id})"
         self._load_friend_suggestions()
-        self._show_success("✓ Existing student information loaded")
+        self._show_success("✓ Student information auto-filled")
         self._safe_update()
 
     def _on_village_changed(self) -> None:
@@ -635,6 +635,10 @@ class AdmissionFormModal(ft.AlertDialog):
                 return
 
             p = Path(selected_path)
+            if p.suffix.lower() not in (".jpg", ".jpeg", ".png"):
+                self._show_error("Invalid file format. Only JPG, JPEG, and PNG images are allowed.")
+                return
+
             raw_bytes = p.read_bytes()
             if len(raw_bytes) > self.MAX_FILE_SIZE_BYTES:
                 self._show_error(f"Photo size ({len(raw_bytes) / 1024:.1f} KB) exceeds the maximum allowed limit of 100 KB.")
@@ -669,6 +673,10 @@ class AdmissionFormModal(ft.AlertDialog):
                 return
 
             p = Path(selected_path)
+            if p.suffix.lower() not in (".jpg", ".jpeg", ".png"):
+                self._show_error("Invalid file format. Only JPG, JPEG, and PNG images are allowed.")
+                return
+
             raw_bytes = p.read_bytes()
             if len(raw_bytes) > self.MAX_FILE_SIZE_BYTES:
                 self._show_error(f"Signature size ({len(raw_bytes) / 1024:.1f} KB) exceeds the maximum allowed limit of 100 KB.")
@@ -770,12 +778,13 @@ class AdmissionFormModal(ft.AlertDialog):
             adm_id = self.controller.create_admission(payload)
             adm = self.controller.get_admission(adm_id)
 
+            # Capture root page reference BEFORE closing the modal to avoid unmounted safe_page evaluation
+            root_page = self.safe_page
             self.close_modal()
             self.on_saved()
 
-            # Open Payment Dialog immediately for payment collection >= ₹500
-            p = self.safe_page
-            if p:
+            # Open Payment Dialog immediately with the root page reference
+            if root_page:
                 pay_dialog = PaymentDialog(
                     admission_id=adm_id,
                     student_name=adm.student_name,
@@ -784,9 +793,11 @@ class AdmissionFormModal(ft.AlertDialog):
                     total_fee=adm.final_fee,
                     already_paid=0.0,
                     default_amount=500.0,
-                    on_payment_completed=lambda pid: self._open_receipt_dialog(adm_id),
+                    page=root_page,
+                    current_status=adm.status,
+                    on_payment_completed=lambda pid: self._open_receipt_dialog_with_page(root_page, adm_id),
                 )
-                p.show_dialog(pay_dialog)
+                root_page.show_dialog(pay_dialog)
 
         except (ValidationError, ConflictError, ServiceError) as ex:
             self._show_error(str(ex))
@@ -794,11 +805,10 @@ class AdmissionFormModal(ft.AlertDialog):
             LogService.error(f"Confirm admission flow error: {ex}", context=self.__class__.__name__)
             self._show_error("An unexpected error occurred during confirmation.")
 
-    def _open_receipt_dialog(self, admission_id: int) -> None:
+    def _open_receipt_dialog_with_page(self, page: Optional[ft.Page], admission_id: int) -> None:
         try:
             receipts = self.receipt_controller.get_receipts_for_admission(admission_id)
-            p = self.safe_page
-            if receipts and p:
+            if receipts and page:
                 adm = self.controller.get_admission(admission_id)
                 r_dialog = ReceiptDialog(
                     receipt=receipts[-1],
@@ -807,6 +817,10 @@ class AdmissionFormModal(ft.AlertDialog):
                     course_name=adm.course_name,
                     mobile_number=adm.mobile_number,
                 )
-                p.show_dialog(r_dialog)
+                page.show_dialog(r_dialog)
         except Exception as ex:
             LogService.error(f"Error opening receipt dialog: {ex}", context=self.__class__.__name__)
+
+    def _open_receipt_dialog(self, admission_id: int) -> None:
+        self._open_receipt_dialog_with_page(self.safe_page, admission_id)
+
