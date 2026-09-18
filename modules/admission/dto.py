@@ -17,7 +17,40 @@ __all__ = [
     "AdmissionSummaryDTO",
     "AdmissionWorkspaceDTO",
     "FriendSuggestionDTO",
+    "DuplicateCheckDTO",
+    "DuplicateCheckResultDTO",
 ]
+
+
+@dataclass(frozen=True)
+class DuplicateCheckDTO:
+    """Input payload for deterministic identity and duplicate admission checking."""
+    full_name: str
+    contact1: str
+    contact2: str
+    course_id: Optional[int] = None
+
+
+@dataclass(frozen=True)
+class DuplicateCheckResultDTO:
+    """
+    Comprehensive result contract for duplicate identity and admission classification.
+    Classification:
+        - "DUPLICATE_ACTIVE": Same student + same active course (BLOCKED)
+        - "EXISTING_STUDENT_NEW_COURSE": Same student + different course (ALLOWED)
+        - "EXISTING_STUDENT_READMISSION": Same student + completed/closed admission (ALLOWED)
+        - "EXISTING_DRAFT": Same student + existing draft (OFFER RESUME)
+        - "NONE": No identity match (NEW STUDENT)
+    """
+    is_identity_match: bool
+    existing_student_id: Optional[int] = None
+    existing_student_name: Optional[str] = None
+    matched_mobile: Optional[str] = None
+    classification: str = "NONE"
+    can_create_admission: bool = True
+    draft_admission_id: Optional[int] = None
+    message: str = ""
+    existing_admissions: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -39,6 +72,7 @@ class AdmissionCreateDTO:
     dob: Optional[str] = None
     gender: Optional[str] = None
     mobile_number: Optional[str] = None
+    secondary_mobile: Optional[str] = None
     email: Optional[str] = None
     aadhaar_number: Optional[str] = None
     parent_guardian_name: Optional[str] = None
@@ -120,6 +154,7 @@ class AdmissionDTO:
     dob: Optional[str] = None
     gender: Optional[str] = None
     mobile_number: Optional[str] = None
+    secondary_mobile: Optional[str] = None
     email: Optional[str] = None
     aadhaar_number: Optional[str] = None
     village: Optional[str] = None
@@ -149,6 +184,10 @@ class AdmissionDTO:
     @property
     def student_mobile(self) -> str:
         return self.mobile_number or ""
+
+    @property
+    def student_secondary_mobile(self) -> str:
+        return self.secondary_mobile or ""
 
     @property
     def final_fee(self) -> float:

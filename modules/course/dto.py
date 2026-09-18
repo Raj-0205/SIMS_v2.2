@@ -10,6 +10,9 @@ __all__ = [
     "CourseCreateDTO",
     "CourseUpdateDTO",
     "CourseSearchResultDTO",
+    "CourseFeeChangeDTO",
+    "CourseFeeHistoryDTO",
+    "CourseOperationalSummaryDTO",
 ]
 
 
@@ -76,3 +79,35 @@ class CourseSearchResultDTO:
         """Helper for UI."""
         return f"{self.code} - {self.name}"
 
+
+@dataclass(frozen=True)
+class CourseFeeChangeDTO:
+    """Command DTO for authorized Institute Course Fee modifications."""
+    course_id: int
+    new_fee: float
+    admin_pin: str
+    reason: str
+    user_id: Optional[int] = None
+    username: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class CourseFeeHistoryDTO:
+    """Read DTO for historical course fee revision audit trail."""
+    id: int
+    course_id: int
+    old_fee: float
+    new_fee: float
+    changed_by_user_id: Optional[int]
+    changed_by_username: str
+    reason: str
+    changed_at: str
+
+
+@dataclass(frozen=True)
+class CourseOperationalSummaryDTO:
+    """Operational summary metrics for a Course."""
+    course_id: int
+    batch_count: int = 0
+    active_batch_count: int = 0
+    total_admissions_count: int = 0

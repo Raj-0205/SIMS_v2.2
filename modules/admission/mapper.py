@@ -40,6 +40,7 @@ class AdmissionMapper:
             dob=str(row["dob"]) if row.get("dob") else None,
             gender=str(row["gender"]) if row.get("gender") else None,
             mobile_number=str(row["mobile_number"]) if row.get("mobile_number") else None,
+            secondary_mobile=str(row["secondary_mobile"]) if row.get("secondary_mobile") else None,
             email=str(row["email"]) if row.get("email") else None,
             aadhaar_number=str(row["aadhaar_number"]) if row.get("aadhaar_number") else None,
             village=str(row["village"]) if row.get("village") else None,

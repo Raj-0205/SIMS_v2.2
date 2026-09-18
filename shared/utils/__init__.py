@@ -2,6 +2,7 @@
 
 from shared.utils.formatting import (
     format_title_case,
+    normalize_name,
     normalize_mobile,
     normalize_indian_mobile,
     format_whatsapp_number,
@@ -12,6 +13,7 @@ from shared.utils.formatting import (
 
 __all__ = [
     "format_title_case",
+    "normalize_name",
     "normalize_mobile",
     "normalize_indian_mobile",
     "format_whatsapp_number",

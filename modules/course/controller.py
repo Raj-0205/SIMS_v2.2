@@ -10,6 +10,9 @@ from modules.course.dto import (
     CourseCreateDTO,
     CourseUpdateDTO,
     CourseSearchResultDTO,
+    CourseFeeChangeDTO,
+    CourseFeeHistoryDTO,
+    CourseOperationalSummaryDTO,
 )
 
 __all__ = ["CourseController"]
@@ -35,7 +38,9 @@ class CourseController:
             status_enum = CourseStatus.ACTIVE
 
         raw_fee = raw_data.get("base_fee")
-        base_fee_val = float(raw_fee) if raw_fee is not None and str(raw_fee).strip() != "" else 0.0
+        base_fee_val = (
+            float(raw_fee) if raw_fee is not None and str(raw_fee).strip() != "" else 0.0
+        )
 
         dto = CourseCreateDTO(
             code=str(raw_data.get("code") or "").strip(),
@@ -57,7 +62,9 @@ class CourseController:
             status_enum = CourseStatus.ACTIVE
 
         raw_fee = raw_data.get("base_fee")
-        base_fee_val = float(raw_fee) if raw_fee is not None and str(raw_fee).strip() != "" else 0.0
+        base_fee_val = (
+            float(raw_fee) if raw_fee is not None and str(raw_fee).strip() != "" else 0.0
+        )
 
         dto = CourseUpdateDTO(
             id=course_id,
@@ -70,6 +77,35 @@ class CourseController:
             status=status_enum,
         )
         self.service.update_course(dto)
+
+    def change_institute_fee(
+        self,
+        course_id: int,
+        raw_data: Mapping[str, Any],
+        user_id: Optional[int] = None,
+        username: Optional[str] = None,
+    ) -> None:
+        """Translates raw fee change dictionary into CourseFeeChangeDTO and delegates."""
+        raw_fee = raw_data.get("new_fee")
+        new_fee_val = float(raw_fee) if raw_fee is not None and str(raw_fee).strip() != "" else 0.0
+
+        dto = CourseFeeChangeDTO(
+            course_id=course_id,
+            new_fee=new_fee_val,
+            admin_pin=str(raw_data.get("admin_pin") or "").strip(),
+            reason=str(raw_data.get("reason") or "").strip(),
+            user_id=user_id,
+            username=username,
+        )
+        self.service.change_institute_fee(dto)
+
+    def get_fee_history(self, course_id: int, limit: int = 50) -> list[CourseFeeHistoryDTO]:
+        """Fetches fee history records for a course."""
+        return self.service.get_fee_history(course_id, limit=limit)
+
+    def toggle_status(self, course_id: int) -> CourseStatus:
+        """Toggles course status between ACTIVE and INACTIVE."""
+        return self.service.toggle_status(course_id)
 
     def delete_course(self, course_id: int) -> None:
         """Deletes course record via service."""
@@ -89,17 +125,39 @@ class CourseController:
         offset: int = 0,
         status: Optional[str] = None,
         category: Optional[str] = None,
+        search: Optional[str] = None,
     ) -> tuple[list[CourseDTO], int]:
         """Returns paginated list of courses and total count."""
         return self.service.list_courses(
-            limit=limit, offset=offset, status=status, category=category
+            limit=limit,
+            offset=offset,
+            status=status,
+            category=category,
+            search=search,
         )
 
     def count_courses(
-        self, status: Optional[str] = None, category: Optional[str] = None
+        self,
+        status: Optional[str] = None,
+        category: Optional[str] = None,
+        search: Optional[str] = None,
     ) -> int:
         """Returns total course count."""
-        return self.service.count_courses(status=status, category=category)
+        return self.service.count_courses(
+            status=status, category=category, search=search
+        )
+
+    def get_categories(self) -> list[str]:
+        """Returns distinct category list."""
+        return self.service.get_categories()
+
+    def get_operational_summary(self, course_id: int) -> CourseOperationalSummaryDTO:
+        """Returns operational summary metrics for a course."""
+        return self.service.get_operational_summary(course_id)
+
+    def get_overall_summary(self) -> dict[str, int]:
+        """Returns high-level KPI counts."""
+        return self.service.get_overall_summary()
 
     def search_courses(
         self, query: str, limit: int = 25, active_only: bool = False
@@ -109,5 +167,6 @@ class CourseController:
         Mandatory for Admission module backward compatibility.
         """
         clean_query = str(query).strip() if query else ""
-        return self.service.search_courses(clean_query, limit=limit, active_only=active_only)
-
+        return self.service.search_courses(
+            clean_query, limit=limit, active_only=active_only
+        )

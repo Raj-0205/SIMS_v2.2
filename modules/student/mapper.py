@@ -37,6 +37,7 @@ class StudentMapper:
             photo_path=str(row["photo_path"]) if row.get("photo_path") else None,
             signature_path=str(row["signature_path"]) if row.get("signature_path") else None,
             mobile_number=str(row.get("mobile_number") or "") if row.get("mobile_number") else None,
+            secondary_mobile=str(row.get("secondary_mobile") or "") if row.get("secondary_mobile") else None,
             email=str(row["email"]) if row.get("email") else None,
             created_at=str(row.get("created_at") or ""),
             updated_at=str(row["updated_at"]) if row.get("updated_at") else None,
@@ -61,6 +62,7 @@ class StudentMapper:
             first_name=str(row.get("first_name") or ""),
             last_name=str(row.get("last_name") or ""),
             mobile_number=str(row.get("mobile_number") or "") if row.get("mobile_number") else None,
+            secondary_mobile=str(row.get("secondary_mobile") or "") if row.get("secondary_mobile") else None,
         )
 
     @staticmethod

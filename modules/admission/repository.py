@@ -149,7 +149,7 @@ class AdmissionRepository(BaseRepository):
     def get_by_id(self, admission_id: int) -> Optional[dict[str, Any]]:
         sql = """
             SELECT a.*,
-                   s.first_name, s.last_name, s.email, s.mobile_number,
+                   s.first_name, s.last_name, s.email, s.mobile_number, s.secondary_mobile,
                    c.id AS course_id, c.code AS course_code, c.name AS course_name, c.base_fee AS course_base_fee,
                    b.batch_name, b.timing,
                    COALESCE((SELECT SUM(amount) FROM payments p WHERE p.admission_id = a.id), 0.0) AS total_paid
@@ -166,7 +166,7 @@ class AdmissionRepository(BaseRepository):
     def get_by_candidate_number(self, year: int, sequence: int) -> Optional[dict[str, Any]]:
         sql = """
             SELECT a.*,
-                   s.first_name, s.last_name, s.email, s.mobile_number,
+                   s.first_name, s.last_name, s.email, s.mobile_number, s.secondary_mobile,
                    c.id AS course_id, c.code AS course_code, c.name AS course_name, c.base_fee AS course_base_fee,
                    b.batch_name, b.timing,
                    COALESCE((SELECT SUM(amount) FROM payments p WHERE p.admission_id = a.id), 0.0) AS total_paid
@@ -179,6 +179,21 @@ class AdmissionRepository(BaseRepository):
             LIMIT 1;
         """
         return self.execute_fetchone(sql, (year, sequence))
+
+    def get_admissions_by_student_id(self, student_id: int) -> list[dict[str, Any]]:
+        """Retrieves all admissions for a student with course and batch details."""
+        sql = """
+            SELECT a.*,
+                   c.id AS course_id, c.code AS course_code, c.name AS course_name, c.base_fee AS course_base_fee,
+                   b.batch_name, b.timing
+            FROM admissions a
+            LEFT JOIN admission_courses ac ON ac.admission_id = a.id
+            LEFT JOIN courses c ON c.id = ac.course_id
+            LEFT JOIN batches b ON b.id = a.batch_id
+            WHERE a.student_id = ?
+            ORDER BY a.id DESC;
+        """
+        return self.execute_fetchall(sql, (student_id,))
 
     def _build_filter_clauses(self, dto: AdmissionFilterDTO) -> tuple[str, list[Any]]:
         clauses: list[str] = []
@@ -253,7 +268,7 @@ class AdmissionRepository(BaseRepository):
         # 2. Paged Data Query
         data_sql = f"""
             SELECT a.*,
-                   s.first_name, s.last_name, s.email, s.mobile_number,
+                   s.first_name, s.last_name, s.email, s.mobile_number, s.secondary_mobile,
                    c.id AS course_id, c.code AS course_code, c.name AS course_name, c.base_fee AS course_base_fee,
                    b.batch_name, b.timing,
                    COALESCE((SELECT SUM(amount) FROM payments p WHERE p.admission_id = a.id), 0.0) AS total_paid

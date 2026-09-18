@@ -51,6 +51,7 @@ class StudentDTO:
     photo_path: Optional[str] = None
     signature_path: Optional[str] = None
     mobile_number: Optional[str] = None
+    secondary_mobile: Optional[str] = None
     email: Optional[str] = None
     created_at: str = ""
     updated_at: Optional[str] = None
@@ -125,6 +126,7 @@ class StudentCreateDTO:
     first_name: str
     last_name: str
     mobile_number: str
+    secondary_mobile: Optional[str] = None
     email: Optional[str] = None
     middle_name: Optional[str] = None
     mother_name: Optional[str] = None
@@ -147,6 +149,7 @@ class StudentUpdateDTO:
     first_name: str
     last_name: str
     mobile_number: str
+    secondary_mobile: Optional[str] = None
     email: Optional[str] = None
     middle_name: Optional[str] = None
     mother_name: Optional[str] = None
@@ -169,6 +172,7 @@ class StudentSearchResultDTO:
     first_name: str
     last_name: str
     mobile_number: Optional[str] = None
+    secondary_mobile: Optional[str] = None
     village: Optional[str] = None
     current_course: Optional[str] = None
 

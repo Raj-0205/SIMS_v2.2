@@ -70,6 +70,19 @@ class NavigationMenu(ft.NavigationRail):
             ),
         ]
 
+        from core.security.context import SecurityContext
+        from core.security.roles import Role
+        current_role = SecurityContext.get_current_role()
+        if current_role and str(current_role).upper() == Role.ADMINISTRATOR.value:
+            self.routes.insert(0, "/control-center")
+            self.destinations.insert(
+                0,
+                ft.NavigationRailDestination(
+                    icon=ft.Icons.ADMIN_PANEL_SETTINGS,
+                    label="Control Center",
+                ),
+            )
+
         self.on_change = self.handle_change
 
     def handle_change(self, e: ft.ControlEvent):

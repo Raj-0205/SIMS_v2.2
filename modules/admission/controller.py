@@ -13,6 +13,8 @@ from modules.admission.dto import (
     AdmissionSummaryDTO,
     AdmissionWorkspaceDTO,
     FriendSuggestionDTO,
+    DuplicateCheckDTO,
+    DuplicateCheckResultDTO,
 )
 
 __all__ = ["AdmissionController"]
@@ -23,6 +25,15 @@ class AdmissionController:
 
     def __init__(self) -> None:
         self.service = AdmissionService()
+
+    def check_duplicate(self, raw_data: Mapping[str, Any]) -> DuplicateCheckResultDTO:
+        dto = DuplicateCheckDTO(
+            full_name=raw_data.get("full_name") or "",
+            contact1=raw_data.get("contact1") or raw_data.get("mobile_number") or "",
+            contact2=raw_data.get("contact2") or raw_data.get("secondary_mobile") or "",
+            course_id=int(raw_data["course_id"]) if raw_data.get("course_id") else None,
+        )
+        return self.service.check_duplicate(dto)
 
     def create_admission(self, raw_data: Mapping[str, Any]) -> int:
         status_val = raw_data.get("status", AdmissionStatus.DRAFT.value)
@@ -39,6 +50,7 @@ class AdmissionController:
             dob=raw_data.get("dob") or nsd.get("dob"),
             gender=raw_data.get("gender") or nsd.get("gender"),
             mobile_number=raw_data.get("mobile_number") or nsd.get("mobile_number"),
+            secondary_mobile=raw_data.get("secondary_mobile") or nsd.get("secondary_mobile"),
             email=raw_data.get("email") or nsd.get("email"),
             aadhaar_number=raw_data.get("aadhaar_number") or nsd.get("aadhaar_number"),
             parent_guardian_name=raw_data.get("parent_guardian_name") or nsd.get("parent_guardian_name"),

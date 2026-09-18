@@ -3,7 +3,12 @@
 from __future__ import annotations
 from typing import Any, Mapping
 from modules.course.constants import CourseStatus
-from modules.course.dto import CourseDTO, CourseSearchResultDTO
+from modules.course.dto import (
+    CourseDTO,
+    CourseSearchResultDTO,
+    CourseFeeHistoryDTO,
+    CourseOperationalSummaryDTO,
+)
 
 __all__ = ["CourseMapper", "CourseSearchMapper"]
 
@@ -49,6 +54,32 @@ class CourseMapper:
             status=status_enum,
         )
 
+    @staticmethod
+    def to_fee_history_dto(row: Mapping[str, Any]) -> CourseFeeHistoryDTO:
+        """Maps a database row to CourseFeeHistoryDTO."""
+        return CourseFeeHistoryDTO(
+            id=int(row["id"]),
+            course_id=int(row["course_id"]),
+            old_fee=float(row.get("old_fee") or 0.0),
+            new_fee=float(row.get("new_fee") or 0.0),
+            changed_by_user_id=int(row["changed_by_user_id"]) if row.get("changed_by_user_id") is not None else None,
+            changed_by_username=str(row.get("changed_by_username") or "System"),
+            reason=str(row.get("reason") or ""),
+            changed_at=str(row.get("changed_at") or ""),
+        )
+
+    @staticmethod
+    def to_operational_summary_dto(
+        course_id: int, row: Mapping[str, Any]
+    ) -> CourseOperationalSummaryDTO:
+        """Maps operational counts row to CourseOperationalSummaryDTO."""
+        return CourseOperationalSummaryDTO(
+            course_id=course_id,
+            batch_count=int(row.get("batch_count") or 0),
+            active_batch_count=int(row.get("active_batch_count") or 0),
+            total_admissions_count=int(row.get("total_admissions_count") or 0),
+        )
+
 
 class CourseSearchMapper:
     """Backward-compatible search mapper wrapper."""
@@ -56,4 +87,3 @@ class CourseSearchMapper:
     @staticmethod
     def to_result_dto(row: Mapping[str, Any]) -> CourseSearchResultDTO:
         return CourseMapper.to_result_dto(row)
-

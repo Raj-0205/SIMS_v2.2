@@ -12,14 +12,14 @@ from core.logger.service import LogService
 from core.exceptions import ValidationError, ConflictError, ServiceError
 from modules.admission.controller import AdmissionController
 from modules.admission.constants import AdmissionStatus, Qualification, BloodGroup, Gender
-from modules.admission.dto import AdmissionDTO, FriendSuggestionDTO
+from modules.admission.dto import AdmissionDTO, FriendSuggestionDTO, DuplicateCheckDTO, DuplicateCheckResultDTO
 from modules.admission.views.payment_dialog import PaymentDialog
 from modules.admission.views.receipt_dialog import ReceiptDialog
 from modules.student.controller import StudentController
 from modules.course.controller import CourseController
 from modules.batch.controller import BatchController
 from modules.receipts.controller import ReceiptController
-from shared.utils.formatting import format_title_case, format_file_size
+from shared.utils.formatting import format_title_case, format_file_size, normalize_mobile
 from ui.themes.theme import AppTheme
 
 __all__ = ["AdmissionFormModal"]
@@ -27,15 +27,16 @@ __all__ = ["AdmissionFormModal"]
 
 class AdmissionFormModal(ft.AlertDialog):
     """
-    Spacious Horizontal Rectangular Desktop Admission Workspace Modal.
+    Spacious Horizontal Rectangular Desktop Admission Workspace Modal (1180 x 680).
     Structured in clear logical sequence:
-    SECTION 1: Student Mode (Register New Student vs Select Existing Student with autofill)
-    SECTION 2: Personal Details (Names, Mother, DOB, Gender, Mobile, Parent, Aadhaar)
-    SECTION 3: Location (Village, Address) & Village Friend Suggestions (Max 3)
-    SECTION 4: Academic & Institution (Qualification, School/College Master, Blood Group)
-    SECTION 5: Course & Dynamic Batch Allocation
-    SECTION 6: Documents (Real File Pickers with <= 100KB validation)
-    SECTION 7: Fees & Actions (Save Draft ₹0 vs Confirm Admission & Continue to Payment >= ₹500)
+    - TOP ALERT: Prominent Contextual Duplicate Alert Card (Active block, Draft resume, Alumni/New course link)
+    - SECTION 1: Student Identity & Mandatory Dual Contacts (Primary Mobile + Secondary Mobile)
+    - SECTION 2: Basic Information & KYC (Mother's Name, DOB, Gender, Aadhaar, Village, Residence)
+    - SECTION 3: Village Friend Matching (Peer Suggestions - Max 3)
+    - SECTION 4: Academic & Institution (Qualification, Master Dropdown, Blood Group)
+    - SECTION 5: Course & Dynamic Batch Allocation
+    - SECTION 6: Documents & Verification (File Pickers with <= 100KB validation)
+    - SECTION 7: Fee Summary & Action Controls (Draft ₹0 vs Confirm Admission >= ₹500)
     """
 
     MAX_FILE_SIZE_BYTES = 100 * 1024  # 100 KB limit
@@ -94,12 +95,49 @@ class AdmissionFormModal(ft.AlertDialog):
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         )
 
-        # ── Top AirDrop Notification Toast Banner ──
+        # ── Top Notification Toast Banner ──
         self.banner_text = ft.Text("", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.W_500)
         self.banner_icon = ft.Icon(ft.Icons.INFO, size=18)
         self.banner_container = ft.Container(
             content=ft.Row([self.banner_icon, self.banner_text], spacing=AppTheme.PAD_SM, vertical_alignment=ft.CrossAxisAlignment.CENTER),
-            padding=ft.Padding(21, 12, 21, 12),
+            padding=ft.Padding(16, 8, 16, 8),
+            border_radius=AppTheme.RADIUS_MD,
+            visible=False,
+        )
+
+        # ── Prominent Duplicate Alert Card (Upper-Center) ──
+        self.duplicate_alert_icon = ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, size=22, color=AppTheme.WARNING)
+        self.duplicate_alert_title = ft.Text("Duplicate Alert", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD)
+        self.duplicate_alert_message = ft.Text("", size=AppTheme.SIZE_CAPTION, expand=True)
+        self.duplicate_alert_action_btn = ft.ElevatedButton(
+            content=ft.Text("Action", size=AppTheme.SIZE_CAPTION),
+            visible=False,
+        )
+        self.duplicate_alert_dismiss_btn = ft.IconButton(
+            icon=ft.Icons.CLOSE,
+            icon_size=16,
+            tooltip="Dismiss Alert",
+            on_click=lambda _: self._hide_duplicate_alert(),
+        )
+        self.duplicate_alert_container = ft.Container(
+            content=ft.Row(
+                controls=[
+                    self.duplicate_alert_icon,
+                    ft.Column(
+                        controls=[
+                            self.duplicate_alert_title,
+                            self.duplicate_alert_message,
+                        ],
+                        spacing=1,
+                        expand=True,
+                    ),
+                    self.duplicate_alert_action_btn,
+                    self.duplicate_alert_dismiss_btn,
+                ],
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=AppTheme.PAD_SM,
+            ),
+            padding=ft.Padding(14, 8, 14, 8),
             border_radius=AppTheme.RADIUS_MD,
             visible=False,
         )
@@ -125,15 +163,16 @@ class AdmissionFormModal(ft.AlertDialog):
             on_change=self._on_student_search_change,
             expand=True,
         )
-        self.student_search_results = ft.Column(spacing=2, scroll=ft.ScrollMode.AUTO, height=120, visible=False)
+        self.student_search_results = ft.Column(spacing=2, scroll=ft.ScrollMode.AUTO, height=110, visible=False)
 
-        # ── SECTION 1: Personal Details ──
+        # ── SECTION 1: Student Identity & Mandatory Contacts ──
         self.first_name_input = ft.TextField(
             label="First Name *",
             hint_text="e.g. Keshav",
             border_radius=AppTheme.RADIUS_MD,
             value=admission.first_name if admission else "",
             expand=True,
+            on_change=lambda _: self._on_identity_input_changed(),
         )
         self.middle_name_input = ft.TextField(
             label="Middle / Father's Name",
@@ -141,6 +180,7 @@ class AdmissionFormModal(ft.AlertDialog):
             border_radius=AppTheme.RADIUS_MD,
             value=admission.middle_name if admission else "",
             expand=True,
+            on_change=lambda _: self._on_identity_input_changed(),
         )
         self.last_name_input = ft.TextField(
             label="Surname / Last Name *",
@@ -148,17 +188,47 @@ class AdmissionFormModal(ft.AlertDialog):
             border_radius=AppTheme.RADIUS_MD,
             value=admission.last_name if admission else "",
             expand=True,
+            on_change=lambda _: self._on_identity_input_changed(),
         )
 
+        self.mobile_input = ft.TextField(
+            label="Contact 1 (Primary Mobile) *",
+            hint_text="10-digit primary mobile number",
+            border_radius=AppTheme.RADIUS_MD,
+            value=admission.mobile_number if admission else "",
+            keyboard_type=ft.KeyboardType.PHONE,
+            prefix_icon=ft.Icons.PHONE,
+            expand=True,
+            on_change=lambda _: self._on_identity_input_changed(),
+        )
+        self.secondary_mobile_input = ft.TextField(
+            label="Contact 2 (Secondary Mobile) *",
+            hint_text="10-digit alternate mobile number (Must differ from Contact 1)",
+            border_radius=AppTheme.RADIUS_MD,
+            value=getattr(admission, "student_secondary_mobile", None) or getattr(admission, "secondary_mobile", None) or "",
+            keyboard_type=ft.KeyboardType.PHONE,
+            prefix_icon=ft.Icons.PHONE_ANDROID,
+            expand=True,
+            on_change=lambda _: self._on_identity_input_changed(),
+        )
+        self.parent_name_input = ft.TextField(
+            label="Parent / Guardian Name",
+            hint_text="e.g. Bharat Patil",
+            border_radius=AppTheme.RADIUS_MD,
+            value=admission.parent_guardian_name if admission else "",
+            expand=True,
+        )
+
+        # ── SECTION 2: Basic Information & KYC ──
         self.mother_name_input = ft.TextField(
-            label="Mother's Name *",
+            label="Mother's Name",
             hint_text="e.g. Sunita",
             border_radius=AppTheme.RADIUS_MD,
             value=admission.mother_name if admission else "",
             expand=True,
         )
         self.dob_input = ft.TextField(
-            label="Date of Birth *",
+            label="Date of Birth",
             hint_text="YYYY-MM-DD",
             border_radius=AppTheme.RADIUS_MD,
             value=admission.dob if admission else "2005-01-01",
@@ -176,33 +246,16 @@ class AdmissionFormModal(ft.AlertDialog):
             expand=True,
         )
 
-        self.mobile_input = ft.TextField(
-            label="Mobile Number *",
-            hint_text="10-digit mobile number",
-            border_radius=AppTheme.RADIUS_MD,
-            value=admission.mobile_number if admission else "",
-            keyboard_type=ft.KeyboardType.PHONE,
-            prefix_icon=ft.Icons.PHONE,
-            expand=True,
-        )
-        self.parent_name_input = ft.TextField(
-            label="Parent / Guardian Name",
-            hint_text="e.g. Bharat Patil",
-            border_radius=AppTheme.RADIUS_MD,
-            value=admission.parent_guardian_name if admission else "",
-            expand=True,
-        )
         self.aadhaar_input = ft.TextField(
-            label="Aadhaar Number (12 digits) *",
-            hint_text="e.g. 1234 5678 9012",
+            label="Aadhaar Number (12 digits)",
+            hint_text="e.g. 1234 5678 9012 (Optional KYC)",
             border_radius=AppTheme.RADIUS_MD,
             value=admission.aadhaar_number if admission else "",
             keyboard_type=ft.KeyboardType.NUMBER,
             prefix_icon=ft.Icons.FINGERPRINT,
             expand=True,
+            on_change=lambda _: self._clear_field_error(self.aadhaar_input),
         )
-
-        # ── SECTION 2: Location Details & Friends ──
         self.village_input = ft.TextField(
             label="Village / City *",
             hint_text="e.g. Chandwad",
@@ -217,8 +270,10 @@ class AdmissionFormModal(ft.AlertDialog):
             border_radius=AppTheme.RADIUS_MD,
             value=admission.address if admission else "",
             expand=True,
+            on_change=lambda _: self._clear_field_error(self.address_input),
         )
 
+        # ── SECTION 3: Village Friend Matching ──
         self.friends_container = ft.Row(wrap=True, spacing=6)
         self.friends_card = ft.Container(
             content=ft.Column(
@@ -229,12 +284,12 @@ class AdmissionFormModal(ft.AlertDialog):
                 spacing=4,
             ),
             bgcolor=AppTheme.SURFACE_VARIANT,
-            padding=ft.Padding(10, 8, 10, 8),
+            padding=ft.Padding(10, 6, 10, 6),
             border_radius=AppTheme.RADIUS_SM,
             visible=False,
         )
 
-        # ── SECTION 3: Qualification & Institution ──
+        # ── SECTION 4: Qualification & Institution ──
         qual_options = [ft.DropdownOption(key=q.value, text=q.value) for q in Qualification]
         self.qualification_dropdown = ft.Dropdown(
             label="Highest Qualification *",
@@ -271,7 +326,7 @@ class AdmissionFormModal(ft.AlertDialog):
             border_radius=AppTheme.RADIUS_MD,
         )
 
-        # ── SECTION 4: Course & Batch ──
+        # ── SECTION 5: Course & Batch Allocation ──
         courses, _ = self.course_controller.list_courses(status="ACTIVE", limit=200)
         self.course_dropdown = ft.Dropdown(
             label="Select Course *",
@@ -289,7 +344,7 @@ class AdmissionFormModal(ft.AlertDialog):
             expand=True,
         )
 
-        # ── SECTION 5: Documents (Real File Pickers & 100 KB validation) ──
+        # ── SECTION 6: Documents (<= 100 KB) ──
         self.photo_info_text = ft.Text(self.photo_filename or "No photo selected (Max 100 KB)", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY)
         self.photo_picker_btn = ft.OutlinedButton(
             content=ft.Text("Choose Photo"),
@@ -320,14 +375,14 @@ class AdmissionFormModal(ft.AlertDialog):
             on_click=self._clear_signature,
         )
 
-        # ── SECTION 6: Fee Calculation & Actions ──
+        # ── SECTION 7: Fee Calculation & Action Controls ──
         self.base_fee_text = ft.Text(f"₹{self.base_course_fee:,.2f}", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD)
         self.discount_input = ft.TextField(
             label="Disc(₹)",
             value=f"{admission.discount:.0f}" if (admission and admission.discount) else "0",
             keyboard_type=ft.KeyboardType.NUMBER,
             border_radius=AppTheme.RADIUS_MD,
-            width=130,
+            width=120,
             on_change=self._on_fee_calculation_change,
         )
         self.final_fee_text = ft.Text(
@@ -337,7 +392,13 @@ class AdmissionFormModal(ft.AlertDialog):
             color=AppTheme.PRIMARY,
         )
 
-        # Buttons
+        # Action Buttons
+        self.check_dup_btn = ft.OutlinedButton(
+            content=ft.Text("Check Identity"),
+            icon=ft.Icons.PERSON_SEARCH,
+            tooltip="Verify if student identity already exists",
+            on_click=lambda _: self._trigger_duplicate_check(show_clean_toast=True),
+        )
         self.save_draft_btn = ft.OutlinedButton(
             content=ft.Text("Save Draft (₹0)"),
             icon=ft.Icons.SAVE_ALT,
@@ -355,61 +416,83 @@ class AdmissionFormModal(ft.AlertDialog):
         self._build_content_layout()
 
     def _build_content_layout(self) -> None:
-        # Left Column: Personal & Location
+        # Left Column: Identity, Contacts, Basic Profile & Friends (~570px)
         left_col = ft.Column(
             controls=[
-                ft.Text("1. PERSONAL DETAILS", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
+                ft.Text("1. STUDENT IDENTITY & CONTACTS", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
                 ft.Row([self.first_name_input, self.middle_name_input, self.last_name_input], spacing=AppTheme.PAD_SM),
-                ft.Row([self.mother_name_input, self.dob_input, self.gender_dropdown], spacing=AppTheme.PAD_SM),
-                ft.Row([self.mobile_input, self.parent_name_input, self.aadhaar_input], spacing=AppTheme.PAD_SM),
+                ft.Row([self.mobile_input, self.secondary_mobile_input], spacing=AppTheme.PAD_SM),
+                self.parent_name_input,
                 ft.Divider(height=1, color=AppTheme.BORDER),
-                ft.Text("2. LOCATION & VILLAGE MATCHING", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
-                ft.Row([self.village_input, self.address_input], spacing=AppTheme.PAD_SM),
+                ft.Text("2. BASIC PROFILE & RESIDENCE", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
+                ft.Row([self.mother_name_input, self.dob_input, self.gender_dropdown], spacing=AppTheme.PAD_SM),
+                ft.Row([self.aadhaar_input, self.village_input], spacing=AppTheme.PAD_SM),
+                self.address_input,
                 self.friends_card,
             ],
             spacing=AppTheme.PAD_SM,
             expand=True,
+            scroll=ft.ScrollMode.AUTO,
         )
 
-        # Right Column: Academic, Course, Documents & Fees
+        # Right Column: Academic, Course, Documents & Fees (~570px)
         right_col = ft.Column(
             controls=[
                 ft.Text("3. ACADEMIC & INSTITUTION", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
                 ft.Row([self.qualification_dropdown, self.institution_dropdown, self.blood_group_dropdown], spacing=AppTheme.PAD_SM),
                 self.qual_other_input,
                 ft.Divider(height=1, color=AppTheme.BORDER),
-                ft.Text("4. COURSE & BATCH", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
+                ft.Text("4. COURSE & BATCH ENROLLMENT", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
                 ft.Row([self.course_dropdown, self.batch_dropdown], spacing=AppTheme.PAD_SM),
                 ft.Divider(height=1, color=AppTheme.BORDER),
-                ft.Text("5. DOCUMENTS (MAX: 100 KB)", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
+                ft.Text("5. DOCUMENTS & VERIFICATION (MAX: 100 KB)", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
                 ft.Row(
                     controls=[
-                        ft.Column([ft.Text("Student Photo *", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD), ft.Row([self.photo_picker_btn, self.photo_clear_btn]), self.photo_info_text], spacing=2),
+                        ft.Column([ft.Text("Student Photo", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD), ft.Row([self.photo_picker_btn, self.photo_clear_btn]), self.photo_info_text], spacing=2),
                         ft.Column([ft.Text("Student Signature", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD), ft.Row([self.sig_picker_btn, self.sig_clear_btn]), self.sig_info_text], spacing=2),
                     ],
                     spacing=AppTheme.PAD_LG,
                 ),
                 ft.Divider(height=1, color=AppTheme.BORDER),
-                ft.Text("6. FEE SUMMARY", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
+                ft.Text("6. FINANCIAL SUMMARY & TERMS", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
                 ft.Row(
                     controls=[
-                        ft.Column([ft.Text("Course Fee", size=AppTheme.SIZE_CAPTION), self.base_fee_text], spacing=2),
+                        ft.Column([ft.Text("Course Base Fee", size=AppTheme.SIZE_CAPTION), self.base_fee_text], spacing=2),
                         self.discount_input,
                         ft.Column([ft.Text("Final Payable Fee", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD), self.final_fee_text], spacing=2),
                     ],
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 ),
+                ft.Container(
+                    content=ft.Row(
+                        controls=[
+                            ft.Icon(ft.Icons.INFO_OUTLINE, size=16, color=AppTheme.PRIMARY),
+                            ft.Text(
+                                "Draft: ₹0 initial fee required | Confirmation: Minimum ₹500 initial payment required",
+                                size=AppTheme.SIZE_CAPTION,
+                                color=AppTheme.TEXT_SECONDARY,
+                            ),
+                        ],
+                        spacing=AppTheme.PAD_XS,
+                    ),
+                    padding=ft.Padding(8, 4, 8, 4),
+                    bgcolor=AppTheme.SURFACE_VARIANT,
+                    border_radius=AppTheme.RADIUS_SM,
+                ),
             ],
             spacing=AppTheme.PAD_SM,
             expand=True,
+            scroll=ft.ScrollMode.AUTO,
         )
 
+        # Main Workspace Content Container (1180 x 680)
         self.content = ft.Container(
-            width=960,
-            height=660,
+            width=1180,
+            height=680,
             content=ft.Column(
                 controls=[
                     self.banner_container,
+                    self.duplicate_alert_container,
                     ft.Row(controls=[self.mode_segmented_btn, self.student_search_input], spacing=AppTheme.PAD_SM, vertical_alignment=ft.CrossAxisAlignment.CENTER),
                     self.student_search_results,
                     ft.Divider(height=1, color=AppTheme.BORDER),
@@ -420,7 +503,22 @@ class AdmissionFormModal(ft.AlertDialog):
             ),
         )
 
-        self.actions = [self.save_draft_btn, self.cancel_btn, self.confirm_pay_btn]
+        self.actions = [
+            ft.Row(
+                controls=[
+                    self.cancel_btn,
+                    self.check_dup_btn,
+                ],
+                spacing=AppTheme.PAD_SM,
+            ),
+            ft.Row(
+                controls=[
+                    self.save_draft_btn,
+                    self.confirm_pay_btn,
+                ],
+                spacing=AppTheme.PAD_SM,
+            ),
+        ]
         self.actions_alignment = ft.MainAxisAlignment.SPACE_BETWEEN
 
     @property
@@ -468,6 +566,138 @@ class AdmissionFormModal(ft.AlertDialog):
     def _show_success(self, msg: str) -> None:
         self._show_toast(msg, is_success=True)
 
+    def _clear_field_error(self, control: ft.Control) -> None:
+        if hasattr(control, "error_text") and control.error_text:
+            control.error_text = None
+            self._safe_update()
+
+    def _on_identity_input_changed(self) -> None:
+        if self.first_name_input.error_text:
+            self.first_name_input.error_text = None
+        if self.last_name_input.error_text:
+            self.last_name_input.error_text = None
+        if self.mobile_input.error_text:
+            self.mobile_input.error_text = None
+        if self.secondary_mobile_input.error_text:
+            self.secondary_mobile_input.error_text = None
+
+        self._trigger_duplicate_check()
+
+    def _trigger_duplicate_check(self, show_clean_toast: bool = False) -> None:
+        """Runs the deterministic duplicate check and surfaces contextual alert card."""
+        if self.selected_student_id or self.is_edit_mode:
+            self._hide_duplicate_alert()
+            return
+
+        first_name = (self.first_name_input.value or "").strip()
+        last_name = (self.last_name_input.value or "").strip()
+        middle_name = (self.middle_name_input.value or "").strip()
+        c1 = normalize_mobile(self.mobile_input.value)
+        c2 = normalize_mobile(self.secondary_mobile_input.value)
+
+        if len(first_name) < 2 or (len(c1) < 10 and len(c2) < 10):
+            self._hide_duplicate_alert()
+            return
+
+        full_name = f"{first_name} {middle_name} {last_name}".strip()
+        cid = int(self.course_dropdown.value) if self.course_dropdown.value and self.course_dropdown.value.isdigit() else None
+
+        result: DuplicateCheckResultDTO = self.controller.check_duplicate({
+            "full_name": full_name,
+            "contact1": c1,
+            "contact2": c2,
+            "course_id": cid,
+        })
+
+        if not result.is_identity_match:
+            self._hide_duplicate_alert()
+            if show_clean_toast:
+                self._show_success("✓ No duplicate student identity found. Registration may proceed.")
+            return
+
+        # Classification-based styling and contextual actions
+        if result.classification == "DUPLICATE_ACTIVE":
+            self.duplicate_alert_container.bgcolor = AppTheme.DANGER_LIGHT
+            self.duplicate_alert_container.border = ft.Border.all(1.5, AppTheme.DANGER)
+            self.duplicate_alert_icon.name = ft.Icons.BLOCK
+            self.duplicate_alert_icon.color = AppTheme.DANGER
+            self.duplicate_alert_title.value = "Duplicate Active Enrollment Blocked"
+            self.duplicate_alert_title.color = AppTheme.DANGER
+            self.duplicate_alert_message.value = result.message
+            self.duplicate_alert_action_btn.visible = False
+            self.save_draft_btn.disabled = True
+            self.confirm_pay_btn.disabled = True
+
+        elif result.classification == "EXISTING_DRAFT":
+            self.duplicate_alert_container.bgcolor = AppTheme.WARNING_LIGHT
+            self.duplicate_alert_container.border = ft.Border.all(1.5, AppTheme.WARNING)
+            self.duplicate_alert_icon.name = ft.Icons.PENDING_ACTIONS
+            self.duplicate_alert_icon.color = AppTheme.WARNING
+            self.duplicate_alert_title.value = "Existing Draft Found"
+            self.duplicate_alert_title.color = AppTheme.WARNING
+            self.duplicate_alert_message.value = result.message
+            self.duplicate_alert_action_btn.text = "Resume Draft"
+            self.duplicate_alert_action_btn.icon = ft.Icons.EDIT_DOCUMENT
+            self.duplicate_alert_action_btn.style = ft.ButtonStyle(bgcolor=AppTheme.WARNING, color=AppTheme.SURFACE)
+            self.duplicate_alert_action_btn.on_click = lambda _, did=result.draft_admission_id: self._resume_draft(did)
+            self.duplicate_alert_action_btn.visible = bool(result.draft_admission_id)
+            self.save_draft_btn.disabled = False
+            self.confirm_pay_btn.disabled = True
+
+        elif result.classification in ("EXISTING_STUDENT_NEW_COURSE", "EXISTING_STUDENT_READMISSION"):
+            is_readm = (result.classification == "EXISTING_STUDENT_READMISSION")
+            self.duplicate_alert_container.bgcolor = AppTheme.SUCCESS_LIGHT if is_readm else AppTheme.PRIMARY_LIGHT
+            self.duplicate_alert_container.border = ft.Border.all(1.5, AppTheme.SUCCESS if is_readm else AppTheme.PRIMARY)
+            self.duplicate_alert_icon.name = ft.Icons.SCHOOL if is_readm else ft.Icons.PERSON_PIN
+            self.duplicate_alert_icon.color = AppTheme.SUCCESS if is_readm else AppTheme.PRIMARY
+            self.duplicate_alert_title.value = "Alumni Re-admission Allowed" if is_readm else "Returning Student Matched"
+            self.duplicate_alert_title.color = AppTheme.SUCCESS if is_readm else AppTheme.PRIMARY
+            self.duplicate_alert_message.value = f"{result.message} (Matched Mobile: {result.matched_mobile})"
+            self.duplicate_alert_action_btn.text = "Link Existing Profile"
+            self.duplicate_alert_action_btn.icon = ft.Icons.LINK
+            self.duplicate_alert_action_btn.style = ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE)
+            self.duplicate_alert_action_btn.on_click = lambda _, sid=result.existing_student_id: self._select_existing_student(sid)
+            self.duplicate_alert_action_btn.visible = bool(result.existing_student_id)
+            self.save_draft_btn.disabled = False
+            self.confirm_pay_btn.disabled = False
+
+        self.duplicate_alert_container.visible = True
+        self._safe_update()
+
+    def _hide_duplicate_alert(self) -> None:
+        self.duplicate_alert_container.visible = False
+        self.save_draft_btn.disabled = False
+        self.confirm_pay_btn.disabled = False
+        self._safe_update()
+
+    def _resume_draft(self, draft_admission_id: Optional[int]) -> None:
+        if not draft_admission_id:
+            return
+        adm = self.controller.get_admission(draft_admission_id)
+        if not adm:
+            self._show_error(f"Draft admission #{draft_admission_id} not found.")
+            return
+
+        self.admission = adm
+        self.is_edit_mode = True
+        self.selected_student_id = adm.student_id
+        self._select_existing_student(adm.student_id)
+
+        self.course_dropdown.value = str(adm.course_id)
+        self.selected_course_id = adm.course_id
+        self.base_course_fee = adm.course_fee
+        self.base_fee_text.value = f"₹{self.base_course_fee:,.2f}"
+        self._update_batches_for_course(adm.course_id)
+        if adm.batch_id:
+            self.batch_dropdown.value = str(adm.batch_id)
+
+        self.discount_input.value = f"{adm.discount:.0f}"
+        self.final_fee_text.value = f"₹{adm.final_fee:,.2f}"
+
+        self._hide_duplicate_alert()
+        self._show_success(f"✓ Resumed Draft Admission #{adm.id} ({adm.admission_number})")
+        self._safe_update()
+
     def _on_mode_change(self, e: ft.ControlEvent) -> None:
         selected_list = list(e.control.selected)
         mode = selected_list[0] if selected_list else "new"
@@ -489,10 +719,11 @@ class AdmissionFormModal(ft.AlertDialog):
         results = self.student_controller.search_students(query)
         tiles = []
         for s in results[:6]:
+            sec_text = f", Alt: {s.secondary_mobile}" if s.secondary_mobile else ""
             tiles.append(
                 ft.ListTile(
                     title=ft.Text(s.display_name, size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
-                    subtitle=ft.Text(f"Mobile: {s.mobile_number or 'N/A'} • Village: {s.village or 'Chandwad'} • ID: #{s.id}", size=AppTheme.SIZE_CAPTION),
+                    subtitle=ft.Text(f"Mobile: {s.mobile_number or N/A}{sec_text} • Village: {s.village or Chandwad} • ID: #{s.id}", size=AppTheme.SIZE_CAPTION),
                     leading=ft.Icon(ft.Icons.PERSON, color=AppTheme.PRIMARY),
                     on_click=lambda _, sid=s.id: self._select_existing_student(sid),
                 )
@@ -512,6 +743,7 @@ class AdmissionFormModal(ft.AlertDialog):
         if st.gender:
             self.gender_dropdown.value = st.gender.upper()
         self.mobile_input.value = st.mobile_number or ""
+        self.secondary_mobile_input.value = st.secondary_mobile or ""
         self.parent_name_input.value = st.parent_guardian_name or ""
         self.aadhaar_input.value = st.aadhaar_number or ""
         self.village_input.value = st.village or "Chandwad"
@@ -540,13 +772,16 @@ class AdmissionFormModal(ft.AlertDialog):
         self.student_search_results.controls.clear()
         self.student_search_input.value = f"{st.display_name} (ID: #{st.id})"
         self._load_friend_suggestions()
+        self.banner_text.value = "✓ Student information auto-filled"
         self._show_success("✓ Student information auto-filled")
         self._safe_update()
 
     def _on_village_changed(self) -> None:
+        self._clear_field_error(self.village_input)
         self._load_friend_suggestions()
 
     def _on_course_selected(self, e: ft.ControlEvent) -> None:
+        self._clear_field_error(self.course_dropdown)
         cid = int(e.control.value)
         self.selected_course_id = cid
         course = self.course_controller.get_course(cid)
@@ -554,6 +789,7 @@ class AdmissionFormModal(ft.AlertDialog):
         self.base_fee_text.value = f"₹{self.base_course_fee:,.2f}"
         self._on_fee_calculation_change()
         self._update_batches_for_course(cid)
+        self._trigger_duplicate_check()
 
     def _update_batches_for_course(self, course_id: int) -> None:
         batches = self.batch_controller.list_batches_by_course(course_id=course_id, status="OPEN")
@@ -698,6 +934,76 @@ class AdmissionFormModal(ft.AlertDialog):
         self.sig_clear_btn.visible = False
         self._safe_update()
 
+    # ── Field-Level Validation UX ──
+    def _validate_fields(self, is_confirm: bool = False) -> bool:
+        """Enforces field-level validation and highlights offending inputs with explicit error text."""
+        has_error = False
+
+        # Clear existing error flags
+        self.first_name_input.error_text = None
+        self.last_name_input.error_text = None
+        self.mobile_input.error_text = None
+        self.secondary_mobile_input.error_text = None
+        self.course_dropdown.error_text = None
+        self.village_input.error_text = None
+        self.aadhaar_input.error_text = None
+
+        first_name = (self.first_name_input.value or "").strip()
+        last_name = (self.last_name_input.value or "").strip()
+        c1 = normalize_mobile(self.mobile_input.value)
+        c2 = normalize_mobile(self.secondary_mobile_input.value)
+        village = (self.village_input.value or "").strip()
+        address = (self.address_input.value or "").strip()
+        aadhaar = (self.aadhaar_input.value or "").strip()
+
+        if not self.selected_student_id:
+            # Mandatory Identity Rules for New Student Creation
+            if not first_name or len(first_name) < 2:
+                self.first_name_input.error_text = "First name is required (min 2 chars)"
+                has_error = True
+
+            if not last_name or len(last_name) < 2:
+                self.last_name_input.error_text = "Surname / Last name is required (min 2 chars)"
+                has_error = True
+
+            if not c1:
+                self.mobile_input.error_text = "Primary mobile number is required"
+                has_error = True
+            elif not re.match(r"^[6-9][0-9]{9}$", c1):
+                self.mobile_input.error_text = "Must be a valid 10-digit Indian mobile number"
+                has_error = True
+
+            if not c2:
+                self.secondary_mobile_input.error_text = "Secondary mobile number is required"
+                has_error = True
+            elif not re.match(r"^[6-9][0-9]{9}$", c2):
+                self.secondary_mobile_input.error_text = "Must be a valid 10-digit Indian mobile number"
+                has_error = True
+            elif c1 and c2 and c1 == c2:
+                self.secondary_mobile_input.error_text = "Secondary mobile cannot be identical to Primary"
+                has_error = True
+
+            if not village and not address:
+                self.village_input.error_text = "At least Village or Residential Address is required"
+                has_error = True
+
+        if not self.course_dropdown.value:
+            self.course_dropdown.error_text = "Please select a Course"
+            has_error = True
+
+        if aadhaar:
+            digits = re.sub(r"\D", "", aadhaar)
+            if len(digits) != 12:
+                self.aadhaar_input.error_text = "Aadhaar must be exactly 12 digits"
+                has_error = True
+
+        if has_error:
+            self._show_error("Please correct the highlighted errors before proceeding.")
+            self._safe_update()
+            return False
+
+        return True
+
     # ── Form Submission ──
     def _gather_form_payload(self, status: AdmissionStatus) -> dict[str, Any]:
         raw_cid = self.course_dropdown.value
@@ -734,6 +1040,7 @@ class AdmissionFormModal(ft.AlertDialog):
             "dob": (self.dob_input.value or "").strip(),
             "gender": self.gender_dropdown.value,
             "mobile_number": (self.mobile_input.value or "").strip(),
+            "secondary_mobile": (self.secondary_mobile_input.value or "").strip(),
             "email": "",
             "aadhaar_number": (self.aadhaar_input.value or "").strip(),
             "parent_guardian_name": parent_name or None,
@@ -756,9 +1063,15 @@ class AdmissionFormModal(ft.AlertDialog):
     def handle_save_draft(self, e: ft.ControlEvent) -> None:
         """Saves admission as a draft (allowed with ₹0 payment)."""
         self.banner_container.visible = False
+        if not self._validate_fields(is_confirm=False):
+            return
+
         try:
             payload = self._gather_form_payload(AdmissionStatus.DRAFT)
-            adm_id = self.controller.create_admission(payload)
+            if self.is_edit_mode and self.admission:
+                self.controller.update_admission(self.admission.id, payload)
+            else:
+                self.controller.create_admission(payload)
             self.close_modal()
             self.on_saved()
         except (ValidationError, ConflictError, ServiceError) as ex:
@@ -773,9 +1086,17 @@ class AdmissionFormModal(ft.AlertDialog):
         and prompts the user to complete payment (>= ₹500) in PaymentDialog.
         """
         self.banner_container.visible = False
+        if not self._validate_fields(is_confirm=True):
+            return
+
         try:
             payload = self._gather_form_payload(AdmissionStatus.REGISTERED)
-            adm_id = self.controller.create_admission(payload)
+            if self.is_edit_mode and self.admission:
+                self.controller.update_admission(self.admission.id, payload)
+                adm_id = self.admission.id
+            else:
+                adm_id = self.controller.create_admission(payload)
+
             adm = self.controller.get_admission(adm_id)
 
             # Capture root page reference BEFORE closing the modal to avoid unmounted safe_page evaluation
@@ -823,4 +1144,3 @@ class AdmissionFormModal(ft.AlertDialog):
 
     def _open_receipt_dialog(self, admission_id: int) -> None:
         self._open_receipt_dialog_with_page(self.safe_page, admission_id)
-

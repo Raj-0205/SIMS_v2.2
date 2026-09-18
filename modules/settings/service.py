@@ -4,6 +4,8 @@ from __future__ import annotations
 from typing import Any, Optional
 from core.service.base import BaseService
 from core.security.auth import AuthService
+from core.security.authorization import AuthorizationService
+from core.security.permissions import Permission
 from core.logger.service import LogService
 from core.exceptions import ValidationError, ServiceError
 from modules.settings.repository import SettingsRepository
@@ -62,6 +64,7 @@ class SettingsService(BaseService):
         return AuthService.verify_password(default_hash, pin_clean)
 
     def set_admin_pin(self, new_pin: str, current_pin: Optional[str] = None) -> bool:
+        AuthorizationService.enforce(Permission.PAYMENT_PIN_CHANGE)
         if not new_pin or len(new_pin.strip()) < 4:
             raise ValidationError("Admin PIN must be at least 4 digits.")
 

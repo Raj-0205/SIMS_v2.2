@@ -5,3 +5,19 @@ name = "Sudharm SIMS"
 version = "2.2.0"
 environment = "development"
 debug = false
+
+[smtp]
+host = "localhost"
+port = 587
+username = ""
+use_tls = true
+from_email = "noreply@sudharmsims.local"
+from_name = "Sudharm SIMS Security"
+
+[session]
+admin_timeout_minutes = 60
+administrator_timeout_minutes = 15
+otp_ttl_seconds = 300
+max_otp_attempts = 3
+max_login_attempts = 5
+lockout_duration_minutes = 15

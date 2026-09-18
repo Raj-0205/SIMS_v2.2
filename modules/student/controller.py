@@ -46,6 +46,7 @@ class StudentController:
             photo_path=str(raw_data["photo_path"]).strip() if raw_data.get("photo_path") else None,
             signature_path=str(raw_data["signature_path"]).strip() if raw_data.get("signature_path") else None,
             mobile_number=str(raw_data.get("mobile_number") or "").strip(),
+            secondary_mobile=str(raw_data.get("secondary_mobile") or "").strip() or None,
             email=str(raw_data.get("email") or "").strip() or None,
         )
         return self.service.create_student(dto)
@@ -69,6 +70,7 @@ class StudentController:
             photo_path=str(raw_data["photo_path"]).strip() if raw_data.get("photo_path") else None,
             signature_path=str(raw_data["signature_path"]).strip() if raw_data.get("signature_path") else None,
             mobile_number=str(raw_data.get("mobile_number") or "").strip(),
+            secondary_mobile=str(raw_data.get("secondary_mobile") or "").strip() or None,
             email=str(raw_data.get("email") or "").strip() or None,
         )
         self.service.update_student(dto)

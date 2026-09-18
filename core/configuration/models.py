@@ -97,6 +97,95 @@ class DatabaseConfig(BaseModel):
     )
 
 
+class SmtpConfig(BaseModel):
+    """
+    Immutable SMTP configuration for security notifications.
+    Password must be retrieved securely from the environment variable SIMS_SMTP_PASSWORD.
+    """
+
+    host: str = Field(
+        default="localhost",
+        description="SMTP server hostname.",
+    )
+
+    port: int = Field(
+        default=587,
+        description="SMTP server port.",
+    )
+
+    username: str = Field(
+        default="",
+        description="SMTP username.",
+    )
+
+    use_tls: bool = Field(
+        default=True,
+        description="Enable STARTTLS encryption.",
+    )
+
+    from_email: str = Field(
+        default="noreply@sudharmsims.local",
+        description="Sender email address.",
+    )
+
+    from_name: str = Field(
+        default="Sudharm SIMS Security",
+        description="Sender display name.",
+    )
+
+    model_config = ConfigDict(
+        frozen=True,
+        extra="ignore",
+    )
+
+
+class SessionConfig(BaseModel):
+    """
+    Session and authentication security configuration.
+    """
+
+    admin_timeout_minutes: int = Field(
+        default=60,
+        ge=1,
+        description="Inactivity timeout for standard Admin sessions in minutes.",
+    )
+
+    administrator_timeout_minutes: int = Field(
+        default=15,
+        ge=1,
+        description="Inactivity timeout for privileged Administrator sessions in minutes.",
+    )
+
+    otp_ttl_seconds: int = Field(
+        default=300,
+        ge=30,
+        description="OTP challenge expiration time in seconds (default: 5 min).",
+    )
+
+    max_otp_attempts: int = Field(
+        default=3,
+        ge=1,
+        description="Maximum failed attempts allowed per OTP challenge.",
+    )
+
+    max_login_attempts: int = Field(
+        default=5,
+        ge=1,
+        description="Maximum consecutive failed password attempts before account lockout.",
+    )
+
+    lockout_duration_minutes: int = Field(
+        default=15,
+        ge=1,
+        description="Account lockout duration in minutes after exceeding max_login_attempts.",
+    )
+
+    model_config = ConfigDict(
+        frozen=True,
+        extra="ignore",
+    )
+
+
 class ConfigurationRoot(BaseModel):
     """
     Root configuration object.
@@ -111,6 +200,14 @@ class ConfigurationRoot(BaseModel):
 
     database: DatabaseConfig = Field(
         default_factory=DatabaseConfig,
+    )
+
+    smtp: SmtpConfig = Field(
+        default_factory=SmtpConfig,
+    )
+
+    session: SessionConfig = Field(
+        default_factory=SessionConfig,
     )
 
     model_config = ConfigDict(

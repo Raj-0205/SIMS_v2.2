@@ -13,6 +13,8 @@ from core.configuration.models import (
     ApplicationConfig,
     ConfigurationRoot,
     DatabaseConfig,
+    SessionConfig,
+    SmtpConfig,
 )
 
 __all__ = ["ConfigService"]
@@ -65,9 +67,19 @@ class ConfigService:
                 **raw_database.get("database", {})
             )
 
+            smtp = SmtpConfig(
+                **raw_application.get("smtp", {})
+            )
+
+            session = SessionConfig(
+                **raw_application.get("session", {})
+            )
+
             cls._instance = ConfigurationRoot(
                 application=application,
                 database=database,
+                smtp=smtp,
+                session=session,
             )
 
         except ValidationError as exc:
@@ -117,3 +129,17 @@ class ConfigService:
         Return database configuration.
         """
         return cls._root().database
+
+    @classmethod
+    def smtp(cls) -> SmtpConfig:
+        """
+        Return SMTP notification configuration.
+        """
+        return cls._root().smtp
+
+    @classmethod
+    def session(cls) -> SessionConfig:
+        """
+        Return session and authentication security configuration.
+        """
+        return cls._root().session

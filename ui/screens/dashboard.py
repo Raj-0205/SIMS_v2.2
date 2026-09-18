@@ -15,6 +15,7 @@ from modules.reports.views.reports_home import ReportsHome
 from modules.settings.views.settings_home import SettingsHome
 from modules.admission.controller import AdmissionController
 from modules.admission.dto import AdmissionSummaryDTO
+from ui.screens.control_center import ControlCenterScreen
 
 __all__ = ["DashboardScreen", "DashboardHome"]
 
@@ -302,6 +303,8 @@ class DashboardScreen(ft.Row):
             view = SettingsHome()
         elif route == "/batch":
             view = CourseHome()
+        elif route == "/control-center":
+            view = ControlCenterScreen(self._page, on_navigate=self.on_route_request)
         else:
             view = DashboardHome(on_navigate=self.on_route_request)
 

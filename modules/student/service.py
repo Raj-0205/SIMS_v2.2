@@ -9,9 +9,11 @@ from typing import Optional
 from core.logger.service import LogService
 from core.service.base import BaseService
 from core.exceptions import ValidationError, ConflictError, ServiceError
+from core.security.authorization import AuthorizationService
+from core.security.permissions import Permission
 from infrastructure.excel import ExcelExporter
 from infrastructure.pdf import PDFExporter
-from shared.utils import format_title_case, normalize_indian_mobile
+from shared.utils import format_title_case, normalize_name, normalize_indian_mobile
 from modules.student.repository import StudentRepository
 from modules.admission.friendship_repository import FriendshipRepository
 from modules.admission.activity_log_repository import ActivityLogRepository
@@ -86,10 +88,14 @@ class StudentService(BaseService):
     def create_student(self, dto: StudentCreateDTO) -> int:
         """
         Creates a new student master record.
-        HARD BLOCK: Rejects duplicate mobile numbers.
+        Canonical Rule: Rejects only if EXACT same normalized full name + any matching mobile.
+        Allows shared family contacts for different student names.
         """
         first_name, last_name = self._validate_names(dto.first_name, dto.last_name)
         mobile_number = self._validate_mobile(dto.mobile_number)
+        secondary_mobile = self._validate_mobile(dto.secondary_mobile) if dto.secondary_mobile else None
+        if secondary_mobile and secondary_mobile == mobile_number:
+            raise ValidationError("Secondary mobile cannot be identical to primary mobile.")
         email = self._validate_email(dto.email)
 
         data = {
@@ -109,18 +115,27 @@ class StudentService(BaseService):
             "signature_path": dto.signature_path,
             "email": email,
             "mobile_number": mobile_number,
+            "secondary_mobile": secondary_mobile,
         }
 
         with self.unit_of_work():
-            existing_mobile = self.repository.get_by_mobile(mobile_number)
-            if existing_mobile:
-                LogService.warning(
-                    f"Student creation rejected: Duplicate mobile '{mobile_number}'.",
-                    context=self.__class__.__name__,
-                )
-                raise ConflictError(
-                    f"A student with mobile number '{mobile_number}' already exists."
-                )
+            # Canonical Identity Rule: Normalized Full Name + Any One Mobile Match
+            norm_full_name = normalize_name(f"{first_name} {dto.middle_name or ''} {last_name}")
+            mobiles_to_check = [mobile_number]
+            if secondary_mobile:
+                mobiles_to_check.append(secondary_mobile)
+
+            candidates = self.repository.find_by_mobiles(mobiles_to_check)
+            for cand in candidates:
+                cand_name = normalize_name(f"{cand['first_name']} {cand.get('middle_name') or ''} {cand['last_name']}")
+                if cand_name == norm_full_name:
+                    LogService.warning(
+                        f"Student creation rejected: Duplicate identity '{first_name} {last_name}' with mobile '{mobile_number}'.",
+                        context=self.__class__.__name__,
+                    )
+                    raise ConflictError(
+                        f"A student with identity '{first_name} {last_name}' and matching contact already exists (ID #{cand['id']})."
+                    )
 
             if email:
                 existing_email = self.repository.get_by_email(email)
@@ -148,13 +163,16 @@ class StudentService(BaseService):
     def update_student(self, dto: StudentUpdateDTO) -> None:
         """
         Updates an existing student master record completely.
-        HARD BLOCK: Rejects duplicate mobile numbers assigned to other students.
+        Canonical Rule: Rejects only if updating to an identity that duplicates another student.
         """
         if not dto.id or dto.id <= 0:
             raise ValidationError("Valid student ID is required for update.")
 
         first_name, last_name = self._validate_names(dto.first_name, dto.last_name)
         mobile_number = self._validate_mobile(dto.mobile_number)
+        secondary_mobile = self._validate_mobile(dto.secondary_mobile) if dto.secondary_mobile else None
+        if secondary_mobile and secondary_mobile == mobile_number:
+            raise ValidationError("Secondary mobile cannot be identical to primary mobile.")
         email = self._validate_email(dto.email)
 
         data = {
@@ -174,6 +192,7 @@ class StudentService(BaseService):
             "signature_path": dto.signature_path,
             "email": email,
             "mobile_number": mobile_number,
+            "secondary_mobile": secondary_mobile,
         }
 
         with self.unit_of_work():
@@ -181,15 +200,24 @@ class StudentService(BaseService):
             if not existing_student:
                 raise ValidationError(f"Student with ID {dto.id} does not exist.")
 
-            mobile_owner = self.repository.get_by_mobile(mobile_number)
-            if mobile_owner and int(mobile_owner["id"]) != int(dto.id):
-                LogService.warning(
-                    f"Student update rejected: Mobile '{mobile_number}' owned by ID {mobile_owner['id']}.",
-                    context=self.__class__.__name__,
-                )
-                raise ConflictError(
-                    f"Mobile number '{mobile_number}' is already registered to another student."
-                )
+            # Check if updated identity conflicts with another student
+            norm_full_name = normalize_name(f"{first_name} {dto.middle_name or ''} {last_name}")
+            mobiles_to_check = [mobile_number]
+            if secondary_mobile:
+                mobiles_to_check.append(secondary_mobile)
+
+            candidates = self.repository.find_by_mobiles(mobiles_to_check)
+            for cand in candidates:
+                if int(cand["id"]) != int(dto.id):
+                    cand_name = normalize_name(f"{cand['first_name']} {cand.get('middle_name') or ''} {cand['last_name']}")
+                    if cand_name == norm_full_name:
+                        LogService.warning(
+                            f"Student update rejected: Identity '{first_name} {last_name}' already owned by ID {cand['id']}.",
+                            context=self.__class__.__name__,
+                        )
+                        raise ConflictError(
+                            f"Student identity '{first_name} {last_name}' with contact '{mobile_number}' is already registered to another student (ID #{cand['id']})."
+                        )
 
             if email:
                 email_owner = self.repository.get_by_email(email)
@@ -332,6 +360,7 @@ class StudentService(BaseService):
             )
 
     def delete_student(self, student_id: int) -> None:
+        AuthorizationService.enforce(Permission.STUDENT_DELETE)
         if not student_id or student_id <= 0:
             raise ValidationError("A valid student ID is required for deletion.")
 

@@ -7,6 +7,8 @@ from typing import Optional
 from core.logger.service import LogService
 from core.service.base import BaseService
 from core.exceptions import ValidationError, ConflictError, ServiceError
+from core.security.authorization import AuthorizationService
+from core.security.permissions import Permission
 from modules.batch.constants import BatchStatus
 from modules.batch.repository import BatchRepository
 from modules.batch.mapper import BatchMapper
@@ -94,6 +96,7 @@ class BatchService(BaseService):
         """
         Creates a new batch with validation and scoped unique name verification.
         """
+        AuthorizationService.enforce(Permission.BATCH_CREATE)
         course_id, clean_name, clean_timing, cap_val, status_val, clean_start, clean_end = (
             self._validate_batch_input(
                 dto.course_id,
@@ -151,6 +154,7 @@ class BatchService(BaseService):
 
     def update_batch(self, dto: BatchUpdateDTO) -> None:
         """Updates an existing batch record with validation and scoped unique name verification."""
+        AuthorizationService.enforce(Permission.BATCH_MANAGE)
         if not dto.id or dto.id <= 0:
             raise ValidationError("A valid Batch ID is required for update.")
 
@@ -200,6 +204,7 @@ class BatchService(BaseService):
         """
         Deletes a batch if not referenced by admissions or historical records.
         """
+        AuthorizationService.enforce(Permission.BATCH_DELETE)
         if not batch_id or batch_id <= 0:
             raise ValidationError("A valid Batch ID is required for deletion.")
 

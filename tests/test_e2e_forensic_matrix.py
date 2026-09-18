@@ -98,7 +98,7 @@ class TestE2EForensicMatrix(unittest.TestCase):
         # 1. Test AdmissionFormModal instantiation (no constructor exception)
         modal = AdmissionFormModal(on_saved=lambda: None)
         self.assertIsNotNone(modal)
-        self.assertEqual(modal.content.width, 960)
+        self.assertEqual(modal.content.width, 1180)
 
         # 2. Create Student Master record
         ts = int(time.time() * 1000) % 10000000

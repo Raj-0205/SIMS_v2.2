@@ -7,12 +7,25 @@ from typing import Optional
 
 __all__ = [
     "format_title_case",
+    "normalize_name",
     "normalize_mobile",
     "format_whatsapp_number",
     "format_whatsapp_url",
     "format_currency",
     "format_file_size",
 ]
+
+
+def normalize_name(name: Optional[str]) -> str:
+    """
+    Normalizes a full name for deterministic identity matching.
+    Strips leading/trailing whitespace, collapses internal whitespace, and lowercases.
+    Example:
+        '   Rahul   Kumar   Sharma  ' -> 'rahul kumar sharma'
+    """
+    if not name:
+        return ""
+    return " ".join(str(name).strip().split()).lower()
 
 
 def format_title_case(value: Optional[str]) -> str:

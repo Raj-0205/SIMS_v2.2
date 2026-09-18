@@ -4,7 +4,10 @@ __all__ = [
     "ArchitectureViolationError",
     "ServiceError",
     "ValidationError",
-    "ConflictError"
+    "ConflictError",
+    "AuthenticationError",
+    "ForbiddenError",
+    "NotificationDeliveryError",
 ]
 
 class ArchitectureViolationError(Exception):
@@ -22,3 +25,16 @@ class ValidationError(ServiceError):
 class ConflictError(ServiceError):
     """Raised when there is a data conflict (e.g., duplicate records, foreign key constraint)."""
     pass
+
+class AuthenticationError(ServiceError):
+    """Raised when authentication credentials or verification fails."""
+    pass
+
+class ForbiddenError(ServiceError):
+    """Raised when an authenticated actor attempts an operation lacking required permissions."""
+    pass
+
+class NotificationDeliveryError(ServiceError):
+    """Raised when an outbound notification (e.g., email) fails to deliver."""
+    pass
+

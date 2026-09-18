@@ -52,6 +52,7 @@ class StudentRepository(BaseRepository):
             s.signature_path,
             s.email,
             s.mobile_number,
+            s.secondary_mobile,
             s.created_at,
             s.updated_at,
             (SELECT COUNT(*) FROM admissions a WHERE a.student_id = s.id) AS admissions_count,
@@ -215,8 +216,8 @@ class StudentRepository(BaseRepository):
                 first_name, middle_name, last_name, mother_name, dob, gender,
                 aadhaar_number, parent_guardian_name, village, address,
                 qualification, blood_group, photo_path, signature_path,
-                email, mobile_number
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                email, mobile_number, secondary_mobile
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         params = (
             data["first_name"],
@@ -235,6 +236,7 @@ class StudentRepository(BaseRepository):
             data.get("signature_path"),
             data.get("email"),
             data.get("mobile_number"),
+            data.get("secondary_mobile"),
         )
         return self.execute_insert(sql, params)
 
@@ -258,6 +260,7 @@ class StudentRepository(BaseRepository):
                 signature_path = COALESCE(?, signature_path),
                 email = ?,
                 mobile_number = ?,
+                secondary_mobile = COALESCE(?, secondary_mobile),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?;
         """
@@ -278,6 +281,7 @@ class StudentRepository(BaseRepository):
             data.get("signature_path"),
             data.get("email"),
             data.get("mobile_number"),
+            data.get("secondary_mobile"),
             student_id,
         )
         return self.execute(sql, params)
@@ -297,14 +301,29 @@ class StudentRepository(BaseRepository):
         return self.execute_fetchone(sql, (student_id,))
 
     def get_by_mobile(self, mobile_number: str) -> Optional[dict[str, Any]]:
-        """Retrieves a student record matching the mobile number."""
+        """Retrieves a student record matching the mobile number as primary or secondary."""
         sql = """
-            SELECT id, first_name, last_name, email, mobile_number, created_at
+            SELECT id, first_name, last_name, email, mobile_number, secondary_mobile, created_at
             FROM students
-            WHERE mobile_number = ?
+            WHERE mobile_number = ? OR secondary_mobile = ?
             LIMIT 1;
         """
-        return self.execute_fetchone(sql, (mobile_number,))
+        return self.execute_fetchone(sql, (mobile_number, mobile_number))
+
+    def find_by_mobiles(self, mobiles: list[str]) -> list[dict[str, Any]]:
+        """Finds all student records matching any of the given mobile numbers (primary or secondary)."""
+        clean_mobiles = [m.strip() for m in mobiles if m and m.strip()]
+        if not clean_mobiles:
+            return []
+        placeholders = ", ".join("?" for _ in clean_mobiles)
+        sql = f"""
+            SELECT s.*
+            FROM students s
+            WHERE s.mobile_number IN ({placeholders})
+               OR s.secondary_mobile IN ({placeholders});
+        """
+        params = tuple(clean_mobiles + clean_mobiles)
+        return self.execute_fetchall(sql, params)
 
     def get_by_email(self, email: str) -> Optional[dict[str, Any]]:
         """Retrieves a student record matching the email address."""

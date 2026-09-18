@@ -4,6 +4,7 @@ import flet as ft
 from ui.screens.login import LoginScreen
 from ui.screens.dashboard import DashboardScreen
 from core.security.auth import AuthService
+from core.security.roles import Role
 
 __all__ = ["AppRouter"]
 
@@ -22,6 +23,7 @@ class AppRouter:
         "/fees",
         "/batch",
         "/settings",
+        "/control-center",
     }
 
     def __init__(self, page: ft.Page) -> None:
@@ -37,6 +39,8 @@ class AppRouter:
     def handle_route_change(self, e: ft.RouteChangeEvent) -> None:
         route = e.route
         is_auth = AuthService.is_authenticated(self.page)
+        session = AuthService._get_session(self.page)
+        user_role = str(AuthService._session_get(session, "role", "") or "").strip().upper()
 
         target_route = route
 
@@ -47,15 +51,21 @@ class AppRouter:
             is_auth = False
 
         # 2. Authorization Guard (Fail-Closed)
-        if target_route in self.PROTECTED_ROUTES:
+        if target_route == "/control-center":
+            if not is_auth:
+                target_route = "/login"
+            elif user_role != Role.ADMINISTRATOR.value:
+                target_route = "/dashboard"
+        elif target_route in self.PROTECTED_ROUTES:
             if not is_auth:
                 target_route = "/login"
         elif target_route == "/login":
             if is_auth:
-                target_route = "/dashboard"
+                target_route = "/control-center" if user_role == Role.ADMINISTRATOR.value else "/dashboard"
         else:
             # 3. Unknown route fallback
-            target_route = "/dashboard" if is_auth else "/login"
+            default_home = "/control-center" if user_role == Role.ADMINISTRATOR.value else "/dashboard"
+            target_route = default_home if is_auth else "/login"
 
         # 4. Redirect & Loop Prevention
         if target_route != route:

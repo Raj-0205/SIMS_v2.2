@@ -21,7 +21,10 @@ from modules.admission.dto import (
     AdmissionSummaryDTO,
     AdmissionWorkspaceDTO,
     FriendSuggestionDTO,
+    DuplicateCheckDTO,
+    DuplicateCheckResultDTO,
 )
+from shared.utils import format_title_case, normalize_name, normalize_mobile
 from modules.admission.mapper import AdmissionMapper
 from modules.admission.repository import AdmissionRepository
 from modules.admission_course.repository import AdmissionCourseRepository
@@ -84,14 +87,154 @@ class AdmissionService(BaseService):
         if not pin or not pin.strip():
             return False
         clean = pin.strip()
-        with self.unit_of_work():
+        from core.database.transaction import TransactionManager
+        if TransactionManager.in_transaction():
             stored_hash = self.settings_repo.get("admin_pin_hash")
+        else:
+            with self.unit_of_work():
+                stored_hash = self.settings_repo.get("admin_pin_hash")
         if stored_hash and AuthService.verify_password(stored_hash, clean):
             return True
         default_hash = AuthService.hash_password(self.DEFAULT_ADMIN_PIN)
         return AuthService.verify_password(default_hash, clean)
 
+    def check_duplicate(self, dto: DuplicateCheckDTO) -> DuplicateCheckResultDTO:
+        """
+        Deterministic duplicate identity and admission classification check.
+        Canonical Rule: NORMALIZED FULL NAME MATCH + ANY ONE MOBILE NUMBER MATCH.
+        Classification:
+            - DUPLICATE_ACTIVE: Same student + same active course (REGISTERED or CONFIRMED) -> can_create=False
+            - EXISTING_DRAFT: Same student + existing draft admission -> can_create=False (offer resume)
+            - EXISTING_STUDENT_READMISSION: Same student + completed/closed admission -> can_create=True
+            - EXISTING_STUDENT_NEW_COURSE: Same student + different course -> can_create=True
+            - NONE: No identity match -> can_create=True
+        """
+        from core.database.transaction import TransactionManager
+        if TransactionManager.in_transaction():
+            return self._check_duplicate_internal(dto)
+        with self.unit_of_work():
+            return self._check_duplicate_internal(dto)
 
+    def _check_duplicate_internal(self, dto: DuplicateCheckDTO) -> DuplicateCheckResultDTO:
+        norm_name = normalize_name(dto.full_name)
+        c1 = normalize_mobile(dto.contact1)
+        c2 = normalize_mobile(dto.contact2) if dto.contact2 else None
+
+        if not norm_name or not c1:
+            return DuplicateCheckResultDTO(
+                is_identity_match=False,
+                classification="NONE",
+                can_create_admission=True,
+                message="Full name and primary mobile are required for identity verification.",
+            )
+
+        mobiles_to_check = [c1]
+        if c2:
+            mobiles_to_check.append(c2)
+
+        candidates = self.student_repo.find_by_mobiles(mobiles_to_check)
+        for cand in candidates:
+            cand_full = f"{cand.get('first_name', '')} {cand.get('middle_name') or ''} {cand.get('last_name', '')}"
+            cand_norm = normalize_name(cand_full)
+            if cand_norm == norm_name:
+                # Identity matched! Determine which mobile matched
+                cand_mobiles = [normalize_mobile(cand.get("mobile_number"))]
+                if cand.get("secondary_mobile"):
+                    cand_mobiles.append(normalize_mobile(cand.get("secondary_mobile")))
+
+                matched_mobile = None
+                for m in mobiles_to_check:
+                    if m in cand_mobiles:
+                        matched_mobile = m
+                        break
+
+                student_id = cand["id"]
+                display_name = f"{cand.get('first_name', '')} {cand.get('last_name', '')}".strip()
+                admissions = self.repository.get_admissions_by_student_id(student_id)
+                target_course_id = dto.course_id
+
+                # 1. Same student + same active course (REGISTERED or CONFIRMED) -> Block
+                if target_course_id:
+                    active_same = [
+                        a for a in admissions
+                        if a.get("course_id") == target_course_id
+                        and a.get("status") in (AdmissionStatus.REGISTERED.value, AdmissionStatus.CONFIRMED.value)
+                    ]
+                    if active_same:
+                        course_name = active_same[0].get("course_name") or f"Course #{target_course_id}"
+                        st = active_same[0].get("status")
+                        return DuplicateCheckResultDTO(
+                            is_identity_match=True,
+                            existing_student_id=student_id,
+                            existing_student_name=display_name,
+                            matched_mobile=matched_mobile,
+                            classification="DUPLICATE_ACTIVE",
+                            can_create_admission=False,
+                            message=f"Student '{display_name}' already has an active ({st}) admission for {course_name}. Creation is blocked.",
+                            existing_admissions=admissions,
+                        )
+
+                # 2. Same student + existing draft admission -> Offer resume
+                draft_admissions = [
+                    a for a in admissions
+                    if a.get("status") == AdmissionStatus.DRAFT.value
+                    and (target_course_id is None or a.get("course_id") == target_course_id)
+                ]
+                if not draft_admissions and target_course_id:
+                    draft_admissions = [
+                        a for a in admissions
+                        if a.get("status") == AdmissionStatus.DRAFT.value
+                    ]
+
+                if draft_admissions:
+                    draft = draft_admissions[0]
+                    c_name = draft.get("course_name") or "selected course"
+                    return DuplicateCheckResultDTO(
+                        is_identity_match=True,
+                        existing_student_id=student_id,
+                        existing_student_name=display_name,
+                        matched_mobile=matched_mobile,
+                        classification="EXISTING_DRAFT",
+                        can_create_admission=False,
+                        draft_admission_id=draft["id"],
+                        message=f"Existing draft admission #{draft['id']} ({c_name}) found for '{display_name}'. You can resume this draft.",
+                        existing_admissions=admissions,
+                    )
+
+                # 3. Same student + completed/closed past courses -> Allow re-admission
+                if admissions and all(
+                    a.get("status") in (AdmissionStatus.COMPLETED.value, AdmissionStatus.CANCELLED.value)
+                    for a in admissions
+                ):
+                    return DuplicateCheckResultDTO(
+                        is_identity_match=True,
+                        existing_student_id=student_id,
+                        existing_student_name=display_name,
+                        matched_mobile=matched_mobile,
+                        classification="EXISTING_STUDENT_READMISSION",
+                        can_create_admission=True,
+                        message=f"Existing student '{display_name}' has completed/closed past courses. Re-admission is allowed.",
+                        existing_admissions=admissions,
+                    )
+
+                # 4. Same student + different course (or student with no previous admissions) -> Allow new admission
+                return DuplicateCheckResultDTO(
+                    is_identity_match=True,
+                    existing_student_id=student_id,
+                    existing_student_name=display_name,
+                    matched_mobile=matched_mobile,
+                    classification="EXISTING_STUDENT_NEW_COURSE",
+                    can_create_admission=True,
+                    message=f"Existing student profile '{display_name}' matched. New admission is allowed.",
+                    existing_admissions=admissions,
+                )
+
+        return DuplicateCheckResultDTO(
+            is_identity_match=False,
+            classification="NONE",
+            can_create_admission=True,
+            message="No duplicate identity found. Proceeding with new student registration.",
+        )
 
     def _validate_personal_info(self, dto: AdmissionCreateDTO) -> tuple[int, dict[str, Any]]:
         """Validates personal information and resolves or creates the student profile."""
@@ -108,7 +251,7 @@ class AdmissionService(BaseService):
             effective_village = clean_village or student.get("village")
             effective_address = clean_address or student.get("address")
 
-            update_data = {}
+            update_data: dict[str, Any] = {}
             if dto.middle_name:
                 update_data["middle_name"] = self._format_name(dto.middle_name)
             if dto.mother_name:
@@ -118,7 +261,9 @@ class AdmissionService(BaseService):
             if dto.gender:
                 update_data["gender"] = dto.gender.strip().upper()
             if dto.aadhaar_number:
-                update_data["aadhaar_number"] = dto.aadhaar_number.strip()
+                digits = re.sub(r"\D", "", dto.aadhaar_number.strip())
+                if len(digits) == 12:
+                    update_data["aadhaar_number"] = digits
             if dto.parent_guardian_name:
                 update_data["parent_guardian_name"] = self._format_name(dto.parent_guardian_name)
             if clean_village:
@@ -129,18 +274,23 @@ class AdmissionService(BaseService):
                 update_data["qualification"] = dto.qualification.strip()
             if dto.blood_group:
                 update_data["blood_group"] = dto.blood_group.strip().upper()
+            if dto.secondary_mobile:
+                sec = normalize_mobile(dto.secondary_mobile)
+                if sec and sec != student.get("mobile_number"):
+                    update_data["secondary_mobile"] = sec
 
             if update_data:
                 update_data["first_name"] = student["first_name"]
                 update_data["last_name"] = student["last_name"]
                 update_data["mobile_number"] = student["mobile_number"]
-                update_data["email"] = student["email"]
+                update_data["email"] = student.get("email")
                 self.student_repo.update(student_id, update_data)
 
             return student_id, {
                 "first_name": student["first_name"],
                 "last_name": student["last_name"],
                 "mobile_number": student["mobile_number"],
+                "secondary_mobile": student.get("secondary_mobile"),
                 "village": effective_village,
                 "address": effective_address,
             }
@@ -153,37 +303,61 @@ class AdmissionService(BaseService):
         first_name = self._format_name(dto.first_name)
         middle_name = self._format_name(dto.middle_name)
         last_name = self._format_name(dto.last_name)
-        mother_name = self._format_name(dto.mother_name)
-        parent_name = self._format_name(dto.parent_guardian_name)
+        mother_name = self._format_name(dto.mother_name) if dto.mother_name else None
+        parent_name = self._format_name(dto.parent_guardian_name) if dto.parent_guardian_name else None
 
         if not first_name or len(first_name) < 2:
             raise ValidationError("First name is required and must be at least 2 characters.")
         if not last_name or len(last_name) < 2:
             raise ValidationError("Surname / Last name is required and must be at least 2 characters.")
-        if not mother_name:
-            raise ValidationError("Mother's name is required.")
-        if not dto.dob:
-            raise ValidationError("Date of Birth is required.")
-        if not dto.gender:
-            raise ValidationError("Gender is required.")
-        if not dto.mobile_number:
-            raise ValidationError("Mobile number is required and cannot be blank.")
-        if not dto.aadhaar_number or len(re.sub(r"\D", "", dto.aadhaar_number)) < 12:
-            raise ValidationError("A valid 12-digit Aadhaar number is required.")
 
-        clean_mobile = re.sub(r"[\s\-]", "", dto.mobile_number.strip())
-        if clean_mobile.startswith("+91"):
-            clean_mobile = clean_mobile[3:]
-        elif clean_mobile.startswith("+"):
-            clean_mobile = clean_mobile[1:]
+        # Validate Contact 1 (primary) and Contact 2 (secondary)
+        c1 = normalize_mobile(dto.mobile_number)
+        c2 = normalize_mobile(dto.secondary_mobile)
 
-        if not re.match(r"^[0-9]{10,15}$", clean_mobile):
-            raise ValidationError("Mobile number must be a valid 10-digit number.")
+        if not c1 or not c2:
+            raise ValidationError("Both Contact 1 (primary) and Contact 2 (secondary) mobile numbers are required.")
 
-        # Check duplicate mobile
-        existing_mobile = self.student_repo.get_by_mobile(clean_mobile)
-        if existing_mobile:
-            raise ConflictError(f"A student with mobile number '{clean_mobile}' already exists.")
+        if c1 == c2:
+            raise ValidationError("Secondary mobile cannot be identical to primary mobile.")
+
+        if not (len(c1) == 10 and c1.isdigit()) or not re.match(r"^[6-9][0-9]{9}$", c1):
+            raise ValidationError("Primary mobile must be a valid 10-digit Indian mobile number.")
+
+        if not (len(c2) == 10 and c2.isdigit()) or not re.match(r"^[6-9][0-9]{9}$", c2):
+            raise ValidationError("Secondary mobile must be a valid 10-digit Indian mobile number.")
+
+        clean_aadhaar = None
+        if dto.aadhaar_number and dto.aadhaar_number.strip():
+            digits = re.sub(r"\D", "", dto.aadhaar_number.strip())
+            if len(digits) != 12:
+                raise ValidationError("Aadhaar number must be exactly 12 digits if provided.")
+            clean_aadhaar = digits
+
+        # Run canonical duplicate identity check
+        full_name = f"{first_name} {middle_name or ''} {last_name}".strip()
+        dup_dto = DuplicateCheckDTO(
+            full_name=full_name,
+            contact1=c1,
+            contact2=c2,
+            course_id=dto.course_id,
+        )
+        dup_result = self.check_duplicate(dup_dto)
+
+        if dup_result.is_identity_match:
+            if not dup_result.can_create_admission:
+                raise ConflictError(dup_result.message)
+            # Allowed existing student (EXISTING_STUDENT_NEW_COURSE or EXISTING_STUDENT_READMISSION)
+            student_id = dup_result.existing_student_id
+            st = self.student_repo.get_by_id(student_id)
+            return student_id, {
+                "first_name": st["first_name"],
+                "last_name": st["last_name"],
+                "mobile_number": st["mobile_number"],
+                "secondary_mobile": st.get("secondary_mobile"),
+                "village": clean_village or st.get("village"),
+                "address": clean_address or st.get("address"),
+            }
 
         student_data = {
             "first_name": first_name,
@@ -191,11 +365,12 @@ class AdmissionService(BaseService):
             "last_name": last_name,
             "mother_name": mother_name,
             "parent_guardian_name": parent_name,
-            "dob": dto.dob.strip(),
-            "gender": dto.gender.strip().upper(),
-            "mobile_number": clean_mobile,
+            "dob": dto.dob.strip() if dto.dob else None,
+            "gender": dto.gender.strip().upper() if dto.gender else None,
+            "mobile_number": c1,
+            "secondary_mobile": c2,
             "email": dto.email.strip().lower() if dto.email else None,
-            "aadhaar_number": dto.aadhaar_number.strip(),
+            "aadhaar_number": clean_aadhaar,
             "village": clean_village,
             "address": clean_address,
             "qualification": dto.qualification.strip() if dto.qualification else None,

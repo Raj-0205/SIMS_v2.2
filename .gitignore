@@ -21,3 +21,21 @@ runtime/logs/*
 
 # Development evidence
 batch2_evidence.txt
+
+# Generated runtime exports
+exports/receipts/*.pdf
+exports/reports/*.csv
+exports/students/*
+
+# Runtime notification artifacts
+exports/notifications/*
+
+# User-uploaded runtime data
+uploads/photos/*
+uploads/signatures/*
+
+# Local SQLite database and backups
+database/*.db
+database/*.db-shm
+database/*.db-wal
+database/*.db.*
