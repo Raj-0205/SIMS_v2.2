@@ -75,6 +75,18 @@ def test_standalone_cli_execution():
     assert "Required Tables Verified" in res.stdout
 
 
+def test_test_database_isolation_invariant():
+    """Verify that tests execute against an isolated test DB and never against production/development DB."""
+    from core.database.engine import DatabaseEngine
+    resolved_db = DatabaseEngine.database_path()
+    dev_db = (PROJECT_ROOT / "database" / "sims.db").resolve()
+    assert resolved_db is not None, "DatabaseEngine database_path() returned None"
+    assert resolved_db != dev_db, (
+        f"CRITICAL ISOLATION INVARIANT VIOLATION: Active DB '{resolved_db}' matches "
+        f"development DB '{dev_db}'"
+    )
+
+
 if __name__ == "__main__":
     print("Running test_verification_passes...")
     test_verification_passes()
@@ -82,4 +94,6 @@ if __name__ == "__main__":
     test_database_unmodified_by_verification()
     print("Running test_standalone_cli_execution...")
     test_standalone_cli_execution()
+    print("Running test_test_database_isolation_invariant...")
+    test_test_database_isolation_invariant()
     print("All tests passed successfully!")

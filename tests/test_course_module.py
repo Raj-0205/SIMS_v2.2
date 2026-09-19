@@ -190,12 +190,29 @@ class TestCourseModule(unittest.TestCase):
 
     def test_12_delete_blocked_by_linked_admissions(self):
         """Verify ConflictError when deleting a course referenced in admission_courses."""
-        # Find a course with linked admissions (e.g. KLIC-EXCEL)
-        klic_excel = self.course_ctrl.get_course_by_code("KLIC-EXCEL")
-        self.assertIsNotNone(klic_excel)
+        code = f"ADM-CRS-{int(time.time() * 1000) % 100000}"
+        cid = self.course_ctrl.create_course({"code": code, "name": "Admission Linked Course", "base_fee": 2500.0})
+
+        unique_mob = f"988{int(time.time() * 1000) % 10000000:07d}"
+        sid = self.student_ctrl.create_student({
+            "first_name": "CourseLinked",
+            "last_name": "Student",
+            "mobile_number": unique_mob,
+            "village": "Chandwad",
+        })
+        self.admission_ctrl.create_admission({
+            "course_id": cid,
+            "student_id": sid,
+            "first_name": "CourseLinked",
+            "last_name": "Student",
+            "mobile_number": unique_mob,
+            "village": "Chandwad",
+            "agreed_fee": 2500.0,
+            "status": "DRAFT",
+        })
 
         with self.assertRaises(ConflictError):
-            self.course_ctrl.delete_course(klic_excel.id)
+            self.course_ctrl.delete_course(cid)
 
     def test_13_delete_blocked_by_linked_batches(self):
         """Verify ConflictError when deleting a course with associated batches."""

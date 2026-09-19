@@ -1,0 +1,5 @@
+# config/testing/database.toml
+# Overrides default database configuration for the testing environment.
+
+[database]
+path = "runtime/test/sims_test.db"
