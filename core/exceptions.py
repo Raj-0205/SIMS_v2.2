@@ -8,6 +8,7 @@ __all__ = [
     "AuthenticationError",
     "ForbiddenError",
     "NotificationDeliveryError",
+    "RateLimitExceededError",
 ]
 
 class ArchitectureViolationError(Exception):
@@ -36,5 +37,9 @@ class ForbiddenError(ServiceError):
 
 class NotificationDeliveryError(ServiceError):
     """Raised when an outbound notification (e.g., email) fails to deliver."""
+    pass
+
+class RateLimitExceededError(AuthenticationError):
+    """Raised when an operation is rate limited or temporarily locked out."""
     pass
 

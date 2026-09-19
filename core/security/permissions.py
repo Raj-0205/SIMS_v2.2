@@ -3,7 +3,7 @@
 from __future__ import annotations
 from enum import Enum
 
-__all__ = ["Permission"]
+__all__ = ["Permission", "SecurityPermission"]
 
 
 class Permission(str, Enum):
@@ -26,3 +26,14 @@ class Permission(str, Enum):
     BATCH_CREATE = "BATCH_CREATE"
     BATCH_MANAGE = "BATCH_MANAGE"
     BATCH_DELETE = "BATCH_DELETE"
+
+
+class SecurityPermission(str, Enum):
+    """
+    Privileged security and recovery governance permissions for SIMS v2.2.
+    Strictly exclusive to the Administrator role.
+    """
+    SECURITY_RECOVERY_MANAGE = "SECURITY_RECOVERY_MANAGE"
+    SECURITY_EMAIL_UPDATE = "SECURITY_EMAIL_UPDATE"
+    ADMIN_PASSWORD_RESET = "ADMIN_PASSWORD_RESET"
+    SECURITY_AUDIT_VIEW = "SECURITY_AUDIT_VIEW"

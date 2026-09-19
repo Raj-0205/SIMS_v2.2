@@ -3,6 +3,8 @@
 import flet as ft
 from ui.screens.login import LoginScreen
 from ui.screens.dashboard import DashboardScreen
+from ui.screens.recovery import PasswordRecoveryScreen
+from ui.screens.break_glass import BreakGlassClaimScreen, BreakGlassRemediationScreen
 from core.security.auth import AuthService
 from core.security.roles import Role
 
@@ -62,6 +64,20 @@ class AppRouter:
         elif target_route == "/login":
             if is_auth:
                 target_route = "/control-center" if user_role == Role.ADMINISTRATOR.value else "/dashboard"
+        elif target_route in ("/recovery", "/break-glass"):
+            if is_auth:
+                target_route = "/control-center" if user_role == Role.ADMINISTRATOR.value else "/dashboard"
+        elif target_route == "/recovery/remediate":
+            # Must hold an active break-glass lease
+            lease_data = None
+            sess = getattr(self.page, "session", None)
+            store = getattr(sess, "store", sess)
+            if hasattr(store, "get"):
+                lease_data = store.get("break_glass_lease")
+            elif isinstance(store, dict):
+                lease_data = store.get("break_glass_lease")
+            if not lease_data or not lease_data.get("lease_granted"):
+                target_route = "/login"
         else:
             # 3. Unknown route fallback
             default_home = "/control-center" if user_role == Role.ADMINISTRATOR.value else "/dashboard"
@@ -78,6 +94,18 @@ class AppRouter:
             if not self.page.views or self.page.views[-1].route != "/login":
                 self.page.views.clear()
                 self.page.views.append(ft.View(route="/login", controls=[LoginScreen(self.page)]))
+        elif target_route == "/recovery":
+            self.dashboard = None
+            self.page.views.clear()
+            self.page.views.append(ft.View(route="/recovery", controls=[PasswordRecoveryScreen(self.page)]))
+        elif target_route == "/break-glass":
+            self.dashboard = None
+            self.page.views.clear()
+            self.page.views.append(ft.View(route="/break-glass", controls=[BreakGlassClaimScreen(self.page)]))
+        elif target_route == "/recovery/remediate":
+            self.dashboard = None
+            self.page.views.clear()
+            self.page.views.append(ft.View(route="/recovery/remediate", controls=[BreakGlassRemediationScreen(self.page)]))
         else:
             if self.page.views and self.page.views[-1].route == "/" and self.dashboard is not None:
                 self.dashboard.mount_view(target_route)

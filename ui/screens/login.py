@@ -81,6 +81,16 @@ class LoginScreen(ft.Container):
             on_click=self.handle_login_step1,
         )
 
+        self.forgot_pwd_btn = ft.TextButton(
+            content=ft.Text("Forgot Password?", size=12, color=AppTheme.PRIMARY),
+            on_click=lambda _: self._page.navigate("/recovery"),
+        )
+
+        self.break_glass_btn = ft.TextButton(
+            content=ft.Text("Emergency Break-Glass", size=12, color=AppTheme.DANGER),
+            on_click=lambda _: self._page.navigate("/break-glass"),
+        )
+
         # Step 2 (OTP) Controls
         self.otp_info_text = ft.Text(
             "",
@@ -197,6 +207,15 @@ class LoginScreen(ft.Container):
                     self.password_field,
                     self.status_message,
                     self.step1_btn,
+                    ft.Row(
+                        controls=[
+                            self.forgot_pwd_btn,
+                            ft.Text("•", color=AppTheme.TEXT_SECONDARY),
+                            self.break_glass_btn,
+                        ],
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        spacing=6,
+                    ),
                 ],
             )
         else:

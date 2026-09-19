@@ -11,10 +11,12 @@ from argon2.exceptions import InvalidHashError, VerifyMismatchError
 
 from core.configuration.service import ConfigService
 from core.database.transaction import TransactionManager
-from core.exceptions import AuthenticationError
+from core.exceptions import AuthenticationError, ForbiddenError, ValidationError
 from core.logger.service import LogService
 from core.security.context import SecurityContext
-from core.security.otp import OTPService
+from core.security.otp import OTPService, OTPPurpose
+from core.security.permissions import Permission, SecurityPermission
+from core.security.authorization import AuthorizationService
 from core.security.roles import Role
 from core.security.audit import SecurityAuditRepository
 from infrastructure.notification.service import NotificationService
@@ -74,6 +76,10 @@ class AuthService:
     @classmethod
     def verify_password(cls, password_hash: str, password: str) -> bool:
         """Return True when the supplied password matches the stored hash."""
+        if not password_hash or not password:
+            return False
+        if not str(password_hash).startswith("$") and str(password).startswith("$"):
+            password_hash, password = password, password_hash
         try:
             return cls._password_hasher.verify(password_hash, password)
         except (VerifyMismatchError, InvalidHashError, Exception):
@@ -362,6 +368,255 @@ class AuthService:
                 "masked_email": cls._mask_email(admin_email),
             }
 
+    # --- Password & Governance Ceremonies ---
+
+    @classmethod
+    def change_password(
+        cls,
+        user_id: int,
+        current_password: str,
+        new_password: str,
+    ) -> dict[str, Any]:
+        """
+        Allows an authenticated user to change their own password upon verifying their current password.
+        Bumps security_version and rotates security_stamp, terminating other concurrent sessions.
+        """
+        if not new_password or len(new_password) < 8:
+            raise ValidationError("New password must be at least 8 characters long.")
+
+        with cls._transaction():
+            repo = UserRepository()
+            auditor = SecurityAuditRepository()
+            user = repo.get_by_id(user_id)
+            if not user or not bool(user.get("is_active", 1)):
+                raise AuthenticationError("User not found or account is inactive.")
+
+            if not cls.verify_password(user["password_hash"], current_password):
+                auditor.insert(
+                    entity_type="SECURITY",
+                    entity_id=user_id,
+                    action="PASSWORD_CHANGE_FAILURE",
+                    actor_name=user["username"],
+                    actor_id=user_id,
+                    details="Incorrect current password provided during password change attempt",
+                )
+                raise AuthenticationError("Current password is incorrect.")
+
+            new_hash = cls.hash_password(new_password)
+            new_ver, new_stamp = repo.update_password(user_id, new_hash)
+
+            auditor.insert(
+                entity_type="SECURITY",
+                entity_id=user_id,
+                action="PASSWORD_CHANGE_SUCCESS",
+                actor_name=user["username"],
+                actor_id=user_id,
+                details=f"Password changed successfully. Monotonic version bumped to {new_ver}.",
+            )
+
+            if user.get("email"):
+                try:
+                    NotificationService.send_password_changed_alert(
+                        recipient_email=user["email"].strip(),
+                        username=user["username"],
+                        change_type="Direct Password Change",
+                    )
+                except Exception:
+                    pass
+
+            return {
+                "success": True,
+                "security_version": new_ver,
+                "security_stamp": new_stamp,
+            }
+
+    @classmethod
+    def initiate_admin_password_reset(
+        cls,
+        administrator_user_id: Any = None,
+        administrator_password: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """
+        Step 1 of Administrator-controlled Admin Password Reset ceremony:
+        1. Validates Administrator identity & elevated privilege (ADMIN_PASSWORD_RESET).
+        2. Re-authenticates Administrator password.
+        3. Issues a purpose-scoped OTP challenge to the Administrator's registered email.
+        """
+        if isinstance(administrator_user_id, str) and administrator_password is None:
+            administrator_password = administrator_user_id
+            administrator_user_id = None
+
+        if administrator_user_id is None:
+            curr = SecurityContext.current_user()
+            if not curr:
+                raise ForbiddenError("Authentication required to reset Admin password.")
+            administrator_user_id = curr.id
+
+        if not administrator_password:
+            raise AuthenticationError("Administrator re-authentication password is required.")
+
+        with cls._transaction():
+            repo = UserRepository()
+            auditor = SecurityAuditRepository()
+
+            admin_user = repo.get_by_id(int(administrator_user_id))
+            if not admin_user or str(admin_user.get("role", "")).upper() != Role.ADMINISTRATOR.value:
+                raise ForbiddenError("Only elevated Administrators may reset the Admin password.")
+
+            AuthorizationService.check_permission(
+                Role.ADMINISTRATOR.value, SecurityPermission.ADMIN_PASSWORD_RESET
+            )
+
+            if not cls.verify_password(admin_user["password_hash"], administrator_password):
+                auditor.insert(
+                    entity_type="SECURITY",
+                    entity_id=administrator_user_id,
+                    action="ADMIN_RESET_AUTH_FAILURE",
+                    actor_name=admin_user["username"],
+                    actor_id=administrator_user_id,
+                    details="Invalid Administrator re-authentication password for Admin password reset ceremony",
+                )
+                raise AuthenticationError("Administrator re-authentication failed: incorrect password.")
+
+            email = admin_user.get("email")
+            if not email or not email.strip():
+                raise ValidationError("Administrator account has no registered email to deliver verification OTP.")
+
+            otp_service = OTPService(repo)
+            challenge_token, plain_otp = otp_service.create_challenge(
+                user_id=int(administrator_user_id),
+                purpose=OTPPurpose.ADMIN_PASSWORD_RESET,
+            )
+
+            NotificationService.send_admin_reset_otp_email(
+                recipient_email=email.strip(),
+                username=admin_user["username"],
+                otp_code=plain_otp,
+                ttl_minutes=ConfigService.session().otp_ttl_seconds // 60,
+            )
+
+            auditor.insert(
+                entity_type="SECURITY",
+                entity_id=administrator_user_id,
+                action="ADMIN_RESET_OTP_DISPATCHED",
+                actor_name=admin_user["username"],
+                actor_id=administrator_user_id,
+                details=f"Admin password reset authorization OTP dispatched to {cls._mask_email(email)}",
+            )
+
+            return {
+                "challenge_token": challenge_token,
+                "masked_email": cls._mask_email(email),
+            }
+
+    @classmethod
+    def complete_admin_password_reset(
+        cls,
+        *args: Any,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """
+        Step 2 of Administrator-controlled Admin Password Reset ceremony:
+        1. Validates the OTP with expected purpose ADMIN_PASSWORD_RESET.
+        2. Applies the new Argon2id password hash to the target Admin user account.
+        3. Rotates Admin user's security stamp and increments security version (instantly invalidating active Admin sessions).
+        4. Writes an immutable audit trail entry.
+        """
+        administrator_user_id = kwargs.get("administrator_user_id")
+        challenge_token = kwargs.get("challenge_token")
+        submitted_otp = kwargs.get("submitted_otp")
+        new_admin_password = kwargs.get("new_admin_password")
+        target_admin_username = kwargs.get("target_admin_username", "admin")
+
+        if args:
+            if len(args) >= 4 and isinstance(args[0], int):
+                administrator_user_id = args[0]
+                challenge_token = args[1]
+                submitted_otp = args[2]
+                new_admin_password = args[3]
+                if len(args) >= 5:
+                    target_admin_username = args[4]
+            elif len(args) >= 3 and isinstance(args[0], str):
+                challenge_token = args[0]
+                submitted_otp = args[1]
+                new_admin_password = args[2]
+                if len(args) >= 4:
+                    if isinstance(args[3], int):
+                        administrator_user_id = args[3]
+                    elif isinstance(args[3], str):
+                        target_admin_username = args[3]
+                if len(args) >= 5:
+                    target_admin_username = args[4]
+
+        if not new_admin_password or len(new_admin_password) < 8:
+            raise ValidationError("New Admin password must be at least 8 characters long.")
+
+        with cls._transaction():
+            repo = UserRepository()
+            auditor = SecurityAuditRepository()
+
+            otp_service = OTPService(repo)
+            try:
+                verified_uid = otp_service.verify_challenge(
+                    challenge_token=challenge_token,
+                    submitted_otp=submitted_otp,
+                    expected_purpose=OTPPurpose.ADMIN_PASSWORD_RESET,
+                )
+            except AuthenticationError:
+                if administrator_user_id:
+                    user_row = repo.get_by_id(int(administrator_user_id))
+                    actor_name = user_row["username"] if user_row else "UNKNOWN"
+                else:
+                    actor_name = "UNKNOWN"
+                auditor.insert(
+                    entity_type="SECURITY",
+                    entity_id=administrator_user_id or 0,
+                    action="ADMIN_RESET_OTP_FAILURE",
+                    actor_name=actor_name,
+                    actor_id=administrator_user_id,
+                    details="Invalid or expired OTP submitted during Admin password reset completion",
+                )
+                raise
+
+            if administrator_user_id and int(verified_uid) != int(administrator_user_id):
+                raise AuthenticationError("OTP challenge authorization mismatch.")
+
+            admin_user = repo.get_by_id(int(verified_uid))
+            if not admin_user or str(admin_user.get("role", "")).upper() != Role.ADMINISTRATOR.value:
+                raise ForbiddenError("Only elevated Administrators may reset the Admin password.")
+
+            # Find target Admin account
+            target_admin = repo.get_by_username(target_admin_username)
+            if not target_admin and target_admin_username == "admin":
+                # Fallback: locate any account with role 'ADMIN'
+                all_users = repo.list_all()
+                for u in all_users:
+                    if str(u.get("role", "")).upper() == Role.ADMIN.value:
+                        target_admin = u
+                        break
+
+            if not target_admin or str(target_admin.get("role", "")).upper() != Role.ADMIN.value:
+                raise ValidationError(f"Target Admin account '{target_admin_username}' not found.")
+
+            target_admin_id = int(target_admin["id"])
+            new_hash = cls.hash_password(new_admin_password)
+            new_ver, new_stamp = repo.update_password(target_admin_id, new_hash)
+
+            auditor.insert(
+                entity_type="SECURITY",
+                entity_id=target_admin_id,
+                action="ADMIN_PASSWORD_RESET_COMPLETED",
+                actor_name=admin_user["username"],
+                actor_id=administrator_user_id,
+                details=f"Admin password reset completed by Administrator '{admin_user['username']}'. Admin sessions invalidated.",
+            )
+
+            return {
+                "success": True,
+                "target_username": target_admin["username"],
+                "target_security_version": new_ver,
+            }
+
     # --- Session Management ---
 
     @classmethod
@@ -417,24 +672,48 @@ class AuthService:
             session.clear()
 
     @classmethod
-    def login(cls, page: ft.Page, user: dict[str, Any]) -> None:
+    def login(
+        cls,
+        page: ft.Page,
+        user: Any,
+        password: Optional[str] = None,
+    ) -> Optional[dict[str, Any]]:
         """Store authenticated state in the current transient Flet session."""
+        if isinstance(user, str) and password is not None:
+            res = cls.authenticate(user, password)
+            user_data = res.get("user")
+        elif isinstance(user, dict):
+            user_data = user
+        else:
+            user_data = None
+
+        if not user_data:
+            return None
+
         session = cls._get_session(page)
         now_ts = datetime.now(timezone.utc).timestamp()
 
+        sec_ver = user_data.get("security_version", 1)
+        sec_stamp = user_data.get("security_stamp", "")
+
         cls._session_set(session, "authenticated", True)
-        cls._session_set(session, "user_id", user["id"])
-        cls._session_set(session, "username", user["username"])
-        cls._session_set(session, "role", user["role"])
+        cls._session_set(session, "user_id", user_data["id"])
+        cls._session_set(session, "username", user_data["username"])
+        cls._session_set(session, "role", user_data["role"])
+        cls._session_set(session, "security_version", sec_ver)
+        cls._session_set(session, "security_stamp", sec_stamp)
         cls._session_set(session, "login_timestamp", now_ts)
         cls._session_set(session, "last_activity_timestamp", now_ts)
 
-        SecurityContext.set_current_user(user["id"], user["username"], user["role"])
+        SecurityContext.set_current_user(
+            user_data["id"], user_data["username"], user_data["role"], sec_ver, sec_stamp
+        )
 
         LogService.info(
-            f"Session started for user '{user['username']}' with role '{user['role']}'.",
+            f"Session started for user '{user_data['username']}' with role '{user_data['role']}'.",
             context="AUTH",
         )
+        return user_data
 
     @classmethod
     def logout(cls, page: ft.Page) -> None:
@@ -450,12 +729,59 @@ class AuthService:
         )
 
     @classmethod
+    def validate_session_state(cls, page: ft.Page) -> bool:
+        """
+        Validates the ambient session against the authoritative database security state.
+        Detects if a credential change or explicit revocation occurred in another session/thread.
+        """
+        session = cls._get_session(page)
+        user_id = cls._session_get(session, "user_id")
+        if not user_id:
+            return False
+
+        sess_ver = cls._session_get(session, "security_version")
+        sess_stamp = cls._session_get(session, "security_stamp")
+
+        # If not set, allow backward compatibility
+        if sess_ver is None and not sess_stamp:
+            return True
+
+        with cls._transaction():
+            user = UserRepository().get_by_id(int(user_id))
+            if not user or not bool(user.get("is_active", 1)):
+                cls.logout(page)
+                return False
+
+            db_ver = user.get("security_version", 1)
+            db_stamp = user.get("security_stamp", "")
+
+            if sess_ver is not None and int(sess_ver) != int(db_ver):
+                LogService.warning(
+                    f"Session invalidated: security_version mismatch for user_id={user_id} (session={sess_ver}, db={db_ver})",
+                    context="AUTH",
+                )
+                cls.logout(page)
+                return False
+
+            if sess_stamp is not None and sess_stamp != "" and sess_stamp != db_stamp:
+                LogService.warning(
+                    f"Session invalidated: security_stamp mismatch for user_id={user_id}",
+                    context="AUTH",
+                )
+                cls.logout(page)
+                return False
+
+        return True
+
+    @classmethod
     def is_authenticated(cls, page: ft.Page) -> bool:
         """Return True when the current Flet session is authenticated and active."""
         session = cls._get_session(page)
         if cls._session_get(session, "authenticated") is not True:
             return False
         if cls.check_session_timeout(page):
+            return False
+        if not cls.validate_session_state(page):
             return False
         return True
 
@@ -493,9 +819,13 @@ class AuthService:
 
         # Session active; touch activity timestamp and ensure SecurityContext
         cls._session_set(session, "last_activity_timestamp", now_ts)
+        sec_ver = cls._session_get(session, "security_version")
+        sec_stamp = cls._session_get(session, "security_stamp")
         SecurityContext.set_current_user(
             cls._session_get(session, "user_id"),
             cls._session_get(session, "username"),
             cls._session_get(session, "role"),
+            sec_ver,
+            sec_stamp,
         )
         return False

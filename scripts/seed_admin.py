@@ -18,6 +18,10 @@ from core.security.auth import AuthService
 from modules.users.repository import UserRepository
 
 
+import argparse
+from core.security.recovery import RecoveryKeyService
+
+
 def _read_password(username: str) -> str:
     """Read a non-empty password securely from environment or terminal."""
     password = os.getenv("SIMS_ADMIN_PASS")
@@ -39,8 +43,12 @@ def _read_password(username: str) -> str:
     return password
 
 
-def seed_admin() -> int:
-    """Create the initial administrative user when it does not exist."""
+def seed_admin(
+    is_administrator: bool = False,
+    custom_username: str | None = None,
+    custom_email: str | None = None,
+) -> int:
+    """Create an administrative user (Admin or Administrator) when it does not exist."""
     print("Initializing authentication database...")
 
     ConfigService.initialize()
@@ -48,10 +56,17 @@ def seed_admin() -> int:
     MigrationEngine.initialize()
     MigrationEngine.upgrade()
 
-    username = os.getenv("SIMS_ADMIN_USER", "admin").strip()
+    target_role = "ADMINISTRATOR" if is_administrator else "ADMIN"
+    default_name = "administrator" if is_administrator else "admin"
+    username = (custom_username or os.getenv("SIMS_ADMIN_USER", default_name)).strip()
+    email = (custom_email or os.getenv("SIMS_ADMIN_EMAIL", "")).strip() or None
 
     if not username:
-        print("[X] SIMS_ADMIN_USER cannot be empty.")
+        print("[X] Username cannot be empty.")
+        return 1
+
+    if is_administrator and not email:
+        print("[X] Administrator account requires an email address (--email or SIMS_ADMIN_EMAIL).")
         return 1
 
     repository = UserRepository()
@@ -87,24 +102,66 @@ def seed_admin() -> int:
         user_id = repository.create_user(
             username=username,
             password_hash=password_hash,
-            role="ADMIN",
+            role=target_role,
+            email=email,
         )
 
         TransactionManager.commit()
 
         print(
-            f"[✓] Admin user '{username}' seeded successfully "
+            f"[✓] {target_role} user '{username}' seeded successfully "
             f"with id={user_id}."
         )
+
+        # Provision recovery key for Administrator
+        if is_administrator:
+            TransactionManager.begin()
+            try:
+                formatted_key, key_id, deliv = RecoveryKeyService.issue_recovery_key(
+                    user_id=user_id,
+                    user_repo=repository,
+                    send_email=True,
+                )
+                TransactionManager.commit()
+                print("=" * 65)
+                print("CRITICAL: BREAK-GLASS EMERGENCY RECOVERY KEY GENERATED")
+                print("=" * 65)
+                print(f"Key Identifier: {key_id}")
+                print(f"Recovery Key:   {formatted_key}")
+                print(f"Email Delivery: {deliv}")
+                print("=" * 65)
+                print("Store this key securely in an encrypted vault or password manager.")
+                print("=" * 65)
+            except Exception as k_exc:
+                if TransactionManager.in_transaction():
+                    TransactionManager.rollback()
+                print(f"[!] Warning: Failed to generate recovery key: {k_exc}")
+
         return 0
 
     except Exception as exc:
         if TransactionManager.in_transaction():
             TransactionManager.rollback()
 
-        print(f"[X] Failed to create admin user: {exc}")
+        print(f"[X] Failed to create user: {exc}")
         return 1
 
 
 if __name__ == "__main__":
-    raise SystemExit(seed_admin())
+    parser = argparse.ArgumentParser(description="Seed initial SIMS administrative users.")
+    parser.add_argument(
+        "--administrator",
+        action="store_true",
+        help="Seed elevated Administrator account (requires email)",
+    )
+    parser.add_argument("--username", help="Account username (defaults to 'admin' or 'administrator')")
+    parser.add_argument("--email", help="Account email address (mandatory for Administrator)")
+    args = parser.parse_args()
+
+    raise SystemExit(
+        seed_admin(
+            is_administrator=args.administrator,
+            custom_username=args.username,
+            custom_email=args.email,
+        )
+    )

@@ -68,8 +68,8 @@ def isolated_test_database():
 
     # Verify migration completion
     current_ver = MigrationEngine.current_version()
-    assert current_ver == 14, (
-        f"Expected schema version 14 after migration upgrade, but got {current_ver}"
+    assert current_ver == 15, (
+        f"Expected schema version 15 after migration upgrade, but got {current_ver}"
     )
 
     # Ensure baseline test admin user exists for foreign key references

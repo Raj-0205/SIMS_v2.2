@@ -1,6 +1,7 @@
 # core/security/otp.py
 
 from __future__ import annotations
+from enum import Enum
 import hashlib
 import hmac
 import secrets
@@ -12,7 +13,15 @@ from core.exceptions import AuthenticationError
 from core.logger.service import LogService
 from modules.users.repository import UserRepository
 
-__all__ = ["OTPService"]
+__all__ = ["OTPService", "OTPPurpose"]
+
+
+class OTPPurpose(str, Enum):
+    LOGIN = "LOGIN"
+    PASSWORD_RESET = "PASSWORD_RESET"
+    ADMIN_PASSWORD_RESET = "ADMIN_PASSWORD_RESET"
+    EMAIL_CHANGE_CURRENT = "EMAIL_CHANGE_CURRENT"
+    EMAIL_CHANGE_NEW = "EMAIL_CHANGE_NEW"
 
 
 class OTPService:
@@ -24,6 +33,7 @@ class OTPService:
     2. Zero plain OTP persistence: only salted cryptographic hashes are saved.
     3. Strict TTL enforcement.
     4. Single-use and attempt exhaustion protections.
+    5. Purpose-scoped isolation (login vs password reset vs email change).
     """
 
     def __init__(self, user_repo: UserRepository | None = None) -> None:
@@ -50,21 +60,26 @@ class OTPService:
         actual_digest = hashlib.sha256(f"{salt}:{otp_code}".encode("utf-8")).hexdigest()
         return hmac.compare_digest(actual_digest, expected_digest)
 
-    def create_challenge(self, user_id: int) -> Tuple[str, str]:
+    def create_challenge(
+        self,
+        user_id: int,
+        purpose: OTPPurpose | str = OTPPurpose.LOGIN,
+    ) -> Tuple[str, str]:
         """
-        Creates and stores an OTP challenge for the given user.
+        Creates and stores an OTP challenge for the given user and purpose.
 
-        Invalidates any previous unconsumed challenges for this user.
+        Invalidates any previous unconsumed challenges for this user and purpose.
         Returns:
             (challenge_token, plain_otp_code)
         The caller MUST transmit the plain_otp_code to the user and immediately discard it.
         """
+        clean_purpose = purpose.value if isinstance(purpose, OTPPurpose) else str(purpose)
         session_config = ConfigService.session()
         ttl_seconds = session_config.otp_ttl_seconds
         max_attempts = session_config.max_otp_attempts
 
-        # Invalidate existing pending challenges for this user (Resend supersedes previous)
-        self._user_repo.invalidate_pending_challenges_for_user(user_id)
+        # Invalidate existing pending challenges for this user and purpose
+        self._user_repo.invalidate_pending_challenges_for_user(user_id, purpose=clean_purpose)
 
         plain_otp = self._generate_numeric_code()
         otp_hash = self._hash_otp(plain_otp)
@@ -80,17 +95,23 @@ class OTPService:
             otp_hash=otp_hash,
             expires_at=expires_at_str,
             max_attempts=max_attempts,
+            purpose=clean_purpose,
         )
 
         LogService.info(
-            f"Created OTP challenge for user_id={user_id} (token={challenge_token[:8]}...)",
+            f"Created OTP challenge for user_id={user_id} purpose={clean_purpose} (token={challenge_token[:8]}...)",
             context="OTP",
         )
         return challenge_token, plain_otp
 
-    def verify_challenge(self, challenge_token: str, submitted_otp: str) -> int:
+    def verify_challenge(
+        self,
+        challenge_token: str,
+        submitted_otp: str,
+        expected_purpose: OTPPurpose | str = OTPPurpose.LOGIN,
+    ) -> int:
         """
-        Verifies an OTP challenge.
+        Verifies an OTP challenge matching the expected purpose.
 
         Returns:
             user_id of the authenticated user upon success.
@@ -98,6 +119,9 @@ class OTPService:
         Raises:
             AuthenticationError with safe, specific diagnostics if invalid, expired, or exhausted.
         """
+        clean_expected_purpose = (
+            expected_purpose.value if isinstance(expected_purpose, OTPPurpose) else str(expected_purpose)
+        )
         challenge = self._user_repo.get_otp_challenge(challenge_token)
         if not challenge:
             raise AuthenticationError("Invalid or nonexistent OTP verification challenge.")
@@ -107,6 +131,15 @@ class OTPService:
 
         if bool(challenge.get("is_consumed")):
             raise AuthenticationError("This verification code has already been used.")
+
+        # Check purpose isolation
+        actual_purpose = str(challenge.get("purpose") or "LOGIN")
+        if actual_purpose != clean_expected_purpose:
+            LogService.warning(
+                f"Mismatched OTP purpose: expected {clean_expected_purpose}, found {actual_purpose}",
+                context="OTP",
+            )
+            raise AuthenticationError("Invalid verification code for this operation.")
 
         # Check expiration
         expires_at_str = challenge["expires_at"]
