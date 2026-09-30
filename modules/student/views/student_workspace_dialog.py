@@ -14,6 +14,8 @@ from modules.student.controller import StudentController
 from modules.student.dto import StudentDTO, StudentWorkspaceDTO
 from modules.student.views.student_form_modal import StudentFormModal
 from shared.utils.formatting import format_whatsapp_url, format_file_size
+from shared.utils.file_dialog import pick_file
+from shared.utils.os_helper import open_path_externally
 from ui.themes.theme import AppTheme
 
 __all__ = ["StudentWorkspaceDialog"]
@@ -95,9 +97,13 @@ class StudentWorkspaceDialog(ft.AlertDialog):
     @property
     def safe_page(self) -> Optional[ft.Page]:
         try:
-            return self.page
+            return getattr(self, "_root_page", None) or self.page or getattr(self, "_page", None)
         except (RuntimeError, AttributeError):
-            return getattr(self, "_page", None)
+            return getattr(self, "_root_page", None) or getattr(self, "_page", None)
+
+    @property
+    def student_dto(self) -> StudentDTO:
+        return self.workspace_data.student
 
     def _safe_update(self) -> None:
         p = self.safe_page
@@ -615,7 +621,7 @@ class StudentWorkspaceDialog(ft.AlertDialog):
 
             def open_pdf(e, pth=r_pdf):
                 if pth and Path(pth).exists():
-                    subprocess.Popen(["xdg-open", pth])
+                    open_path_externally(pth)
                 else:
                     self.show_toast("PDF receipt file not found on disk.", is_error=True)
 
@@ -802,19 +808,12 @@ class StudentWorkspaceDialog(ft.AlertDialog):
         student = self.workspace_data.student
 
         def trigger_upload(doc_type: str):
-            """Uses Zenity / file dialog to select real file and upload under <= 100 KB check."""
+            """Uses cross-platform file dialog to select real file and upload under <= 100 KB check."""
             try:
-                result = subprocess.run(
-                    ["zenity", "--file-selection", f"--title=Select Student {doc_type.title()} (<= 100 KB)", "--file-filter=Images (*.jpg *.jpeg *.png) | *.jpg *.jpeg *.png *.JPG *.JPEG *.PNG"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                )
-                selected_path = result.stdout.strip()
-                if not selected_path or not Path(selected_path).is_file():
+                p = pick_file(title=f"Select Student {doc_type.title()} (<= 100 KB)", allowed_extensions=[".jpg", ".jpeg", ".png"])
+                if not p or not p.is_file():
                     return
 
-                p = Path(selected_path)
                 if p.suffix.lower() not in (".jpg", ".jpeg", ".png"):
                     self.show_toast("Invalid file format. Only JPG, JPEG, and PNG images are allowed.", is_error=True)
                     return

@@ -91,10 +91,13 @@ class SettingsHome(ft.Container):
 
     @property
     def safe_page(self) -> Optional[ft.Page]:
+        p = getattr(self, "_root_page", None) or getattr(self, "_page", None)
+        if p:
+            return p
         try:
             return self.page
         except (RuntimeError, AttributeError):
-            return getattr(self, "_page", None)
+            return None
 
     def show_toast(self, message: str, is_error: bool = False, is_success: bool = False) -> None:
         self.toast_text.value = message

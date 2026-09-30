@@ -599,6 +599,42 @@ class StudentRepository(BaseRepository):
         sql = "SELECT 1 FROM admissions WHERE student_id = ? LIMIT 1;"
         return self.exists(sql, (student_id,))
 
+    def get_student_dependency_counts(self, student_id: int) -> dict[str, Any]:
+        """Calculates exact count of relational dependencies attached to a student profile."""
+        adm_row = self.execute_fetchone("SELECT count(*) as cnt FROM admissions WHERE student_id = ?;", (student_id,))
+        pay_row = self.execute_fetchone("SELECT count(*) as cnt, COALESCE(SUM(amount), 0) as total FROM payments WHERE student_id = ?;", (student_id,))
+        rcp_row = self.execute_fetchone("SELECT count(*) as cnt FROM receipts WHERE student_id = ?;", (student_id,))
+        fr_row = self.execute_fetchone("SELECT count(*) as cnt FROM student_friendships WHERE student_id = ? OR friend_student_id = ?;", (student_id, student_id))
+        stud_row = self.execute_fetchone("SELECT photo_path, signature_path FROM students WHERE id = ?;", (student_id,))
+
+        doc_count = 0
+        if stud_row:
+            if stud_row.get("photo_path"):
+                doc_count += 1
+            if stud_row.get("signature_path"):
+                doc_count += 1
+
+        return {
+            "admissions": int(adm_row["cnt"]) if adm_row else 0,
+            "payments": int(pay_row["cnt"]) if pay_row else 0,
+            "payments_total": float(pay_row["total"]) if pay_row else 0.0,
+            "receipts": int(rcp_row["cnt"]) if rcp_row else 0,
+            "friendships": int(fr_row["cnt"]) if fr_row else 0,
+            "documents": doc_count,
+        }
+
+    def delete_student_cascade(self, student_id: int) -> None:
+        """Deletes all child dependencies and student profile strictly within active transaction."""
+        self.execute("DELETE FROM receipts WHERE student_id = ?;", (student_id,))
+        self.execute("DELETE FROM payments WHERE student_id = ?;", (student_id,))
+        self.execute("""
+            DELETE FROM admission_courses 
+            WHERE admission_id IN (SELECT id FROM admissions WHERE student_id = ?);
+        """, (student_id,))
+        self.execute("DELETE FROM student_friendships WHERE student_id = ? OR friend_student_id = ?;", (student_id, student_id))
+        self.execute("DELETE FROM admissions WHERE student_id = ?;", (student_id,))
+        self.execute("DELETE FROM students WHERE id = ?;", (student_id,))
+
     def delete(self, student_id: int) -> int:
         sql = "DELETE FROM students WHERE id = ?;"
         return self.execute(sql, (student_id,))

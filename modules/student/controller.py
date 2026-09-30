@@ -75,6 +75,10 @@ class StudentController:
         )
         self.service.update_student(dto)
 
+    def get_deletion_impact(self, student_id: int) -> dict[str, Any]:
+        """Calculates relational deletion impact via service."""
+        return self.service.get_deletion_impact(student_id)
+
     def delete_student(self, student_id: int) -> None:
         """Deletes student record via service."""
         self.service.delete_student(student_id)
@@ -82,6 +86,10 @@ class StudentController:
     def get_student(self, student_id: int) -> StudentDTO:
         """Fetches full student profile by ID."""
         return self.service.get_student(student_id)
+
+    def get_by_mobile(self, mobile_number: str) -> Optional[StudentDTO]:
+        """Fetches full student profile by mobile number."""
+        return self.service.get_by_mobile(mobile_number)
 
     def get_student_workspace(self, student_id: int) -> StudentWorkspaceDTO:
         """Fetches aggregate data required by the Student Workspace."""

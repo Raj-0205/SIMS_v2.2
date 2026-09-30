@@ -1,10 +1,13 @@
 # core/exceptions.py
+from typing import Any
 
 __all__ = [
     "ArchitectureViolationError",
     "ServiceError",
     "ValidationError",
     "ConflictError",
+    "NotFoundError",
+    "EntityNotFoundError",
     "AuthenticationError",
     "ForbiddenError",
     "NotificationDeliveryError",
@@ -26,6 +29,18 @@ class ValidationError(ServiceError):
 class ConflictError(ServiceError):
     """Raised when there is a data conflict (e.g., duplicate records, foreign key constraint)."""
     pass
+
+class NotFoundError(ServiceError):
+    """Raised when a requested resource or entity is not found."""
+    pass
+
+class EntityNotFoundError(NotFoundError):
+    """Raised when a specific domain entity is not found by ID or key."""
+    def __init__(self, entity_name: str = "Entity", entity_id: Any = None) -> None:
+        self.entity_name = entity_name
+        self.entity_id = entity_id
+        msg = f"{entity_name} #{entity_id} not found." if entity_id is not None else f"{entity_name} not found."
+        super().__init__(msg)
 
 class AuthenticationError(ServiceError):
     """Raised when authentication credentials or verification fails."""

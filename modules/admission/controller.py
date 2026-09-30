@@ -179,6 +179,14 @@ class AdmissionController:
     def cancel_admission(self, admission_id: int, reason: str, actor_id: Optional[int] = None) -> bool:
         return self.service.cancel_admission(admission_id=admission_id, reason=reason, actor_id=actor_id)
 
+    def get_deletion_impact(self, admission_id: int) -> dict[str, Any]:
+        """Calculates relational deletion impact via service."""
+        return self.service.get_deletion_impact(admission_id)
+
+    def delete_admission(self, admission_id: int, actor_id: Optional[int] = None) -> None:
+        """Permanently deletes admission and linked records via service."""
+        self.service.delete_admission(admission_id=admission_id, actor_id=actor_id)
+
     def export_admissions_csv(self, raw_filter: Mapping[str, Any], target_path: Optional[str] = None) -> str:
         raw_sorts = raw_filter.get("sorts") or raw_filter.get("sort_keys") or [("id", "desc")]
         sort_keys = list(raw_sorts)

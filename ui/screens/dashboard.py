@@ -11,6 +11,7 @@ from ui.layout.content_host import ContentHost
 from modules.student.views.student_home import StudentHome
 from modules.admission.views.admission_home import AdmissionHome
 from modules.course.views.course_home import CourseHome
+from modules.batch.views.batch_home import BatchHome
 from modules.reports.views.reports_home import ReportsHome
 from modules.settings.views.settings_home import SettingsHome
 from modules.admission.controller import AdmissionController
@@ -248,16 +249,117 @@ class DashboardHome(ft.Container):
                 )
             self.recent_table.rows = rows
 
-            if self.page:
+            try:
                 self.update()
+            except Exception:
+                pass
         except Exception:
             pass
+
+
+class ErrorRecoveryView(ft.Container):
+    """
+    Actionable Error Recovery View for SIMS v2.2.
+    Renders when a route or screen fails to mount/load data,
+    providing error diagnostics, a 'Go Back' action, a 'Retry' action,
+    and a 'Return to Dashboard' button.
+    """
+
+    def __init__(
+        self,
+        route: str,
+        error_message: str,
+        on_retry: Optional[Callable[[], None]] = None,
+        on_back: Optional[Callable[[], None]] = None,
+        on_dashboard: Optional[Callable[[], None]] = None,
+    ) -> None:
+        super().__init__(
+            expand=True,
+            padding=ft.Padding(AppTheme.PAD_LG, AppTheme.PAD_LG, AppTheme.PAD_LG, AppTheme.PAD_LG),
+            bgcolor=AppTheme.BACKGROUND,
+            alignment=ft.Alignment(0, 0),
+        )
+
+        card = ft.Container(
+            width=640,
+            padding=AppTheme.PAD_LG,
+            bgcolor=AppTheme.SURFACE,
+            border_radius=AppTheme.RADIUS_LG,
+            border=ft.Border.all(1, AppTheme.DANGER_LIGHT),
+            content=ft.Column(
+                controls=[
+                    ft.Row(
+                        controls=[
+                            ft.Icon(ft.Icons.ERROR_OUTLINE, color=AppTheme.DANGER, size=32),
+                            ft.Column(
+                                controls=[
+                                    ft.Text("Screen Load Failure", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
+                                    ft.Text(f"Failed to initialize view for: {route}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
+                                ],
+                                spacing=2,
+                            ),
+                        ],
+                        spacing=AppTheme.PAD_MD,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    ft.Divider(height=1, color=AppTheme.BORDER),
+                    ft.Text(
+                        "An unexpected error occurred while loading this module. Full forensics have been recorded in the application log.",
+                        size=AppTheme.SIZE_BODY,
+                        color=AppTheme.TEXT_SECONDARY,
+                    ),
+                    ft.Container(
+                        content=ft.Text(
+                            error_message or "Unknown exception",
+                            size=AppTheme.SIZE_CAPTION,
+                            font_family="monospace",
+                            color=AppTheme.DANGER,
+                            selectable=True,
+                        ),
+                        bgcolor=AppTheme.DANGER_LIGHT,
+                        border_radius=AppTheme.RADIUS_MD,
+                        padding=AppTheme.PAD_MD,
+                        width=600,
+                    ),
+                    ft.Row(
+                        controls=[
+                            ft.FilledButton(
+                                "Go Back",
+                                icon=ft.Icons.ARROW_BACK,
+                                style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE),
+                                on_click=lambda _: on_back() if on_back else None,
+                            ),
+                            ft.OutlinedButton(
+                                "Retry",
+                                icon=ft.Icons.REFRESH,
+                                on_click=lambda _: on_retry() if on_retry else None,
+                            ),
+                            ft.TextButton(
+                                "Return to Dashboard",
+                                on_click=lambda _: on_dashboard() if on_dashboard else None,
+                            ),
+                        ],
+                        spacing=AppTheme.PAD_SM,
+                        alignment=ft.MainAxisAlignment.END,
+                    ),
+                ],
+                spacing=AppTheme.PAD_MD,
+                tight=True,
+            ),
+        )
+
+        self.content = card
 
 
 class DashboardScreen(ft.Row):
     """Main ERP Dashboard Layout."""
 
-    def __init__(self, page: ft.Page, on_route_request: Callable[[str], None]):
+    def __init__(
+        self,
+        page: ft.Page,
+        on_route_request: Callable[[str], None],
+        on_back_request: Optional[Callable[[], None]] = None,
+    ):
         super().__init__(
             expand=True,
             spacing=0,
@@ -265,6 +367,7 @@ class DashboardScreen(ft.Row):
 
         self._page = page
         self.on_route_request = on_route_request
+        self.on_back_request = on_back_request
 
         self.content_host = ContentHost()
 
@@ -289,26 +392,43 @@ class DashboardScreen(ft.Row):
 
     def mount_view(self, route: str):
         self.nav_menu.set_route(route)
-        if route == "/dashboard":
-            view = DashboardHome(on_navigate=self.on_route_request)
-        elif route == "/students":
-            view = StudentHome()
-        elif route == "/admissions":
-            view = AdmissionHome()
-        elif route == "/courses":
-            view = CourseHome()
-        elif route == "/fees":
-            view = ReportsHome()
-        elif route == "/settings":
-            view = SettingsHome()
-        elif route == "/batch":
-            view = CourseHome()
-        elif route == "/control-center":
-            view = ControlCenterScreen(self._page, on_navigate=self.on_route_request)
-        else:
-            view = DashboardHome(on_navigate=self.on_route_request)
+        try:
+            if route == "/dashboard":
+                view = DashboardHome(on_navigate=self.on_route_request)
+            elif route == "/students":
+                view = StudentHome()
+            elif route == "/admissions":
+                view = AdmissionHome()
+            elif route == "/courses":
+                view = CourseHome()
+            elif route == "/fees":
+                view = ReportsHome()
+            elif route == "/settings":
+                view = SettingsHome()
+            elif route == "/batch":
+                view = BatchHome()
+            elif route == "/control-center":
+                view = ControlCenterScreen(self._page, on_navigate=self.on_route_request)
+            else:
+                view = DashboardHome(on_navigate=self.on_route_request)
 
-        self.content_host.mount(view)
-        if hasattr(view, "load_data"):
-            view.load_data()
+            self.content_host.mount(view)
+            if hasattr(view, "load_data"):
+                view.load_data()
+        except Exception as ex:
+            import logging, traceback
+            from datetime import datetime
+            from core.security.context import SecurityContext
+            current_user = SecurityContext.get_current_user_id() or "anonymous"
+            logging.getLogger("sims.ui").error(
+                f"[UI Forensic Error] User: {current_user} | Route: {route} | Time: {datetime.now().isoformat()} | Error: {str(ex)}\n{traceback.format_exc()}"
+            )
+            recovery_view = ErrorRecoveryView(
+                route=route,
+                error_message=str(ex),
+                on_retry=lambda: self.mount_view(route),
+                on_back=self.on_back_request or (lambda: self.on_route_request("/dashboard")),
+                on_dashboard=lambda: self.on_route_request("/dashboard"),
+            )
+            self.content_host.mount(recovery_view)
 

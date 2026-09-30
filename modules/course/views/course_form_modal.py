@@ -220,12 +220,18 @@ class CourseFormModal(ft.AlertDialog):
             on_fee_updated=on_updated,
             page=target_page,
         )
-        target_page.open(dialog)
+        target_page.show_dialog(dialog)
+
+    def _safe_update(self) -> None:
+        try:
+            self.update()
+        except RuntimeError:
+            pass
 
     def _show_error(self, message: str) -> None:
         self.error_text.value = f"⚠ {message}"
         self.error_container.visible = True
-        self.update()
+        self._safe_update()
 
     def handle_save(self, e: ft.ControlEvent) -> None:
         """Validates inputs and commits course creation or update."""
@@ -268,7 +274,7 @@ class CourseFormModal(ft.AlertDialog):
 
         try:
             self.save_btn.disabled = True
-            self.update()
+            self._safe_update()
 
             if self.is_edit and self.course:
                 self.controller.update_course(self.course.id, payload)
@@ -293,10 +299,11 @@ class CourseFormModal(ft.AlertDialog):
 
     def close_dialog(self, e: Optional[ft.ControlEvent] = None) -> None:
         """Closes the modal safely using Flet's pop_dialog."""
-        try:
-            if self.page:
-                self.page.pop_dialog()
-            elif self._root_page:
-                self._root_page.pop_dialog()
-        except RuntimeError:
-            pass
+        target_page = getattr(self, "_root_page", None)
+        if not target_page:
+            try:
+                target_page = self.page
+            except RuntimeError:
+                target_page = None
+        if target_page:
+            target_page.pop_dialog()

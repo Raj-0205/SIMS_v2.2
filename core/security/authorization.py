@@ -18,6 +18,7 @@ ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
     Role.ADMINISTRATOR: {
         Permission.PAYMENT_PIN_CHANGE,
         Permission.STUDENT_DELETE,
+        Permission.ADMISSION_DELETE,
         Permission.COURSE_CREATE,
         Permission.COURSE_MANAGE,
         Permission.COURSE_DELETE,

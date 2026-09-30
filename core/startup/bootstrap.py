@@ -118,9 +118,9 @@ class ApplicationBootstrapper:
 
             page.title = f"{app_config.name} v{app_config.version}"
             page.window_width = 1280
-            page.window_height = 720
+            page.window_height = 800
             page.window_min_width = 1024
-            page.window_min_height = 768
+            page.window_min_height = 720
             page.theme_mode = ft.ThemeMode.LIGHT
             page.padding = 0
 

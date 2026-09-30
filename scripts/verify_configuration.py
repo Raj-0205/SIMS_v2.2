@@ -1,6 +1,17 @@
-# @Final
-# File: scripts/verify_configuration.py
-# Status: NEW
+import os
+import sys
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+# Auto-detect local virtual environment site-packages if running under system python
+for venv_name in (".venv", "venv"):
+    for lib_dir in ("lib", "lib64"):
+        for sp in (PROJECT_ROOT / venv_name / lib_dir).glob("python*/site-packages"):
+            if sp.is_dir() and str(sp) not in sys.path:
+                sys.path.insert(0, str(sp))
 
 from core.configuration.service import ConfigService
 

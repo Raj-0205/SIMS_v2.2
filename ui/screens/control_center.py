@@ -7,6 +7,7 @@ import flet as ft
 
 from core.database.engine import DatabaseEngine
 from core.database.migration import MigrationEngine
+from core.database.transaction import TransactionManager
 from core.exceptions import AuthenticationError, ForbiddenError, ValidationError
 from core.security.auth import AuthService
 from core.security.context import SecurityContext
@@ -324,6 +325,16 @@ class ControlCenterScreen(ft.Container):
             dlg.open = False
             p.update()
 
+    def _update_dialog(self, dlg: ft.AlertDialog) -> None:
+        try:
+            dlg.update()
+        except Exception:
+            if self._page:
+                try:
+                    self._page.update()
+                except Exception:
+                    pass
+
     def _show_reset_admin_password_dialog(self, e: ft.ControlEvent) -> None:
         """Dialog workflow for resetting operational Admin password with OTP authorization."""
         admin_id = SecurityContext.get_current_user_id()
@@ -342,13 +353,13 @@ class ControlCenterScreen(ft.Container):
             if not reauth_pwd.value or not new_pwd.value:
                 msg_text.value = "Please enter both Administrator password and new Admin password."
                 msg_text.color = AppTheme.DANGER
-                dlg.update()
+                self._update_dialog(dlg)
                 return
 
             if len(new_pwd.value) < 8:
                 msg_text.value = "New Admin password must be at least 8 characters long."
                 msg_text.color = AppTheme.DANGER
-                dlg.update()
+                self._update_dialog(dlg)
                 return
 
             try:
@@ -363,11 +374,11 @@ class ControlCenterScreen(ft.Container):
                 confirm_btn.visible = True
                 msg_text.value = f"Authorization OTP sent to {res['masked_email']}."
                 msg_text.color = AppTheme.PRIMARY_HOVER
-                dlg.update()
+                self._update_dialog(dlg)
             except Exception as exc:
                 msg_text.value = str(exc)
                 msg_text.color = AppTheme.DANGER
-                dlg.update()
+                self._update_dialog(dlg)
 
         def on_confirm_reset(_):
             msg_text.value = ""
@@ -375,7 +386,7 @@ class ControlCenterScreen(ft.Container):
             if not otp_val or len(otp_val) != 6:
                 msg_text.value = "Please enter a valid 6-digit OTP code."
                 msg_text.color = AppTheme.DANGER
-                dlg.update()
+                self._update_dialog(dlg)
                 return
 
             try:
@@ -390,7 +401,7 @@ class ControlCenterScreen(ft.Container):
             except Exception as exc:
                 msg_text.value = str(exc)
                 msg_text.color = AppTheme.DANGER
-                dlg.update()
+                self._update_dialog(dlg)
 
         send_btn = ft.ElevatedButton("Send Authorization OTP", on_click=on_send_otp)
         confirm_btn = ft.ElevatedButton("Confirm & Reset Admin Password", on_click=on_confirm_reset, visible=False)
@@ -436,13 +447,13 @@ class ControlCenterScreen(ft.Container):
             if not curr_pwd.value or not new_pwd.value:
                 msg_text.value = "Please complete all password fields."
                 msg_text.color = AppTheme.DANGER
-                dlg.update()
+                self._update_dialog(dlg)
                 return
 
             if new_pwd.value != confirm_pwd.value:
                 msg_text.value = "New passwords do not match."
                 msg_text.color = AppTheme.DANGER
-                dlg.update()
+                self._update_dialog(dlg)
                 return
 
             try:
@@ -452,7 +463,7 @@ class ControlCenterScreen(ft.Container):
             except Exception as exc:
                 msg_text.value = str(exc)
                 msg_text.color = AppTheme.DANGER
-                dlg.update()
+                self._update_dialog(dlg)
 
         dlg = ft.AlertDialog(
             modal=True,
@@ -491,7 +502,7 @@ class ControlCenterScreen(ft.Container):
             if not email_val or "@" not in email_val:
                 msg_text.value = "Please enter a valid email address."
                 msg_text.color = AppTheme.DANGER
-                dlg.update()
+                self._update_dialog(dlg)
                 return
 
             try:
@@ -507,11 +518,11 @@ class ControlCenterScreen(ft.Container):
                 finalize_btn.visible = True
                 msg_text.value = "Verification codes sent to both current and new email addresses."
                 msg_text.color = AppTheme.PRIMARY_HOVER
-                dlg.update()
+                self._update_dialog(dlg)
             except Exception as exc:
                 msg_text.value = str(exc)
                 msg_text.color = AppTheme.DANGER
-                dlg.update()
+                self._update_dialog(dlg)
 
         def on_finalize(_):
             c_val = (curr_otp.value or "").strip()
@@ -519,7 +530,7 @@ class ControlCenterScreen(ft.Container):
             if not c_val or not n_val:
                 msg_text.value = "Both verification codes must be entered."
                 msg_text.color = AppTheme.DANGER
-                dlg.update()
+                self._update_dialog(dlg)
                 return
 
             try:
@@ -531,7 +542,7 @@ class ControlCenterScreen(ft.Container):
             except Exception as exc:
                 msg_text.value = str(exc)
                 msg_text.color = AppTheme.DANGER
-                dlg.update()
+                self._update_dialog(dlg)
 
         send_codes_btn = ft.ElevatedButton("Send Verification Codes", on_click=on_send_codes)
         finalize_btn = ft.ElevatedButton("Verify & Finalize Email Change", on_click=on_finalize, visible=False)
@@ -596,11 +607,11 @@ class ControlCenterScreen(ft.Container):
                     ft.Text("Store this key securely in an encrypted vault. It cannot be recovered later.", size=12, color=AppTheme.DANGER),
                 ]
                 rotate_btn.visible = False
-                dlg.update()
+                self._update_dialog(dlg)
                 self.load_data()
             except Exception as exc:
                 body_column.controls.append(ft.Text(f"Failed to rotate key: {exc}", color=AppTheme.DANGER, size=12))
-                dlg.update()
+                self._update_dialog(dlg)
 
         rotate_btn = ft.ElevatedButton("Rotate Key Now", on_click=do_rotate, style=ft.ButtonStyle(bgcolor=AppTheme.DANGER, color=ft.Colors.WHITE))
 
@@ -633,13 +644,25 @@ class ControlCenterScreen(ft.Container):
             self.pin_message_text.value = f"Failed to update PIN: {str(exc)}"
             self.pin_message_text.color = AppTheme.DANGER
 
-        if self.page:
+        try:
             self.update()
+        except Exception:
+            pass
 
     def load_data(self) -> None:
         """Fetch and populate security audit trail logs."""
         try:
-            logs = self.activity_repo.get_recent_logs(limit=25)
+            if not TransactionManager.in_transaction():
+                TransactionManager.begin()
+                try:
+                    logs = self.activity_repo.get_recent_logs(limit=25)
+                    TransactionManager.commit()
+                except Exception:
+                    TransactionManager.rollback()
+                    raise
+            else:
+                logs = self.activity_repo.get_recent_logs(limit=25)
+
             # Filter or prioritize SECURITY events
             rows = []
             for log in logs:
@@ -674,7 +697,9 @@ class ControlCenterScreen(ft.Container):
                     )
                 )
             self.audit_table.rows = rows
-            if self.page:
+            try:
                 self.update()
+            except Exception:
+                pass
         except Exception:
             pass

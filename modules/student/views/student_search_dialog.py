@@ -67,10 +67,22 @@ class StudentSearchDialog(ft.AlertDialog):
         self.on_student_selected(student)
         self.close_dialog()
 
+    @property
+    def safe_page(self) -> ft.Page | None:
+        p = getattr(self, "_root_page", None) or getattr(self, "_page", None)
+        if p:
+            return p
+        try:
+            return self.page
+        except RuntimeError:
+            return None
+
     def close_dialog(self, e: Optional[ft.ControlEvent] = None) -> None:
         """Closes the modal safely using Flet's pop_dialog."""
-        try:
-            if self.page:
-                self.page.pop_dialog()
-        except RuntimeError:
-            pass
+        p = self.safe_page
+        if p:
+            try:
+                p.pop_dialog()
+            except Exception:
+                pass
+        self.open = False

@@ -260,12 +260,23 @@ class StudentFormModal(ft.AlertDialog):
         self.actions = [self.cancel_btn, self.submit_btn]
         self.actions_alignment = ft.MainAxisAlignment.END
 
-    def _safe_update(self) -> None:
+    @property
+    def safe_page(self) -> Optional[ft.Page]:
+        p = getattr(self, "_root_page", None) or getattr(self, "_page", None)
+        if p:
+            return p
         try:
-            if self.page:
+            return self.page
+        except (RuntimeError, AttributeError):
+            return None
+
+    def _safe_update(self) -> None:
+        p = self.safe_page
+        if p:
+            try:
                 self.update()
-        except RuntimeError:
-            pass
+            except RuntimeError:
+                pass
 
     def _show_error(self, message: str) -> None:
         self.error_text.value = message
@@ -343,8 +354,11 @@ class StudentFormModal(ft.AlertDialog):
             self._show_error("An unexpected error occurred. Please try again.")
 
     def close_modal(self, e: Optional[ft.ControlEvent] = None) -> None:
-        try:
-            if self.page:
-                self.page.pop_dialog()
-        except RuntimeError:
-            pass
+        p = self.safe_page
+        if p:
+            try:
+                p.pop_dialog()
+            except RuntimeError:
+                pass
+
+    handle_save = handle_submit

@@ -20,6 +20,103 @@ class ReportsService(BaseService):
     def __init__(self) -> None:
         self.repo = BaseRepository()
 
+    def _build_fees_filter_clauses(
+        self,
+        course_id: Optional[int] = None,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+    ) -> tuple[str, list[Any]]:
+        clauses = []
+        params = []
+
+        if search and search.strip():
+            p = f"%{search.strip()}%"
+            clauses.append("""(
+                s.first_name LIKE ? OR s.last_name LIKE ? OR (s.first_name || ' ' || s.last_name) LIKE ?
+                OR s.mobile_number LIKE ? OR CAST(a.id AS TEXT) LIKE ? OR c.name LIKE ?
+                OR (CAST(a.candidate_year AS TEXT) || '-' || printf('%03d', a.candidate_sequence)) LIKE ?
+                OR EXISTS (
+                    SELECT 1 FROM admission_courses ac2 
+                    JOIN courses c2 ON c2.id = ac2.course_id 
+                    WHERE ac2.admission_id = a.id AND c2.name LIKE ?
+                )
+            )""")
+            params.extend([p, p, p, p, p, p, p, p])
+
+        if course_id and course_id > 0:
+            clauses.append("ac.course_id = ?")
+            params.append(course_id)
+
+        if status and status.strip() and status.strip().upper() != "ALL":
+            st = status.strip().upper()
+            if st == "ACTIVE":
+                clauses.append("a.status IN ('DRAFT', 'REGISTERED', 'CONFIRMED')")
+            else:
+                clauses.append("a.status = ?")
+                params.append(st)
+
+        where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        return where_sql, params
+
+    def _resolve_sort_order(self, sort_by: Optional[str]) -> str:
+        if not sort_by or sort_by.upper() in ("NONE", "DEFAULT"):
+            return "ORDER BY a.id DESC"
+        st = sort_by.strip().upper()
+        if st == "INST1":
+            return "ORDER BY inst1 DESC, a.id DESC"
+        elif st == "INST2":
+            return "ORDER BY inst2 DESC, a.id DESC"
+        elif st == "INST3":
+            return "ORDER BY inst3 DESC, a.id DESC"
+        elif st == "INST4":
+            return "ORDER BY inst4 DESC, a.id DESC"
+        elif st == "PAID":
+            return "ORDER BY total_paid DESC, a.id DESC"
+        elif st == "PENDING":
+            return "ORDER BY pending_fees DESC, a.id DESC"
+        return "ORDER BY a.id DESC"
+
+    def _map_report_rows(self, raw_admissions: list[dict[str, Any]], start_idx: int = 1) -> list[dict[str, Any]]:
+        results = []
+        for idx, adm in enumerate(raw_admissions, start=start_idx):
+            adm_id = adm["admission_id"]
+            inst1 = float(adm.get("inst1") or 0.0)
+            inst2 = float(adm.get("inst2") or 0.0)
+            inst3 = float(adm.get("inst3") or 0.0)
+            inst4 = float(adm.get("inst4") or 0.0)
+            total_paid = float(adm.get("total_paid") or 0.0)
+
+            total_fees = float(adm.get("agreed_fee") or 0.0) - float(adm.get("discount") or 0.0)
+            pending_fees = max(0.0, total_fees - total_paid)
+
+            friend_name = (adm.get("friend_name") or "").strip() or "—"
+            friend_mobile = adm.get("friend_mobile") or "—"
+
+            c_year = adm.get("candidate_year") or 2026
+            c_seq = adm.get("candidate_sequence") or adm_id
+            adm_num = f"{c_year}-{c_seq:03d}"
+
+            results.append({
+                "sr_no": idx,
+                "course_name": adm.get("course_name") or "General Course",
+                "admission_date": str(adm.get("admission_date") or "")[:10],
+                "admission_id": adm_num,
+                "name": f"{adm.get('first_name', '')} {adm.get('last_name', '')}".strip(),
+                "mob_no": adm.get("mobile_number") or "—",
+                "admission_status": adm.get("admission_status") or "REGISTERED",
+                "total_fees": total_fees,
+                "inst1": inst1,
+                "inst2": inst2,
+                "inst3": inst3,
+                "inst4": inst4,
+                "total_paid": total_paid,
+                "pending_fees": pending_fees,
+                "address": adm.get("address") or adm.get("village") or "—",
+                "friend_name": friend_name,
+                "friend_mobile": friend_mobile,
+            })
+        return results
+
     def get_admission_fees_report(
         self,
         course_id: Optional[int] = None,
@@ -27,34 +124,12 @@ class ReportsService(BaseService):
         search: Optional[str] = None,
         sort_by: Optional[str] = None,
     ) -> list[dict[str, Any]]:
+        """Returns full unpaginated admission fees report rows (legacy compatible)."""
         with self.unit_of_work():
-            clauses = []
-            params = []
+            where_sql, params = self._build_fees_filter_clauses(course_id, status, search)
+            order_by_sql = self._resolve_sort_order(sort_by)
 
-            if search and search.strip():
-                p = f"%{search.strip()}%"
-                clauses.append("""(
-                    s.first_name LIKE ? OR s.last_name LIKE ? OR (s.first_name || ' ' || s.last_name) LIKE ?
-                    OR s.mobile_number LIKE ? OR CAST(a.id AS TEXT) LIKE ? OR c.name LIKE ?
-                    OR (CAST(a.candidate_year AS TEXT) || '-' || printf('%03d', a.candidate_sequence)) LIKE ?
-                )""")
-                params.extend([p, p, p, p, p, p, p])
-
-            if course_id and course_id > 0:
-                clauses.append("ac.course_id = ?")
-                params.append(course_id)
-
-            if status and status.strip() and status.strip().upper() != "ALL":
-                st = status.strip().upper()
-                if st == "ACTIVE":
-                    clauses.append("a.status IN ('DRAFT', 'REGISTERED')")
-                else:
-                    clauses.append("a.status = ?")
-                    params.append(st)
-
-            where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-
-            # Single aggregated SQL query eliminating N+1 loop queries (SIMS-PERF-01)
+            # High-performance aggregated SQL query eliminating correlated subqueries (SIMS-PERF-01)
             sql = f"""
                 SELECT a.id AS admission_id,
                        a.candidate_year,
@@ -70,91 +145,183 @@ class ReportsService(BaseService):
                        s.last_name,
                        s.mobile_number,
                        c.id AS course_id,
-                       c.name AS course_name,
-                       COALESCE((SELECT SUM(amount) FROM payments WHERE admission_id = a.id AND installment_number = 1), 0.0) AS inst1,
-                       COALESCE((SELECT SUM(amount) FROM payments WHERE admission_id = a.id AND installment_number = 2), 0.0) AS inst2,
-                       COALESCE((SELECT SUM(amount) FROM payments WHERE admission_id = a.id AND installment_number = 3), 0.0) AS inst3,
-                       COALESCE((SELECT SUM(amount) FROM payments WHERE admission_id = a.id AND installment_number = 4), 0.0) AS inst4,
-                       COALESCE((SELECT SUM(amount) FROM payments WHERE admission_id = a.id), 0.0) AS total_paid,
-                       (
-                           SELECT TRIM(s_f.first_name || ' ' || s_f.last_name)
-                           FROM student_friendships sf
-                           JOIN students s_f ON s_f.id = (CASE WHEN sf.student_id = s.id THEN sf.friend_student_id ELSE sf.student_id END)
-                           WHERE (sf.student_id = s.id OR sf.friend_student_id = s.id) AND sf.is_active = 1
-                           LIMIT 1
-                       ) AS friend_name,
-                       (
-                           SELECT s_f.mobile_number
-                           FROM student_friendships sf
-                           JOIN students s_f ON s_f.id = (CASE WHEN sf.student_id = s.id THEN sf.friend_student_id ELSE sf.student_id END)
-                           WHERE (sf.student_id = s.id OR sf.friend_student_id = s.id) AND sf.is_active = 1
-                           LIMIT 1
-                       ) AS friend_mobile
+                       COALESCE(c.name, 'General Course') AS course_name,
+                       COALESCE(p.inst1, 0.0) AS inst1,
+                       COALESCE(p.inst2, 0.0) AS inst2,
+                       COALESCE(p.inst3, 0.0) AS inst3,
+                       COALESCE(p.inst4, 0.0) AS inst4,
+                       COALESCE(p.total_paid, 0.0) AS total_paid,
+                       MAX(0.0, (COALESCE(a.agreed_fee, 0.0) - COALESCE(a.discount, 0.0)) - COALESCE(p.total_paid, 0.0)) AS pending_fees,
+                       f.friend_name,
+                       f.friend_mobile
                 FROM admissions a
                 JOIN students s ON s.id = a.student_id
                 LEFT JOIN admission_courses ac ON ac.admission_id = a.id
                 LEFT JOIN courses c ON c.id = ac.course_id
+                LEFT JOIN (
+                    SELECT admission_id,
+                           SUM(CASE WHEN installment_number = 1 THEN amount ELSE 0 END) AS inst1,
+                           SUM(CASE WHEN installment_number = 2 THEN amount ELSE 0 END) AS inst2,
+                           SUM(CASE WHEN installment_number = 3 THEN amount ELSE 0 END) AS inst3,
+                           SUM(CASE WHEN installment_number = 4 THEN amount ELSE 0 END) AS inst4,
+                           SUM(amount) AS total_paid
+                    FROM payments
+                    GROUP BY admission_id
+                ) p ON p.admission_id = a.id
+                LEFT JOIN (
+                    SELECT 
+                        sf.base_student_id,
+                        TRIM(s_f.first_name || ' ' || s_f.last_name) AS friend_name,
+                        s_f.mobile_number AS friend_mobile
+                    FROM (
+                        SELECT 
+                            student_id AS base_student_id,
+                            friend_student_id AS target_friend_id,
+                            ROW_NUMBER() OVER (PARTITION BY student_id ORDER BY id ASC) as rn
+                        FROM student_friendships
+                        WHERE is_active = 1
+                        UNION ALL
+                        SELECT 
+                            friend_student_id AS base_student_id,
+                            student_id AS target_friend_id,
+                            ROW_NUMBER() OVER (PARTITION BY friend_student_id ORDER BY id ASC) as rn
+                        FROM student_friendships
+                        WHERE is_active = 1
+                    ) sf
+                    JOIN students s_f ON s_f.id = sf.target_friend_id
+                    WHERE sf.rn = 1
+                ) f ON f.base_student_id = s.id
                 {where_sql}
-                ORDER BY a.id DESC;
+                {order_by_sql};
             """
-
             raw_admissions = self.repo.execute_fetchall(sql, tuple(params))
-            results = []
+            return self._map_report_rows(raw_admissions, start_idx=1)
 
-            for idx, adm in enumerate(raw_admissions, start=1):
-                adm_id = adm["admission_id"]
-                inst1 = float(adm.get("inst1") or 0.0)
-                inst2 = float(adm.get("inst2") or 0.0)
-                inst3 = float(adm.get("inst3") or 0.0)
-                inst4 = float(adm.get("inst4") or 0.0)
-                total_paid = float(adm.get("total_paid") or 0.0)
+    def get_admission_fees_report_paginated(
+        self,
+        course_id: Optional[int] = None,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> dict[str, Any]:
+        """Returns paginated fees report with metadata and sequential sr_no."""
+        with self.unit_of_work():
+            where_sql, params = self._build_fees_filter_clauses(course_id, status, search)
 
-                total_fees = float(adm.get("agreed_fee") or 0.0) - float(adm.get("discount") or 0.0)
-                pending_fees = max(0.0, total_fees - total_paid)
+            # Count total matching records
+            count_sql = f"""
+                SELECT COUNT(*) as cnt
+                FROM admissions a
+                JOIN students s ON s.id = a.student_id
+                LEFT JOIN admission_courses ac ON ac.admission_id = a.id
+                LEFT JOIN courses c ON c.id = ac.course_id
+                {where_sql};
+            """
+            count_res = self.repo.execute_fetchone(count_sql, tuple(params))
+            total_count = int(count_res["cnt"]) if count_res else 0
 
-                friend_name = (adm.get("friend_name") or "").strip() or "—"
-                friend_mobile = adm.get("friend_mobile") or "—"
+            page_val = max(1, page)
+            page_size_val = max(1, page_size)
+            offset_val = (page_val - 1) * page_size_val
+            total_pages = max(1, (total_count + page_size_val - 1) // page_size_val)
 
-                c_year = adm.get("candidate_year") or 2026
-                c_seq = adm.get("candidate_sequence") or adm_id
-                adm_num = f"{c_year}-{c_seq:03d}"
+            order_by_sql = self._resolve_sort_order(sort_by)
 
-                results.append({
-                    "sr_no": idx,
-                    "course_name": adm.get("course_name") or "General Course",
-                    "admission_date": str(adm.get("admission_date") or "")[:10],
-                    "admission_id": adm_num,
-                    "name": f"{adm.get('first_name', '')} {adm.get('last_name', '')}".strip(),
-                    "mob_no": adm.get("mobile_number") or "—",
-                    "admission_status": adm.get("admission_status") or "REGISTERED",
-                    "total_fees": total_fees,
-                    "inst1": inst1,
-                    "inst2": inst2,
-                    "inst3": inst3,
-                    "inst4": inst4,
-                    "total_paid": total_paid,
-                    "pending_fees": pending_fees,
-                    "address": adm.get("address") or adm.get("village") or "—",
-                    "friend_name": friend_name,
-                    "friend_mobile": friend_mobile,
-                })
+            sql = f"""
+                SELECT a.id AS admission_id,
+                       a.candidate_year,
+                       a.candidate_sequence,
+                       a.created_at AS admission_date,
+                       a.status AS admission_status,
+                       a.agreed_fee,
+                       a.discount,
+                       a.village,
+                       a.address,
+                       s.id AS student_id,
+                       s.first_name,
+                       s.last_name,
+                       s.mobile_number,
+                       c.id AS course_id,
+                       COALESCE(c.name, 'General Course') AS course_name,
+                       COALESCE(p.inst1, 0.0) AS inst1,
+                       COALESCE(p.inst2, 0.0) AS inst2,
+                       COALESCE(p.inst3, 0.0) AS inst3,
+                       COALESCE(p.inst4, 0.0) AS inst4,
+                       COALESCE(p.total_paid, 0.0) AS total_paid,
+                       MAX(0.0, (COALESCE(a.agreed_fee, 0.0) - COALESCE(a.discount, 0.0)) - COALESCE(p.total_paid, 0.0)) AS pending_fees,
+                       f.friend_name,
+                       f.friend_mobile
+                FROM admissions a
+                JOIN students s ON s.id = a.student_id
+                LEFT JOIN admission_courses ac ON ac.admission_id = a.id
+                LEFT JOIN courses c ON c.id = ac.course_id
+                LEFT JOIN (
+                    SELECT admission_id,
+                           SUM(CASE WHEN installment_number = 1 THEN amount ELSE 0 END) AS inst1,
+                           SUM(CASE WHEN installment_number = 2 THEN amount ELSE 0 END) AS inst2,
+                           SUM(CASE WHEN installment_number = 3 THEN amount ELSE 0 END) AS inst3,
+                           SUM(CASE WHEN installment_number = 4 THEN amount ELSE 0 END) AS inst4,
+                           SUM(amount) AS total_paid
+                    FROM payments
+                    GROUP BY admission_id
+                ) p ON p.admission_id = a.id
+                LEFT JOIN (
+                    SELECT 
+                        sf.base_student_id,
+                        TRIM(s_f.first_name || ' ' || s_f.last_name) AS friend_name,
+                        s_f.mobile_number AS friend_mobile
+                    FROM (
+                        SELECT 
+                            student_id AS base_student_id,
+                            friend_student_id AS target_friend_id,
+                            ROW_NUMBER() OVER (PARTITION BY student_id ORDER BY id ASC) as rn
+                        FROM student_friendships
+                        WHERE is_active = 1
+                        UNION ALL
+                        SELECT 
+                            friend_student_id AS base_student_id,
+                            student_id AS target_friend_id,
+                            ROW_NUMBER() OVER (PARTITION BY friend_student_id ORDER BY id ASC) as rn
+                        FROM student_friendships
+                        WHERE is_active = 1
+                    ) sf
+                    JOIN students s_f ON s_f.id = sf.target_friend_id
+                    WHERE sf.rn = 1
+                ) f ON f.base_student_id = s.id
+                {where_sql}
+                {order_by_sql}
+                LIMIT ? OFFSET ?;
+            """
+            exec_params = list(params) + [page_size_val, offset_val]
+            raw_admissions = self.repo.execute_fetchall(sql, tuple(exec_params))
+            rows = self._map_report_rows(raw_admissions, start_idx=offset_val + 1)
 
-            if sort_by:
-                if sort_by == "INST1":
-                    results.sort(key=lambda x: x["inst1"], reverse=True)
-                elif sort_by == "INST2":
-                    results.sort(key=lambda x: x["inst2"], reverse=True)
-                elif sort_by == "INST3":
-                    results.sort(key=lambda x: x["inst3"], reverse=True)
-                elif sort_by == "INST4":
-                    results.sort(key=lambda x: x["inst4"], reverse=True)
-                elif sort_by == "PAID":
-                    results.sort(key=lambda x: x["total_paid"], reverse=True)
-                elif sort_by == "PENDING":
-                    results.sort(key=lambda x: x["pending_fees"], reverse=True)
+            return {
+                "rows": rows,
+                "total_count": total_count,
+                "page": page_val,
+                "page_size": page_size_val,
+                "total_pages": total_pages,
+            }
 
-            return results
-
+    def export_filtered_fees_report_csv(
+        self,
+        course_id: Optional[int] = None,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        target_path: Optional[str | Path] = None,
+    ) -> Path:
+        """Exports all filtered report records (full dataset, not just current page) to CSV."""
+        all_rows = self.get_admission_fees_report(
+            course_id=course_id,
+            status=status,
+            search=search,
+            sort_by=sort_by,
+        )
+        return self.export_fees_report_csv(all_rows, target_path=target_path)
 
     def filter_payments_by_amount(self, target_amount: float, search: Optional[str] = None) -> list[dict[str, Any]]:
         """Filters payments matching exact amount (e.g. ₹500, ₹1000)."""

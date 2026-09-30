@@ -39,7 +39,7 @@ class AdmissionRepository(BaseRepository):
             JOIN admission_courses ac ON ac.admission_id = a.id
             WHERE a.student_id = ?
               AND ac.course_id = ?
-              AND a.status IN ('DRAFT', 'REGISTERED')
+              AND a.status IN ('DRAFT', 'REGISTERED', 'CONFIRMED')
             LIMIT 1;
         """
         return self.exists(query, (student_id, course_id))
@@ -325,6 +325,35 @@ class AdmissionRepository(BaseRepository):
             "today_collection": float(pay_stats.get("today_collection", 0.0)),
             "total_pending": total_pending,
         }
+
+    def get_admission_dependency_counts(self, admission_id: int) -> dict[str, Any]:
+        """Calculates exact count of relational dependencies attached to an admission record."""
+        pay_row = self.execute_fetchone(
+            "SELECT count(*) as cnt, COALESCE(SUM(amount), 0) as total FROM payments WHERE admission_id = ?;",
+            (admission_id,),
+        )
+        rcp_row = self.execute_fetchone(
+            "SELECT count(*) as cnt FROM receipts WHERE admission_id = ?;",
+            (admission_id,),
+        )
+        crs_row = self.execute_fetchone(
+            "SELECT count(*) as cnt FROM admission_courses WHERE admission_id = ?;",
+            (admission_id,),
+        )
+        return {
+            "payments": int(pay_row["cnt"]) if pay_row else 0,
+            "payments_total": float(pay_row["total"]) if pay_row else 0.0,
+            "receipts": int(rcp_row["cnt"]) if rcp_row else 0,
+            "courses": int(crs_row["cnt"]) if crs_row else 0,
+        }
+
+    def delete_admission_cascade(self, admission_id: int) -> None:
+        """Deletes child payments, receipts, course bridges, nullifies friendships, and deletes admission."""
+        self.execute("DELETE FROM receipts WHERE admission_id = ?;", (admission_id,))
+        self.execute("DELETE FROM payments WHERE admission_id = ?;", (admission_id,))
+        self.execute("DELETE FROM admission_courses WHERE admission_id = ?;", (admission_id,))
+        self.execute("UPDATE student_friendships SET admission_id = NULL WHERE admission_id = ?;", (admission_id,))
+        self.execute("DELETE FROM admissions WHERE id = ?;", (admission_id,))
 
     def delete(self, admission_id: int) -> int:
         """Deletes an admission record and course bridge linkage."""

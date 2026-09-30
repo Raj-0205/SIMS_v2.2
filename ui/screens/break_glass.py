@@ -187,7 +187,7 @@ class BreakGlassRemediationScreen(ft.Container):
         self.new_email_field = ft.TextField(
             label="Emergency Contact Email (Optional Update)",
             hint_text="Leave blank to preserve current email",
-            prefix_icon=ft.Icons.EMAIL_OUTLINED,
+            prefix_icon=ft.Icons.EMAIL,
             width=360,
         )
         self.status_message = ft.Text("", size=13, text_align=ft.TextAlign.CENTER, weight=ft.FontWeight.W_500)

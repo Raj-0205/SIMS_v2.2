@@ -9,8 +9,10 @@ from typing import Any, Optional
 
 from core.service.base import BaseService
 from core.security.auth import AuthService
+from core.security.authorization import AuthorizationService
+from core.security.permissions import Permission
 from core.logger.service import LogService
-from core.exceptions import ServiceError, ValidationError, ConflictError
+from core.exceptions import ServiceError, ValidationError, ConflictError, NotFoundError, EntityNotFoundError
 from modules.admission.constants import AdmissionStatus, Qualification, BloodGroup, Gender
 from modules.admission.dto import (
     AdmissionCreateDTO,
@@ -38,7 +40,6 @@ from modules.batch.repository import BatchRepository
 from modules.payments.repository import PaymentRepository
 from modules.payments.mapper import PaymentMapper
 from modules.payments.dto import PaymentCreateDTO
-from modules.payments.service import PaymentService
 from modules.receipts.repository import ReceiptRepository
 from modules.receipts.mapper import ReceiptMapper
 from modules.receipts.dto import ReceiptCreateDTO
@@ -74,6 +75,7 @@ class AdmissionService(BaseService):
         self.payment_repo = PaymentRepository()
         self.receipt_repo = ReceiptRepository()
         self.settings_repo = SettingsRepository()
+        from modules.payments.service import PaymentService
         self.payment_service = PaymentService()
         self.receipt_service = ReceiptService()
 
@@ -487,10 +489,10 @@ class AdmissionService(BaseService):
             # 4. Document Validation
             photo_path, signature_path = self._validate_documents(dto, student_id)
 
-            # 5. State Restriction: Prevent duplicate concurrent active draft/registered for the SAME course
-            if target_status in (AdmissionStatus.DRAFT, AdmissionStatus.REGISTERED):
+            # 5. State Restriction: Prevent duplicate concurrent active admissions for the SAME course
+            if target_status in (AdmissionStatus.DRAFT, AdmissionStatus.REGISTERED, AdmissionStatus.CONFIRMED):
                 if self.repository.has_active_admission_for_course(student_id, dto.course_id):
-                    raise ConflictError(f"Student already has an active '{target_status.value}' admission for course '{course['name']}'.")
+                    raise ConflictError(f"Student already has an active admission for course '{course['name']}'.")
 
             # 6. Determine Candidate Year & Sequence (YYYY-NNN)
             admission_year = dto.candidate_year or datetime.now().year
@@ -840,6 +842,45 @@ class AdmissionService(BaseService):
             )
             LogService.info(f"Admission #{adm.admission_number} cancelled. Reason: {reason.strip()}", context="AdmissionService")
             return True
+
+    def get_deletion_impact(self, admission_id: int) -> dict[str, Any]:
+        """Calculates full dependency impact before destructive deletion by Administrator."""
+        AuthorizationService.enforce(Permission.ADMISSION_DELETE)
+        if not admission_id or admission_id <= 0:
+            raise ValidationError("A valid admission ID is required.")
+        with self.unit_of_work():
+            adm = self.get_admission(admission_id)
+            if not adm:
+                raise NotFoundError(f"Admission #{admission_id} not found.")
+            impact = self.repository.get_admission_dependency_counts(admission_id)
+            impact["admission_number"] = adm.admission_number
+            impact["student_name"] = adm.student_name
+            impact["course_name"] = adm.course_name
+            impact["admission_id"] = admission_id
+            return impact
+
+    def delete_admission(self, admission_id: int, actor_id: Optional[int] = None) -> None:
+        """Permanently deletes an admission record and its financial dependencies in an audited operation."""
+        AuthorizationService.enforce(Permission.ADMISSION_DELETE)
+        if not admission_id or admission_id <= 0:
+            raise ValidationError("A valid admission ID is required.")
+
+        with self.unit_of_work():
+            adm = self.get_admission(admission_id)
+            if not adm:
+                raise NotFoundError(f"Admission #{admission_id} not found.")
+
+            self.repository.delete_admission_cascade(admission_id)
+
+            self.activity_repo.insert(
+                "ADMISSION",
+                admission_id,
+                "ADMISSION_DELETED",
+                actor_name="ADMINISTRATOR",
+                actor_id=actor_id,
+                details=f"Permanently deleted admission {adm.admission_number} ({adm.course_name}) for student '{adm.student_name}'.",
+            )
+            LogService.info(f"Admission #{adm.admission_number} permanently deleted by Administrator.", context="AdmissionService")
 
     def export_admissions_csv(self, dto: AdmissionFilterDTO, target_path: Optional[str | Path] = None) -> Path:
         """Exports filtered admissions into Excel-compatible CSV with installment breakdown."""

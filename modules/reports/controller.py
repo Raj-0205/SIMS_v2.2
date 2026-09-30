@@ -23,8 +23,33 @@ class ReportsController:
     ) -> list[dict[str, Any]]:
         return self.service.get_admission_fees_report(course_id, status, search, sort_by)
 
+    def get_admission_fees_report_paginated(
+        self,
+        course_id: Optional[int] = None,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> dict[str, Any]:
+        return self.service.get_admission_fees_report_paginated(
+            course_id, status, search, sort_by, page, page_size
+        )
+
     def filter_payments_by_amount(self, target_amount: float, search: Optional[str] = None) -> list[dict[str, Any]]:
         return self.service.filter_payments_by_amount(target_amount, search)
 
     def export_fees_report_csv(self, report_rows: list[dict[str, Any]], target_path: Optional[str | Path] = None) -> Path:
         return self.service.export_fees_report_csv(report_rows, target_path)
+
+    def export_filtered_fees_report_csv(
+        self,
+        course_id: Optional[int] = None,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        target_path: Optional[str | Path] = None,
+    ) -> Path:
+        return self.service.export_filtered_fees_report_csv(
+            course_id, status, search, sort_by, target_path
+        )

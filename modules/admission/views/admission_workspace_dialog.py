@@ -79,6 +79,20 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
             on_click=self._handle_cancel_admission,
             visible=not is_cancelled,
         )
+
+        from core.security.context import SecurityContext
+        from core.security.roles import Role
+        current_role = SecurityContext.get_current_role()
+        is_admin = (str(current_role).upper() == Role.ADMINISTRATOR.value)
+
+        self.delete_admission_btn = ft.OutlinedButton(
+            content=ft.Text("Delete Admission", color=AppTheme.DANGER),
+            icon=ft.Icons.DELETE_FOREVER,
+            style=ft.ButtonStyle(color=AppTheme.DANGER),
+            on_click=self._handle_delete_admission,
+            visible=is_admin,
+        )
+
         self.pay_btn = ft.ElevatedButton(
             content=ft.Text("Collect Payment"),
             icon=ft.Icons.PAYMENTS,
@@ -105,7 +119,13 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
         self.actions = [
             ft.Row(
                 controls=[
-                    self.cancel_admission_btn,
+                    ft.Row(
+                        controls=[
+                            self.cancel_admission_btn,
+                            self.delete_admission_btn,
+                        ],
+                        spacing=AppTheme.PAD_SM,
+                    ),
                     ft.Row(controls=[self.pay_btn, self.close_btn], spacing=AppTheme.PAD_SM),
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -156,10 +176,17 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
 
     @property
     def safe_page(self) -> Optional[ft.Page]:
+        p = getattr(self, "_root_page", None) or getattr(self, "_page", None)
+        if p:
+            return p
         try:
             return self.page
         except (RuntimeError, AttributeError):
-            return getattr(self, "_page", None)
+            return None
+
+    @property
+    def admission(self) -> Optional[AdmissionDTO]:
+        return self.workspace_dto.admission if self.workspace_dto else None
 
     def _safe_update(self) -> None:
         p = self.safe_page
@@ -529,6 +556,109 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
     def _on_payment_collected(self, payment_id: Optional[int] = None) -> None:
         self.load_data()
         self.on_updated()
+
+    def _handle_delete_admission(self, e: ft.ControlEvent) -> None:
+        p = self.safe_page
+        if not p or not self.workspace_dto:
+            return
+
+        adm = self.workspace_dto.admission
+        try:
+            impact = self.controller.get_deletion_impact(self.admission_id)
+        except Exception as ex:
+            LogService.error(f"Failed to calculate deletion impact: {ex}", context=self.__class__.__name__)
+            return
+
+        def do_close_del_dlg(ev):
+            try:
+                p.pop_dialog()
+            except RuntimeError:
+                pass
+
+        def do_confirm_del(ev):
+            try:
+                self.controller.delete_admission(self.admission_id)
+                p.pop_dialog()  # close confirm dlg
+                self.close_dialog()  # close workspace
+                self.on_updated()
+                snack = ft.SnackBar(
+                    content=ft.Text(f"Admission #{self.admission_id} ({adm.admission_number}) permanently deleted."),
+                    bgcolor=AppTheme.SUCCESS,
+                )
+                p.overlay.append(snack)
+                snack.open = True
+                p.update()
+            except Exception as ex:
+                LogService.error(f"Failed to delete admission: {ex}", context=self.__class__.__name__)
+                snack = ft.SnackBar(
+                    content=ft.Text(f"Failed to delete admission: {ex}"),
+                    bgcolor=AppTheme.DANGER,
+                )
+                p.overlay.append(snack)
+                snack.open = True
+                p.update()
+
+        del_dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.WARNING_AMBER, color=AppTheme.DANGER, size=24),
+                    ft.Text("Permanent Admission Deletion", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H2),
+                ],
+                spacing=8,
+            ),
+            content=ft.Container(
+                width=480,
+                content=ft.Column(
+                    controls=[
+                        ft.Text(
+                            f"Are you sure you want to permanently delete admission {adm.admission_number} ({adm.course_name}) for {adm.student_name}?",
+                            weight=ft.FontWeight.W_600,
+                            size=AppTheme.SIZE_BODY,
+                        ),
+                        ft.Text(
+                            "This is a permanent destructive operation. The following related records will be permanently removed:",
+                            size=AppTheme.SIZE_CAPTION,
+                            color=AppTheme.TEXT_SECONDARY,
+                        ),
+                        ft.Container(
+                            content=ft.Column(
+                                controls=[
+                                    ft.Text(f"• Payments: {impact.get('payments', 0)} (Total: ₹{impact.get('payments_total', 0.0):,.2f})", size=AppTheme.SIZE_CAPTION),
+                                    ft.Text(f"• Receipts: {impact.get('receipts', 0)}", size=AppTheme.SIZE_CAPTION),
+                                    ft.Text(f"• Course Enrolments: {impact.get('courses', 0)}", size=AppTheme.SIZE_CAPTION),
+                                    ft.Text("• Student Profile: Preserved (Only this admission record is removed)", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD),
+                                ],
+                                spacing=4,
+                            ),
+                            bgcolor=AppTheme.SURFACE_VARIANT,
+                            padding=AppTheme.PAD_SM,
+                            border_radius=AppTheme.RADIUS_SM,
+                        ),
+                        ft.Container(height=4),
+                        ft.Text(
+                            "CAUTION: This operation cannot be undone. An audit event will be recorded.",
+                            size=AppTheme.SIZE_CAPTION,
+                            color=AppTheme.DANGER,
+                            weight=ft.FontWeight.BOLD,
+                        ),
+                    ],
+                    spacing=AppTheme.PAD_SM,
+                    tight=True,
+                ),
+            ),
+            actions=[
+                ft.TextButton("Cancel", on_click=do_close_del_dlg),
+                ft.ElevatedButton(
+                    "Delete Permanently",
+                    icon=ft.Icons.DELETE_FOREVER,
+                    style=ft.ButtonStyle(bgcolor=AppTheme.DANGER, color=AppTheme.SURFACE),
+                    on_click=do_confirm_del,
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        p.show_dialog(del_dlg)
 
     def close_dialog(self, _=None) -> None:
         p = self.safe_page

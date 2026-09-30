@@ -9,6 +9,7 @@ from typing import Optional
 import flet as ft
 
 from core.logger.service import LogService
+from shared.utils.os_helper import open_path_externally
 from ui.themes.theme import AppTheme
 from modules.receipts.controller import ReceiptController
 from modules.receipts.dto import ReceiptDTO
@@ -174,10 +175,13 @@ class ReceiptDialog(ft.AlertDialog):
 
     @property
     def safe_page(self) -> Optional[ft.Page]:
+        p = getattr(self, "_root_page", None) or getattr(self, "_page", None)
+        if p:
+            return p
         try:
             return self.page
         except (RuntimeError, AttributeError):
-            return getattr(self, "_page", None)
+            return None
 
     def close_modal(self, e: Optional[ft.ControlEvent] = None) -> None:
         p = self.safe_page
@@ -190,18 +194,12 @@ class ReceiptDialog(ft.AlertDialog):
     def handle_print(self, e: ft.ControlEvent) -> None:
         """Opens receipt PDF with system print / viewer."""
         if self.receipt.pdf_path and os.path.exists(self.receipt.pdf_path):
-            try:
-                subprocess.Popen(["xdg-open", self.receipt.pdf_path])
-            except Exception:
-                webbrowser.open(f"file://{os.path.abspath(self.receipt.pdf_path)}")
+            open_path_externally(self.receipt.pdf_path)
 
     def handle_export_pdf(self, e: ft.ControlEvent) -> None:
         """Opens the exported PDF file location."""
         if self.receipt.pdf_path and os.path.exists(self.receipt.pdf_path):
-            try:
-                subprocess.Popen(["xdg-open", self.receipt.pdf_path])
-            except Exception:
-                webbrowser.open(f"file://{os.path.abspath(self.receipt.pdf_path)}")
+            open_path_externally(self.receipt.pdf_path)
 
     def handle_whatsapp(self, e: ft.ControlEvent) -> None:
         """Opens WhatsApp Web / Desktop with pre-filled message and receipt details."""

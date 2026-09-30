@@ -450,9 +450,10 @@ class TestDualTierAuthentication(unittest.TestCase):
         7. BATCH_MANAGE
         8. BATCH_DELETE
         """
-        all_8 = {
+        all_privs = {
             Permission.PAYMENT_PIN_CHANGE,
             Permission.STUDENT_DELETE,
+            Permission.ADMISSION_DELETE,
             Permission.COURSE_CREATE,
             Permission.COURSE_MANAGE,
             Permission.COURSE_DELETE,
@@ -461,9 +462,9 @@ class TestDualTierAuthentication(unittest.TestCase):
             Permission.BATCH_DELETE,
         }
 
-        # Administrator possesses all 8
+        # Administrator possesses all privileged permissions
         admin_privs = AuthorizationService.get_permissions_for_role(Role.ADMINISTRATOR.value)
-        self.assertEqual(admin_privs, all_8)
+        self.assertEqual(admin_privs, all_privs)
 
         # Admin possesses ZERO of the 8 privileged permissions
         op_privs = AuthorizationService.get_permissions_for_role(Role.ADMIN.value)

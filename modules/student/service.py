@@ -359,6 +359,20 @@ class StudentService(BaseService):
                 details=f"Removed {doc_type} document.",
             )
 
+    def get_deletion_impact(self, student_id: int) -> dict[str, Any]:
+        """Calculates full dependency impact before destructive deletion by Administrator."""
+        AuthorizationService.enforce(Permission.STUDENT_DELETE)
+        if not student_id or student_id <= 0:
+            raise ValidationError("A valid student ID is required.")
+        with self.unit_of_work():
+            existing = self.repository.get_by_id(student_id)
+            if not existing:
+                raise ValidationError(f"Student ID {student_id} not found.")
+            impact = self.repository.get_student_dependency_counts(student_id)
+            impact["student_name"] = f"{existing.get('first_name', '')} {existing.get('last_name', '')}".strip()
+            impact["student_id"] = student_id
+            return impact
+
     def delete_student(self, student_id: int) -> None:
         AuthorizationService.enforce(Permission.STUDENT_DELETE)
         if not student_id or student_id <= 0:
@@ -369,15 +383,30 @@ class StudentService(BaseService):
             if not existing:
                 raise ValidationError(f"Student ID {student_id} not found.")
 
-            if self.repository.has_admissions(student_id):
-                raise ConflictError(
-                    "Cannot delete student profile with linked admission records. "
-                    "ERP audit policy preserves historical admission data."
-                )
+            student_name = f"{existing.get('first_name', '')} {existing.get('last_name', '')}".strip()
+            photo_path = existing.get("photo_path")
+            sig_path = existing.get("signature_path")
 
-            self.repository.delete(student_id)
+            self.repository.delete_student_cascade(student_id)
+
+            for fpath in (photo_path, sig_path):
+                if fpath:
+                    try:
+                        p = Path(fpath)
+                        if p.is_file():
+                            p.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+
+            self.activity_log_repo.insert(
+                entity_type="STUDENT",
+                entity_id=student_id,
+                action="STUDENT_DELETED",
+                actor_name="ADMINISTRATOR",
+                details=f"Permanently deleted student '{student_name}' (ID: #{student_id}) and linked dependencies.",
+            )
             LogService.info(
-                f"Student ID {student_id} deleted successfully.",
+                f"Student ID {student_id} permanently deleted by Administrator.",
                 context=self.__class__.__name__,
             )
 
@@ -390,6 +419,17 @@ class StudentService(BaseService):
             if not row:
                 raise ValidationError(f"Student with ID {student_id} not found.")
             return StudentMapper.to_dto(row)
+
+    def get_by_mobile(self, mobile_number: str) -> Optional[StudentDTO]:
+        clean_mobile = self._sanitize_string(mobile_number)
+        if not clean_mobile:
+            return None
+        with self.unit_of_work():
+            row = self.repository.get_by_mobile(clean_mobile)
+            if not row:
+                return None
+            full_row = self.repository.get_by_id(int(row["id"]))
+            return StudentMapper.to_dto(full_row) if full_row else None
 
     def get_student_workspace(self, student_id: int) -> StudentWorkspaceDTO:
         student = self.get_student(student_id)

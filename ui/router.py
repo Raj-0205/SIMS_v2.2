@@ -32,11 +32,24 @@ class AppRouter:
         self.page = page
         self.page.on_route_change = self.handle_route_change
         self.dashboard = None
+        self._route_history: list[str] = []
 
     def request_navigation(self, route: str) -> None:
         """Sole owner of actual navigation requests triggered by child components."""
         if self.page.route != route:
             self.page.navigate(route)
+
+    def go_back(self) -> None:
+        """Navigates back to the previous valid route in the history stack."""
+        if len(self._route_history) > 1:
+            self._route_history.pop()  # remove current route
+            prev_route = self._route_history.pop()  # pop previous route so request_navigation will re-push it
+            self.request_navigation(prev_route)
+        else:
+            session = AuthService._get_session(self.page)
+            user_role = str(AuthService._session_get(session, "role", "") or "").strip().upper()
+            fallback = "/control-center" if user_role == Role.ADMINISTRATOR.value else "/dashboard"
+            self.request_navigation(fallback)
 
     def handle_route_change(self, e: ft.RouteChangeEvent) -> None:
         route = e.route
@@ -91,6 +104,7 @@ class AppRouter:
         # 5. View Mounting
         if target_route == "/login":
             self.dashboard = None
+            self._route_history.clear()
             if not self.page.views or self.page.views[-1].route != "/login":
                 self.page.views.clear()
                 self.page.views.append(ft.View(route="/login", controls=[LoginScreen(self.page)]))
@@ -107,12 +121,19 @@ class AppRouter:
             self.page.views.clear()
             self.page.views.append(ft.View(route="/recovery/remediate", controls=[BreakGlassRemediationScreen(self.page)]))
         else:
+            if not self._route_history or self._route_history[-1] != target_route:
+                self._route_history.append(target_route)
+
             if self.page.views and self.page.views[-1].route == "/" and self.dashboard is not None:
                 self.dashboard.mount_view(target_route)
             else:
                 self.page.views.clear()
                 if not self.dashboard:
-                    self.dashboard = DashboardScreen(self.page, on_route_request=self.request_navigation)
+                    self.dashboard = DashboardScreen(
+                        self.page,
+                        on_route_request=self.request_navigation,
+                        on_back_request=self.go_back,
+                    )
                 self.dashboard.mount_view(target_route)
                 self.page.views.append(
                     ft.View(

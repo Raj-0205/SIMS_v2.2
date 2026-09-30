@@ -9,9 +9,14 @@ __all__ = ["SecurityContext"]
 
 
 class SecurityContext:
-    """Thread-local security context for the currently executing actor."""
+    """Thread-local security context with session-level fallback for Flet worker threads."""
 
     _state = threading.local()
+    _fallback_user_id: Optional[int] = None
+    _fallback_username: Optional[str] = None
+    _fallback_role: Optional[str] = None
+    _fallback_security_version: Optional[int] = None
+    _fallback_security_stamp: Optional[str] = None
 
     @classmethod
     def _get_state(cls) -> threading.local:
@@ -21,6 +26,7 @@ class SecurityContext:
             cls._state.role = None
             cls._state.security_version = None
             cls._state.security_stamp = None
+            cls._state.is_set = False
         return cls._state
 
     @classmethod
@@ -38,31 +44,52 @@ class SecurityContext:
         state.role = role
         state.security_version = security_version
         state.security_stamp = security_stamp
+        state.is_set = True
+
+        cls._fallback_user_id = user_id
+        cls._fallback_username = username
+        cls._fallback_role = role
+        cls._fallback_security_version = security_version
+        cls._fallback_security_stamp = security_stamp
 
     @classmethod
     def get_current_user_id(cls) -> Optional[int]:
-        return getattr(cls._get_state(), "user_id", None)
+        state = cls._get_state()
+        if getattr(state, "is_set", False):
+            return state.user_id
+        return cls._fallback_user_id
 
     @classmethod
     def get_current_username(cls) -> Optional[str]:
-        return getattr(cls._get_state(), "username", None)
+        state = cls._get_state()
+        if getattr(state, "is_set", False):
+            return state.username
+        return cls._fallback_username
 
     @classmethod
     def get_current_role(cls) -> Optional[str]:
-        return getattr(cls._get_state(), "role", None)
+        state = cls._get_state()
+        if getattr(state, "is_set", False):
+            return state.role
+        return cls._fallback_role
 
     @classmethod
     def get_current_security_version(cls) -> Optional[int]:
-        return getattr(cls._get_state(), "security_version", None)
+        state = cls._get_state()
+        if getattr(state, "is_set", False):
+            return state.security_version
+        return cls._fallback_security_version
 
     @classmethod
     def get_current_security_stamp(cls) -> Optional[str]:
-        return getattr(cls._get_state(), "security_stamp", None)
+        state = cls._get_state()
+        if getattr(state, "is_set", False):
+            return state.security_stamp
+        return cls._fallback_security_stamp
 
     @classmethod
     def current_user(cls) -> Any:
-        state = cls._get_state()
-        uid = getattr(state, "user_id", None)
+        uid = cls.get_current_user_id()
         if not uid:
             return None
 
@@ -82,10 +109,10 @@ class SecurityContext:
 
         return _CurrentUser(
             uid,
-            getattr(state, "username", None),
-            getattr(state, "role", None),
-            getattr(state, "security_version", None),
-            getattr(state, "security_stamp", None),
+            cls.get_current_username(),
+            cls.get_current_role(),
+            cls.get_current_security_version(),
+            cls.get_current_security_stamp(),
         )
 
     @classmethod
@@ -96,6 +123,13 @@ class SecurityContext:
         state.role = None
         state.security_version = None
         state.security_stamp = None
+        state.is_set = True
+
+        cls._fallback_user_id = None
+        cls._fallback_username = None
+        cls._fallback_role = None
+        cls._fallback_security_version = None
+        cls._fallback_security_stamp = None
 
     @classmethod
     @contextmanager

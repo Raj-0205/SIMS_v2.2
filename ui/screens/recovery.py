@@ -38,7 +38,7 @@ class PasswordRecoveryScreen(ft.Container):
         self.identifier_field = ft.TextField(
             label="Username or Email Address",
             autofocus=True,
-            prefix_icon=ft.Icons.ACCOUNT_CIRCLE_OUTLINE,
+            prefix_icon=ft.Icons.PERSON_OUTLINE,
             width=320,
             on_submit=self._handle_step1_submit,
         )

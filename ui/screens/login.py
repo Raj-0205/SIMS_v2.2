@@ -62,6 +62,13 @@ class LoginScreen(ft.Container):
             text_align=ft.TextAlign.CENTER,
         )
 
+        self.username_field = ft.TextField(
+            label="Username",
+            value="admin",
+            prefix_icon=ft.Icons.PERSON_OUTLINE,
+            on_submit=lambda _: self.password_field.focus(),
+        )
+
         self.password_field = ft.TextField(
             label="Password",
             password=True,
@@ -162,9 +169,13 @@ class LoginScreen(ft.Container):
         if selected == "ADMINISTRATOR":
             self.role_description_text.value = "Account: administrator • Privileged Governance (Email OTP Required)"
             self.step1_btn.content = ft.Text("Continue to Verification", weight=ft.FontWeight.BOLD)
+            if (self.username_field.value or "") in ("admin", "administrator", ""):
+                self.username_field.value = "administrator"
         else:
             self.role_description_text.value = "Account: admin • Operational Account"
             self.step1_btn.content = ft.Text("Sign In as Admin", weight=ft.FontWeight.BOLD)
+            if (self.username_field.value or "") in ("admin", "administrator", ""):
+                self.username_field.value = "admin"
 
         self.password_field.value = ""
         self.status_message.value = ""
@@ -204,6 +215,7 @@ class LoginScreen(ft.Container):
                     self.role_selector,
                     self.role_description_text,
                     ft.Container(height=6),
+                    self.username_field,
                     self.password_field,
                     self.status_message,
                     self.step1_btn,
@@ -251,7 +263,10 @@ class LoginScreen(ft.Container):
         self.status_message.value = ""
         password = self.password_field.value or ""
         selected_intent = next(iter(self.role_selector.selected), "ADMIN")
-        username = "admin" if selected_intent == "ADMIN" else "administrator"
+        raw_user = (self.username_field.value or "").strip()
+        if not raw_user:
+            raw_user = "admin" if selected_intent == "ADMIN" else "administrator"
+        username = raw_user
 
         if not password:
             self._show_error("Please enter your password.")

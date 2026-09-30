@@ -20,6 +20,7 @@ from modules.course.controller import CourseController
 from modules.batch.controller import BatchController
 from modules.receipts.controller import ReceiptController
 from shared.utils.formatting import format_title_case, format_file_size, normalize_mobile
+from shared.utils.file_dialog import pick_file
 from ui.themes.theme import AppTheme
 
 __all__ = ["AdmissionFormModal"]
@@ -860,17 +861,10 @@ class AdmissionFormModal(ft.AlertDialog):
     # ── Real File Pickers (<= 100 KB) ──
     def _trigger_photo_picker(self, e: ft.ControlEvent) -> None:
         try:
-            result = subprocess.run(
-                ["zenity", "--file-selection", "--title=Select Student Photo (Max 100 KB)", "--file-filter=Images (*.jpg *.jpeg *.png) | *.jpg *.jpeg *.png *.JPG *.JPEG *.PNG"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            selected_path = result.stdout.strip()
-            if not selected_path or not Path(selected_path).is_file():
+            p = pick_file(title="Select Student Photo (Max 100 KB)", allowed_extensions=[".jpg", ".jpeg", ".png"])
+            if not p or not p.is_file():
                 return
 
-            p = Path(selected_path)
             if p.suffix.lower() not in (".jpg", ".jpeg", ".png"):
                 self._show_error("Invalid file format. Only JPG, JPEG, and PNG images are allowed.")
                 return
@@ -898,17 +892,10 @@ class AdmissionFormModal(ft.AlertDialog):
 
     def _trigger_signature_picker(self, e: ft.ControlEvent) -> None:
         try:
-            result = subprocess.run(
-                ["zenity", "--file-selection", "--title=Select Student Signature (Max 100 KB)", "--file-filter=Images (*.jpg *.jpeg *.png) | *.jpg *.jpeg *.png *.JPG *.JPEG *.PNG"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            selected_path = result.stdout.strip()
-            if not selected_path or not Path(selected_path).is_file():
+            p = pick_file(title="Select Student Signature (Max 100 KB)", allowed_extensions=[".jpg", ".jpeg", ".png"])
+            if not p or not p.is_file():
                 return
 
-            p = Path(selected_path)
             if p.suffix.lower() not in (".jpg", ".jpeg", ".png"):
                 self._show_error("Invalid file format. Only JPG, JPEG, and PNG images are allowed.")
                 return

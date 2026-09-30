@@ -9,6 +9,7 @@ import flet as ft
 from core.logger.service import LogService
 from modules.reports.controller import ReportsController
 from modules.course.controller import CourseController
+from shared.utils.os_helper import open_path_externally
 from ui.themes.theme import AppTheme
 
 __all__ = ["ReportsHome"]
@@ -37,6 +38,12 @@ class ReportsHome(ft.Container):
         self.selected_status: str = "ALL"
         self.sort_by: Optional[str] = None
         self.filter_amount: float = 500.0
+
+        # Pagination states for Tab 1
+        self.current_page: int = 1
+        self.page_size: int = 50
+        self.total_count: int = 0
+        self.total_pages: int = 1
 
         self._build_ui()
 
@@ -132,17 +139,16 @@ class ReportsHome(ft.Container):
         self._set_tab(self.active_tab)
 
     def handle_export_csv(self, e: ft.ControlEvent) -> None:
-        if not self.report_data:
-            self.report_data = self.controller.get_admission_fees_report(
+        try:
+            status_param = None if self.selected_status == "ALL" else self.selected_status
+            path = self.controller.export_filtered_fees_report_csv(
                 course_id=self.selected_course_id,
-                status=self.selected_status,
+                status=status_param,
                 search=self.search_text,
                 sort_by=self.sort_by,
             )
-        try:
-            path = self.controller.export_fees_report_csv(self.report_data)
             self.show_toast(f"Report exported successfully: {path.name}", is_success=True)
-            subprocess.Popen(["xdg-open", str(path.parent)])
+            open_path_externally(path.parent)
         except Exception as ex:
             self.show_toast(f"Export error: {ex}", is_error=True)
 
@@ -155,12 +161,19 @@ class ReportsHome(ft.Container):
 
     # ── TAB 1: ADMISSION FEES REPORT (17 COLUMNS) ──
     def _build_fees_report_tab(self) -> ft.Container:
-        self.report_data = self.controller.get_admission_fees_report(
+        status_param = None if self.selected_status == "ALL" else self.selected_status
+        result = self.controller.get_admission_fees_report_paginated(
             course_id=self.selected_course_id,
-            status=self.selected_status,
+            status=status_param,
             search=self.search_text,
             sort_by=self.sort_by,
+            page=self.current_page,
+            page_size=self.page_size,
         )
+        self.report_data = result["rows"]
+        self.total_count = result["total_count"]
+        self.total_pages = result["total_pages"]
+        self.current_page = result["page"]
 
         courses, _ = self.course_controller.list_courses(limit=100)
         c_options = [ft.DropdownOption(key="ALL", text="All Courses")]
@@ -172,14 +185,17 @@ class ReportsHome(ft.Container):
             prefix_icon=ft.Icons.SEARCH,
             value=self.search_text,
             border_radius=AppTheme.RADIUS_MD,
-            width=260,
+            width=250,
         )
 
         def do_search(e):
             self.search_text = (search_box.value or "").strip()
+            self.current_page = 1
             self._set_tab(0)
 
         search_box.on_submit = do_search
+
+        search_btn = ft.ElevatedButton("Search", icon=ft.Icons.SEARCH, on_click=do_search)
 
         course_dropdown = ft.Dropdown(
             label="Course",
@@ -192,9 +208,30 @@ class ReportsHome(ft.Container):
         def on_c_change(e):
             val = course_dropdown.value
             self.selected_course_id = int(val) if val and val != "ALL" else None
+            self.current_page = 1
             self._set_tab(0)
 
         course_dropdown.on_select = on_c_change
+
+        status_dropdown = ft.Dropdown(
+            label="Status",
+            options=[
+                ft.DropdownOption(key="ALL", text="All Statuses"),
+                ft.DropdownOption(key="CONFIRMED", text="Confirmed"),
+                ft.DropdownOption(key="REGISTERED", text="Registered"),
+                ft.DropdownOption(key="CANCELLED", text="Cancelled"),
+            ],
+            value=self.selected_status or "ALL",
+            border_radius=AppTheme.RADIUS_MD,
+            width=150,
+        )
+
+        def on_s_change(e):
+            self.selected_status = status_dropdown.value or "ALL"
+            self.current_page = 1
+            self._set_tab(0)
+
+        status_dropdown.on_select = on_s_change
 
         sort_dropdown = ft.Dropdown(
             label="Sort By Installment",
@@ -215,13 +252,15 @@ class ReportsHome(ft.Container):
         def on_sort_change(e):
             val = sort_dropdown.value
             self.sort_by = val if val != "NONE" else None
+            self.current_page = 1
             self._set_tab(0)
 
         sort_dropdown.on_select = on_sort_change
 
         filter_bar = ft.Row(
-            controls=[search_box, course_dropdown, sort_dropdown],
+            controls=[search_box, search_btn, course_dropdown, status_dropdown, sort_dropdown],
             spacing=AppTheme.PAD_SM,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
         rows = []
@@ -284,12 +323,97 @@ class ReportsHome(ft.Container):
             column_spacing=14,
         )
 
+        empty_container = ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Icon(ft.Icons.SEARCH_OFF, size=40, color=AppTheme.TEXT_MUTED),
+                    ft.Text("No admission records found matching filters.", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_SECONDARY),
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=AppTheme.PAD_XS,
+            ),
+            padding=ft.Padding(0, 30, 0, 30),
+            visible=len(rows) == 0,
+        )
+
+        def on_prev_page(e):
+            if self.current_page > 1:
+                self.current_page -= 1
+                self._set_tab(0)
+
+        def on_next_page(e):
+            if self.current_page < self.total_pages:
+                self.current_page += 1
+                self._set_tab(0)
+
+        def on_page_size_change(e):
+            try:
+                self.page_size = int(page_size_dropdown.value)
+                self.current_page = 1
+                self._set_tab(0)
+            except (ValueError, TypeError):
+                pass
+
+        start_item = (self.current_page - 1) * self.page_size + 1 if self.total_count > 0 else 0
+        end_item = min(self.total_count, self.current_page * self.page_size)
+
+        pagination_info = ft.Text(
+            f"Showing {start_item} - {end_item} of {self.total_count} admissions (Page {self.current_page} of {self.total_pages})"
+            if self.total_count > 0 else "Showing 0 of 0 admissions",
+            size=AppTheme.SIZE_CAPTION,
+            color=AppTheme.TEXT_SECONDARY,
+        )
+
+        page_size_dropdown = ft.Dropdown(
+            value=str(self.page_size),
+            width=120,
+            text_size=AppTheme.SIZE_CAPTION,
+            options=[
+                ft.DropdownOption(key="10", text="10 / page"),
+                ft.DropdownOption(key="25", text="25 / page"),
+                ft.DropdownOption(key="50", text="50 / page"),
+                ft.DropdownOption(key="100", text="100 / page"),
+            ],
+            on_select=on_page_size_change,
+        )
+
+        prev_page_btn = ft.IconButton(
+            icon=ft.Icons.CHEVRON_LEFT,
+            tooltip="Previous Page",
+            disabled=self.current_page <= 1,
+            on_click=on_prev_page,
+        )
+        next_page_btn = ft.IconButton(
+            icon=ft.Icons.CHEVRON_RIGHT,
+            tooltip="Next Page",
+            disabled=self.current_page >= self.total_pages,
+            on_click=on_next_page,
+        )
+
+        pagination_row = ft.Row(
+            controls=[
+                pagination_info,
+                ft.Row(
+                    controls=[
+                        page_size_dropdown,
+                        prev_page_btn,
+                        next_page_btn,
+                    ],
+                    spacing=AppTheme.PAD_XS,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
+            ],
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+
         return ft.Container(
             content=ft.Column(
                 controls=[
                     filter_bar,
-                    ft.Text(f"Showing {len(self.report_data)} Admission Records (Installment Breakdown)", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_SECONDARY),
-                    ft.ListView(controls=[table], expand=True),
+                    ft.ListView(controls=[table], expand=True) if len(rows) > 0 else empty_container,
+                    ft.Divider(height=1, color=AppTheme.BORDER),
+                    pagination_row,
                 ],
                 spacing=AppTheme.PAD_SM,
                 expand=True,

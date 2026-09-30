@@ -398,25 +398,36 @@ class CourseHome(ft.Column):
         )
 
     def _handle_add_course(self, e: ft.ControlEvent) -> None:
-        if not self.page:
+        p = self.safe_page
+        if not p:
             return
-        modal = CourseFormModal(on_saved=lambda cid: self.refresh_data(), page=self.page)
-        self.page.open(modal)
+        modal = CourseFormModal(on_saved=lambda cid: self.refresh_data(), page=p)
+        p.show_dialog(modal)
 
     def _handle_edit_course(self, course: CourseDTO) -> None:
-        if not self.page:
+        p = self.safe_page
+        if not p:
             return
-        modal = CourseFormModal(course=course, on_saved=lambda cid: self.refresh_data(), page=self.page)
-        self.page.open(modal)
+        modal = CourseFormModal(course=course, on_saved=lambda cid: self.refresh_data(), page=p)
+        p.show_dialog(modal)
 
     def _handle_change_fee(self, course: CourseDTO) -> None:
-        if not self.page:
+        p = self.safe_page
+        if not p:
             return
-        dialog = CourseFeeDialog(course=course, on_fee_updated=lambda cid: self.refresh_data(), page=self.page)
-        self.page.open(dialog)
+        dialog = CourseFeeDialog(course=course, on_fee_updated=lambda cid: self.refresh_data(), page=p)
+        p.show_dialog(dialog)
 
     def _handle_view_details(self, course_id: int) -> None:
-        if not self.page:
+        p = self.safe_page
+        if not p:
             return
-        dialog = CourseDetailDialog(course_id=course_id, on_course_mutated=self.refresh_data, page=self.page)
-        self.page.open(dialog)
+        dialog = CourseDetailDialog(course_id=course_id, on_course_mutated=self.refresh_data, page=p)
+        p.show_dialog(dialog)
+
+    @property
+    def safe_page(self) -> Optional[ft.Page]:
+        try:
+            return getattr(self, "_root_page", None) or self.page or getattr(self, "_page", None)
+        except (RuntimeError, AttributeError):
+            return getattr(self, "_root_page", None) or getattr(self, "_page", None)

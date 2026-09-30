@@ -72,13 +72,25 @@ class AdmissionForm(ft.Column):
         self.spacing = 15
         self.horizontal_alignment = ft.CrossAxisAlignment.START
 
+    @property
+    def safe_page(self) -> ft.Page | None:
+        p = getattr(self, "_root_page", None) or getattr(self, "_page", None)
+        if p:
+            return p
+        try:
+            return self.page
+        except RuntimeError:
+            return None
+
     def open_student_dialog(self, e: ft.ControlEvent) -> None:
-        if self.page:
-            self.page.show_dialog(self.student_search_dialog)
+        p = self.safe_page
+        if p:
+            p.show_dialog(self.student_search_dialog)
 
     def open_course_dialog(self, e: ft.ControlEvent) -> None:
-        if self.page:
-            self.page.show_dialog(self.course_search_dialog)
+        p = self.safe_page
+        if p:
+            p.show_dialog(self.course_search_dialog)
 
     def on_student_selected(self, student: StudentSearchResultDTO) -> None:
         self.selected_student_id = student.id
@@ -105,10 +117,11 @@ class AdmissionForm(ft.Column):
         self.register_btn.disabled = not (self.selected_student_id and self.selected_course_id)
 
     def show_message(self, message: str, is_error: bool = False) -> None:
-        if not self.page: return
+        p = self.safe_page
+        if not p: return
         color = ft.Colors.ERROR if is_error else ft.Colors.GREEN
         snackbar = ft.SnackBar(content=ft.Text(message, color=ft.Colors.WHITE), bgcolor=color)
-        self.page.show_dialog(snackbar)
+        p.show_dialog(snackbar)
 
     def handle_register(self, e: ft.ControlEvent) -> None:
         raw_data = {

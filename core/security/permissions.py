@@ -14,8 +14,9 @@ class Permission(str, Enum):
     # Financial Governance
     PAYMENT_PIN_CHANGE = "PAYMENT_PIN_CHANGE"
 
-    # Student Management Lifecycle
+    # Student & Admission Management Lifecycle
     STUDENT_DELETE = "STUDENT_DELETE"
+    ADMISSION_DELETE = "ADMISSION_DELETE"
 
     # Course / Curriculum Governance
     COURSE_CREATE = "COURSE_CREATE"

@@ -1113,6 +1113,8 @@ class StudentHome(ft.Container):
         )
         self._open_dialog(modal)
 
+    handle_new_student = handle_add_student
+
     def handle_edit_student(self, student: StudentDTO) -> None:
         """Opens the Student Edit modal."""
         modal = StudentFormModal(
@@ -1132,14 +1134,29 @@ class StudentHome(ft.Container):
         self._open_dialog(workspace)
 
     def handle_delete_student(self, student: StudentDTO) -> None:
-        """Opens Delete Confirmation Dialog with ERP foreign key & audit rules."""
+        """Opens Administrator Destructive Deletion Dialog with exact dependency breakdown."""
+        from core.security.context import SecurityContext
+        from core.security.roles import Role
+        from core.exceptions import ForbiddenError
+        
+        current_role = SecurityContext.get_current_role()
+        if str(current_role).upper() != Role.ADMINISTRATOR.value:
+            self.show_snackbar("Access Denied: Only an Administrator can delete student profiles.", is_error=True)
+            return
+
+        try:
+            impact = self.controller.get_deletion_impact(student.id)
+        except Exception as ex:
+            self.show_snackbar(f"Failed to calculate deletion impact: {ex}", is_error=True)
+            return
+
         def confirm_delete(e):
             msg = ""
             err = False
             try:
                 self.controller.delete_student(student.id)
-                msg = f"Student '{student.display_name}' deleted successfully."
-            except (ValidationError, ConflictError, ServiceError) as ex:
+                msg = f"Student '{student.display_name}' and all linked records permanently deleted."
+            except (ValidationError, ConflictError, ServiceError, ForbiddenError) as ex:
                 msg = str(ex)
                 err = True
             except Exception as ex:
@@ -1147,14 +1164,12 @@ class StudentHome(ft.Container):
                 msg = "An unexpected error occurred during deletion."
                 err = True
             finally:
-                # Pop confirmation dialog FIRST
                 try:
                     if self.page:
                         self.page.pop_dialog()
                 except RuntimeError:
                     pass
 
-                # Then show snackbar and refresh table
                 if msg:
                     self.show_snackbar(msg, is_error=err)
                 if not err:
@@ -1167,38 +1182,50 @@ class StudentHome(ft.Container):
             except RuntimeError:
                 pass
 
+        details_controls = [
+            ft.Text(
+                f"Permanently delete student '{student.display_name}' (ID: #{student.id})?",
+                size=AppTheme.SIZE_BODY,
+                weight=ft.FontWeight.BOLD,
+                color=AppTheme.TEXT_PRIMARY,
+            ),
+            ft.Container(height=4),
+            ft.Text("The following associated records will also be permanently deleted:", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
+            ft.Text(f"• Admissions: {impact.get('admissions', 0)}", size=AppTheme.SIZE_CAPTION),
+            ft.Text(f"• Payments: {impact.get('payments', 0)} (Total: ₹{impact.get('payments_total', 0.0):,.2f})", size=AppTheme.SIZE_CAPTION),
+            ft.Text(f"• Receipts: {impact.get('receipts', 0)}", size=AppTheme.SIZE_CAPTION),
+            ft.Text(f"• Documents: {impact.get('documents', 0)}", size=AppTheme.SIZE_CAPTION),
+            ft.Text(f"• Peer Connections: {impact.get('friendships', 0)}", size=AppTheme.SIZE_CAPTION),
+            ft.Container(height=6),
+            ft.Text(
+                "CAUTION: This operation cannot be undone. An audit event will be recorded.",
+                size=AppTheme.SIZE_CAPTION,
+                color=AppTheme.DANGER,
+                weight=ft.FontWeight.BOLD,
+            ),
+        ]
+
         dialog = ft.AlertDialog(
             modal=True,
             title=ft.Row(
                 controls=[
-                    ft.Icon(ft.Icons.WARNING_AMBER, color=AppTheme.DANGER, size=22),
-                    ft.Text("Confirm Student Deletion", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
+                    ft.Icon(ft.Icons.WARNING_AMBER, color=AppTheme.DANGER, size=24),
+                    ft.Text("Administrator: Delete Student Profile", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
                 ],
                 spacing=AppTheme.PAD_SM,
             ),
             content=ft.Container(
-                width=420,
+                width=460,
                 content=ft.Column(
-                    controls=[
-                        ft.Text(
-                            f"Are you sure you want to delete student '{student.display_name}' (ID: #{student.id})?",
-                            size=AppTheme.SIZE_BODY,
-                            color=AppTheme.TEXT_PRIMARY,
-                        ),
-                        ft.Text(
-                            "ERP Policy: Student profiles with linked admission history cannot be deleted.",
-                            size=AppTheme.SIZE_CAPTION,
-                            color=AppTheme.TEXT_SECONDARY,
-                        ),
-                    ],
-                    spacing=AppTheme.PAD_SM,
+                    controls=details_controls,
+                    spacing=AppTheme.PAD_XS,
                     tight=True,
                 ),
             ),
             actions=[
                 ft.TextButton(content=ft.Text("Cancel", size=AppTheme.SIZE_BODY), on_click=cancel_delete),
                 ft.ElevatedButton(
-                    content=ft.Text("Delete Record", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                    content=ft.Text("Permanently Delete", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
                     style=ft.ButtonStyle(bgcolor=AppTheme.DANGER, color=AppTheme.SURFACE),
                     on_click=confirm_delete,
                 ),
@@ -1209,9 +1236,9 @@ class StudentHome(ft.Container):
 
     def _open_dialog(self, dialog: ft.AlertDialog) -> None:
         try:
-            page = self.page
-        except RuntimeError:
-            page = None
+            page = self.page or getattr(self, "_root_page", None)
+        except (RuntimeError, AttributeError):
+            page = getattr(self, "_root_page", None)
         if not page:
             return
         page.show_dialog(dialog)

@@ -207,6 +207,7 @@ class CourseDetailDialog(ft.AlertDialog):
                 pricing_box,
                 operational_metrics,
                 desc_box,
+                self._build_batches_section(),
                 history_section,
                 ft.Divider(height=8),
                 admin_toolbar,
@@ -214,6 +215,93 @@ class CourseDetailDialog(ft.AlertDialog):
             spacing=AppTheme.PAD_MD,
             scroll=ft.ScrollMode.AUTO,
         )
+
+    def _build_batches_section(self) -> ft.Control:
+        from modules.batch.controller import BatchController
+        from modules.batch.views.batch_form_modal import BatchFormModal
+
+        batch_ctrl = BatchController()
+        try:
+            batches = batch_ctrl.list_batches_by_course(course_id=self.course_id)
+        except Exception:
+            batches = []
+
+        def on_add_batch(e):
+            target_page = self._root_page or getattr(self, "page", None)
+            if target_page:
+                modal = BatchFormModal(
+                    preselected_course_id=self.course_id,
+                    on_saved=lambda _: self._refresh_dialog(),
+                )
+                target_page.show_dialog(modal)
+
+        batch_items = []
+        for b in batches:
+            status_color = AppTheme.SUCCESS if b.status.value == "OPEN" else AppTheme.TEXT_MUTED
+            batch_items.append(
+                ft.Container(
+                    content=ft.Row(
+                        controls=[
+                            ft.Column(
+                                controls=[
+                                    ft.Text(b.batch_name, size=AppTheme.SIZE_BODY, weight=ft.FontWeight.W_600),
+                                    ft.Text(f"Timing: {b.timing} | Max: {b.max_capacity} students", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
+                                ],
+                                spacing=1,
+                            ),
+                            ft.Container(
+                                content=ft.Text(b.status.value, size=AppTheme.SIZE_CAPTION, color=status_color, weight=ft.FontWeight.BOLD),
+                                bgcolor=AppTheme.SURFACE_VARIANT,
+                                padding=ft.Padding(6, 2, 6, 2),
+                                border_radius=AppTheme.RADIUS_SM,
+                            ),
+                        ],
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    ),
+                    padding=ft.Padding(8, 6, 8, 6),
+                    bgcolor=AppTheme.BACKGROUND,
+                    border_radius=AppTheme.RADIUS_SM,
+                )
+            )
+
+        if not batch_items:
+            batch_items.append(
+                ft.Text("No active batches configured for this course.", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED)
+            )
+
+        return ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Row(
+                        controls=[
+                            ft.Text("Course Batches", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                            ft.TextButton("+ Add Batch", on_click=on_add_batch),
+                        ],
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    ),
+                    ft.Column(controls=batch_items, spacing=4),
+                ],
+                spacing=6,
+            ),
+            bgcolor=AppTheme.SURFACE,
+            padding=ft.Padding(12, 8, 12, 8),
+            border_radius=AppTheme.RADIUS_MD,
+            border=ft.Border.all(1, AppTheme.BORDER),
+        )
+
+    def _refresh_dialog(self) -> None:
+        self.summary = self.controller.get_operational_summary(self.course_id)
+        self.content = ft.Container(
+            content=self._build_body(),
+            width=650,
+            height=500,
+            padding=ft.Padding(0, 8, 0, 0),
+        )
+        try:
+            self.update()
+        except RuntimeError:
+            pass
+        self.on_course_mutated()
 
     def _metric_tile(self, label: str, value: str, icon: str) -> ft.Control:
         return ft.Container(
@@ -288,7 +376,7 @@ class CourseDetailDialog(ft.AlertDialog):
             self.on_course_mutated()
 
         fee_diag = CourseFeeDialog(course=self.course, on_fee_updated=on_updated, page=target_page)
-        target_page.open(fee_diag)
+        target_page.show_dialog(fee_diag)
 
     def _handle_edit_click(self, e: ft.ControlEvent) -> None:
         target_page = self.page or self._root_page
@@ -307,7 +395,7 @@ class CourseDetailDialog(ft.AlertDialog):
             self.on_course_mutated()
 
         modal = CourseFormModal(course=self.course, on_saved=on_saved, page=target_page)
-        target_page.open(modal)
+        target_page.show_dialog(modal)
 
     def _handle_toggle_status_click(self, e: ft.ControlEvent) -> None:
         try:
@@ -332,11 +420,17 @@ class CourseDetailDialog(ft.AlertDialog):
         except Exception as exc:
             LogService.error(f"Delete failed: {exc}", context=self.__class__.__name__)
 
-    def close_dialog(self, e: Optional[ft.ControlEvent] = None) -> None:
+    @property
+    def safe_page(self) -> Optional[ft.Page]:
         try:
-            if self.page:
-                self.page.pop_dialog()
-            elif self._root_page:
-                self._root_page.pop_dialog()
-        except RuntimeError:
-            pass
+            return getattr(self, "_root_page", None) or self.page or getattr(self, "_page", None)
+        except (RuntimeError, AttributeError):
+            return getattr(self, "_root_page", None) or getattr(self, "_page", None)
+
+    def close_dialog(self, e: Optional[ft.ControlEvent] = None) -> None:
+        p = self.safe_page
+        if p:
+            try:
+                p.pop_dialog()
+            except RuntimeError:
+                pass

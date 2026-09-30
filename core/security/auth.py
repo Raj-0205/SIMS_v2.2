@@ -431,6 +431,16 @@ class AuthService:
             }
 
     @classmethod
+    def rotate_security_stamp(cls, user_id: int) -> tuple[int, str]:
+        """
+        Rotates the security stamp and bumps monotonic version for user_id.
+        Immediately terminates any concurrent or active sessions.
+        """
+        with cls._transaction():
+            repo = UserRepository()
+            return repo.rotate_security_credentials(user_id)
+
+    @classmethod
     def initiate_admin_password_reset(
         cls,
         administrator_user_id: Any = None,

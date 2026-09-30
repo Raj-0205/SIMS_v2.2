@@ -199,6 +199,10 @@ class AdmissionDTO:
         return max(0.0, self.final_fee - self.total_paid)
 
     @property
+    def pending_fee(self) -> float:
+        return self.pending_amount
+
+    @property
     def admission_number(self) -> str:
         """Official candidate number YYYY-NNN format."""
         if self.candidate_year and self.candidate_sequence:
