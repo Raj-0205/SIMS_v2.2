@@ -49,22 +49,25 @@ class DatabaseEngine:
         def info(message: str) -> None:
             try:
                 LogService.info(message, context="DATABASE")
-            except Exception:
-                pass
+            except Exception as ex:
+                import sys
+                print(f"[DATABASE_EMERGENCY_LOG] INFO: {message} (LogService failed: {ex})", file=sys.stderr)
 
         @staticmethod
         def warning(message: str) -> None:
             try:
                 LogService.warning(message, context="DATABASE")
-            except Exception:
-                pass
+            except Exception as ex:
+                import sys
+                print(f"[DATABASE_EMERGENCY_LOG] WARNING: {message} (LogService failed: {ex})", file=sys.stderr)
 
         @staticmethod
         def error(message: str) -> None:
             try:
                 LogService.error(message, context="DATABASE")
-            except Exception:
-                pass
+            except Exception as ex:
+                import sys
+                print(f"[DATABASE_EMERGENCY_LOG] ERROR: {message} (LogService failed: {ex})", file=sys.stderr)
 
     @classmethod
     def _create_connection(cls, autocommit: bool = False) -> sqlite3.Connection:

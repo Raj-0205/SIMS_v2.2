@@ -46,6 +46,7 @@ class SettingsService(BaseService):
         }
 
     def save_institute_profile(self, profile: dict[str, str]) -> None:
+        AuthorizationService.enforce(Permission.SETTINGS_MANAGE)
         for k, v in profile.items():
             self.set_setting(k, v, category="INSTITUTE")
 

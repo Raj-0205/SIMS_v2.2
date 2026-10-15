@@ -53,3 +53,18 @@ class ReportsController:
         return self.service.export_filtered_fees_report_csv(
             course_id, status, search, sort_by, target_path
         )
+
+    def export_fees_report_excel(self, report_rows: list[dict[str, Any]], target_path: Optional[str | Path] = None) -> Path:
+        return self.service.export_fees_report_excel(report_rows, target_path)
+
+    def export_filtered_fees_report_excel(
+        self,
+        course_id: Optional[int] = None,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        target_path: Optional[str | Path] = None,
+    ) -> Path:
+        return self.service.export_filtered_fees_report_excel(
+            course_id, status, search, sort_by, target_path
+        )

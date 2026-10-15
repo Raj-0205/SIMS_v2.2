@@ -84,6 +84,22 @@ class StudentRepository(BaseRepository):
                 LIMIT 1
             ) AS latest_course_base_fee,
             (
+                SELECT (COALESCE(a.agreed_fee, c.base_fee) - COALESCE(a.discount, 0.0))
+                FROM admissions a
+                LEFT JOIN admission_courses ac ON ac.admission_id = a.id
+                LEFT JOIN courses c ON c.id = ac.course_id
+                WHERE a.student_id = s.id
+                ORDER BY a.id DESC
+                LIMIT 1
+            ) AS latest_agreed_fee,
+            (
+                SELECT COALESCE(SUM(p.amount), 0.0)
+                FROM payments p
+                WHERE p.admission_id = (
+                    SELECT a.id FROM admissions a WHERE a.student_id = s.id ORDER BY a.id DESC LIMIT 1
+                )
+            ) AS latest_paid_amount,
+            (
                 SELECT a.id
                 FROM admissions a
                 WHERE a.student_id = s.id

@@ -25,6 +25,7 @@ ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
         Permission.BATCH_CREATE,
         Permission.BATCH_MANAGE,
         Permission.BATCH_DELETE,
+        Permission.SETTINGS_MANAGE,
     },
 }
 

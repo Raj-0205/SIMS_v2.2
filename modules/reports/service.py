@@ -323,6 +323,23 @@ class ReportsService(BaseService):
         )
         return self.export_fees_report_csv(all_rows, target_path=target_path)
 
+    def export_filtered_fees_report_excel(
+        self,
+        course_id: Optional[int] = None,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        target_path: Optional[str | Path] = None,
+    ) -> Path:
+        """Exports all filtered report records to styled Microsoft Excel (.xlsx) workbook."""
+        all_rows = self.get_admission_fees_report(
+            course_id=course_id,
+            status=status,
+            search=search,
+            sort_by=sort_by,
+        )
+        return self.export_fees_report_excel(all_rows, target_path=target_path)
+
     def filter_payments_by_amount(self, target_amount: float, search: Optional[str] = None) -> list[dict[str, Any]]:
         """Filters payments matching exact amount (e.g. ₹500, ₹1000)."""
         with self.unit_of_work():
@@ -420,10 +437,70 @@ class ReportsService(BaseService):
         default_file = default_dir / f"fee_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         path = Path(target_path) if target_path else default_file
 
-        metadata = {
-            "Module": "SIMS v2.2 Admission & Fee Reporting System",
-            "Export Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "Total Records": len(report_rows),
-        }
+        return ExcelExporter.export_to_csv(headers=headers, rows=csv_rows, output_path=path)
 
-        return ExcelExporter.export_to_csv(headers=headers, rows=csv_rows, output_path=path, metadata=metadata)
+    def export_fees_report_excel(self, report_rows: list[dict[str, Any]], target_path: Optional[str | Path] = None) -> Path:
+        """Exports fee report records into a styled Microsoft Excel (.xlsx) workbook with bold headers and totals."""
+        headers = [
+            "SR.NO",
+            "COURSE NAME",
+            "ADMISSION DATE",
+            "ADMISSION ID",
+            "NAME",
+            "MOB NO",
+            "ADMISSION STATUS",
+            "TOTAL FEES",
+            "1ST INSTALLMENT",
+            "2ND INSTALLMENT",
+            "3RD INSTALLMENT",
+            "4TH INSTALLMENT",
+            "TOTAL FEES PAID",
+            "PENDING FEES",
+            "ADDRESS",
+            "FRIEND NAME",
+            "FRIEND CONTACT NO",
+        ]
+
+        rows = []
+        for idx, r in enumerate(report_rows, start=1):
+            clean_name = str(r.get("name") or "").strip()
+            clean_mob = str(r.get("mob_no") or "").strip()
+            inst1_val = float(r.get("inst1") or 0.0)
+            inst2_val = float(r.get("inst2") or 0.0)
+            inst3_val = float(r.get("inst3") or 0.0)
+            inst4_val = float(r.get("inst4") or 0.0)
+
+            rows.append([
+                idx,
+                r.get("course_name") or "General Course",
+                str(r.get("admission_date") or "")[:10],
+                r.get("admission_id") or "—",
+                clean_name or "—",
+                clean_mob or "—",
+                r.get("admission_status") or "CONFIRMED",
+                float(r.get("total_fees") or 0.0),
+                inst1_val if inst1_val > 0 else "—",
+                inst2_val if inst2_val > 0 else "—",
+                inst3_val if inst3_val > 0 else "—",
+                inst4_val if inst4_val > 0 else "—",
+                float(r.get("total_paid") or 0.0),
+                float(r.get("pending_fees") or 0.0),
+                r.get("address") or "—",
+                r.get("friend_name") or "—",
+                r.get("friend_mobile") or "—",
+            ])
+
+        default_dir = Path("exports/reports")
+        default_dir.mkdir(parents=True, exist_ok=True)
+        default_file = default_dir / f"fee_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        path = Path(target_path) if target_path else default_file
+
+        return ExcelExporter.export_to_excel(
+            headers=headers,
+            rows=rows,
+            output_path=path,
+            sheet_name="Fee Report",
+            title="SUDHARM INFOTECH - ADMISSION & FEE REPORT",
+            subtitle=f"Generated on {datetime.now().strftime('%d-%b-%Y %I:%M %p')} • Total Records: {len(report_rows)}",
+            include_totals=True,
+        )

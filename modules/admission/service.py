@@ -642,7 +642,7 @@ class AdmissionService(BaseService):
         with self.unit_of_work():
             row = self.repository.get_by_id(admission_id)
             if not row:
-                raise ValidationError(f"Admission with ID {admission_id} not found.")
+                raise NotFoundError(f"Admission with ID {admission_id} not found.")
             return AdmissionMapper.to_dto(row)
 
     def get_admission_workspace(self, admission_id: int) -> AdmissionWorkspaceDTO:
@@ -650,7 +650,7 @@ class AdmissionService(BaseService):
         with self.unit_of_work():
             adm_row = self.repository.get_by_id(admission_id)
             if not adm_row:
-                raise ValidationError(f"Admission with ID {admission_id} not found.")
+                raise NotFoundError(f"Admission with ID {admission_id} not found.")
             adm = AdmissionMapper.to_dto(adm_row)
 
             pay_rows = self.payment_repo.get_by_admission_id(admission_id)
@@ -964,14 +964,99 @@ class AdmissionService(BaseService):
                     friend_mobile,
                 ])
 
-        metadata = {
-            "Module": "SIMS v2.2 Admission Management System",
-            "Export Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "Total Records": len(admissions),
-            "Status Filter": dto.status or "All",
-        }
+        return ExcelExporter.export_to_csv(headers=headers, rows=rows, output_path=path)
 
-        return ExcelExporter.export_to_csv(headers=headers, rows=rows, output_path=path, metadata=metadata)
+    def export_admissions_excel(self, dto: AdmissionFilterDTO, target_path: Optional[str | Path] = None) -> Path:
+        """Exports filtered admissions into a styled Microsoft Excel (.xlsx) workbook with bold headers and totals."""
+        from infrastructure.excel.exporter import ExcelExporter
+        
+        filter_all = AdmissionFilterDTO(
+            query=dto.query,
+            course_id=dto.course_id,
+            status=dto.status,
+            year=dto.year,
+            month=dto.month,
+            sort_keys=dto.sort_keys,
+            limit=10000,
+            offset=0,
+        )
+        admissions, total = self.filter_admissions(filter_all)
+        
+        default_dir = Path("exports/admissions")
+        default_name = f"admission_directory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        path = Path(target_path) if target_path else default_dir / default_name
+
+        headers = [
+            "SR.NO",
+            "COURSE NAME",
+            "ADMISSION DATE",
+            "ADMISSION ID",
+            "NAME",
+            "MOB NO",
+            "ADMISSION STATUS",
+            "TOTAL FEES",
+            "1ST INSTALLMENT",
+            "2ND INSTALLMENT",
+            "3RD INSTALLMENT",
+            "4TH INSTALLMENT",
+            "TOTAL FEES PAID",
+            "PENDING FEES",
+            "ADDRESS",
+            "FRIEND NAME",
+            "FRIEND CONTACT NO",
+        ]
+        rows = []
+        with self.unit_of_work():
+            for idx, a in enumerate(admissions, start=1):
+                payments = self.payment_repo.get_by_admission_id(a.id)
+                inst_map = {}
+                for p in payments:
+                    inst_num = p.get("installment_number") or 1
+                    inst_map[inst_num] = inst_map.get(inst_num, 0.0) + float(p.get("amount") or 0.0)
+
+                inst1 = inst_map.get(1, 0.0)
+                inst2 = inst_map.get(2, 0.0)
+                inst3 = inst_map.get(3, 0.0)
+                inst4 = inst_map.get(4, 0.0)
+                total_paid = sum(inst_map.values())
+                final_fee = float(a.agreed_fee - a.discount)
+                pending = max(0.0, final_fee - total_paid)
+
+                friends = self.friendship_repo.get_friends_for_admission(a.id)
+                if not friends:
+                    friends = self.friendship_repo.get_confirmed_friends(a.student_id)
+                friend_name = f"{friends[0]['first_name']} {friends[0]['last_name']}".strip() if friends else "—"
+                friend_mobile = friends[0].get("mobile_number") or "—" if friends else "—"
+
+                rows.append([
+                    idx,
+                    a.course_name,
+                    str(a.created_at)[:10] if a.created_at else "—",
+                    a.admission_number,
+                    a.student_name,
+                    a.mobile_number or "—",
+                    a.status,
+                    final_fee,
+                    inst1 if inst1 > 0 else "—",
+                    inst2 if inst2 > 0 else "—",
+                    inst3 if inst3 > 0 else "—",
+                    inst4 if inst4 > 0 else "—",
+                    total_paid,
+                    pending,
+                    a.address or a.village or "—",
+                    friend_name,
+                    friend_mobile,
+                ])
+
+        return ExcelExporter.export_to_excel(
+            headers=headers,
+            rows=rows,
+            output_path=path,
+            sheet_name="Admissions",
+            title="SUDHARM INFOTECH - ADMISSIONS DIRECTORY",
+            subtitle=f"Generated on {datetime.now().strftime('%d-%b-%Y %I:%M %p')} • Total Admissions: {len(admissions)}",
+            include_totals=True,
+        )
 
     def export_admissions_pdf(self, dto: AdmissionFilterDTO, target_path: Optional[str | Path] = None) -> Path:
         """Exports filtered admissions into vector PDF report."""

@@ -46,12 +46,15 @@ class AdmissionFormModal(ft.AlertDialog):
         self,
         admission: Optional[AdmissionDTO] = None,
         on_saved: Optional[Callable[[], None]] = None,
+        initial_enquiry_data: Optional[dict[str, Any]] = None,
     ) -> None:
         super().__init__(modal=True)
 
         self.admission = admission
         self.is_edit_mode = admission is not None
         self.on_saved = on_saved or (lambda: None)
+        self.initial_enquiry_data = initial_enquiry_data or {}
+        self.initial_enquiry_id = self.initial_enquiry_data.get("enquiry_id")
 
         self.controller = AdmissionController()
         self.student_controller = StudentController()
@@ -61,7 +64,7 @@ class AdmissionFormModal(ft.AlertDialog):
 
         # State Variables
         self.selected_student_id: Optional[int] = admission.student_id if admission else None
-        self.selected_course_id: Optional[int] = admission.course_id if admission else None
+        self.selected_course_id: Optional[int] = admission.course_id if admission else (int(self.initial_enquiry_data["course_id"]) if self.initial_enquiry_data.get("course_id") else None)
         self.selected_batch_id: Optional[int] = admission.batch_id if admission else None
         self.base_course_fee: float = admission.course_fee if admission else 0.0
         self.enrollment_mode: str = "existing" if (self.is_edit_mode and admission) else "new"
@@ -171,7 +174,7 @@ class AdmissionFormModal(ft.AlertDialog):
             label="First Name *",
             hint_text="e.g. Keshav",
             border_radius=AppTheme.RADIUS_MD,
-            value=admission.first_name if admission else "",
+            value=admission.first_name if admission else self.initial_enquiry_data.get("first_name", ""),
             expand=True,
             on_change=lambda _: self._on_identity_input_changed(),
         )
@@ -179,7 +182,7 @@ class AdmissionFormModal(ft.AlertDialog):
             label="Middle / Father's Name",
             hint_text="e.g. Bharat",
             border_radius=AppTheme.RADIUS_MD,
-            value=admission.middle_name if admission else "",
+            value=admission.middle_name if admission else self.initial_enquiry_data.get("middle_name", ""),
             expand=True,
             on_change=lambda _: self._on_identity_input_changed(),
         )
@@ -187,7 +190,7 @@ class AdmissionFormModal(ft.AlertDialog):
             label="Surname / Last Name *",
             hint_text="e.g. Patil",
             border_radius=AppTheme.RADIUS_MD,
-            value=admission.last_name if admission else "",
+            value=admission.last_name if admission else self.initial_enquiry_data.get("last_name", ""),
             expand=True,
             on_change=lambda _: self._on_identity_input_changed(),
         )
@@ -196,9 +199,10 @@ class AdmissionFormModal(ft.AlertDialog):
             label="Contact 1 (Primary Mobile) *",
             hint_text="10-digit primary mobile number",
             border_radius=AppTheme.RADIUS_MD,
-            value=admission.mobile_number if admission else "",
+            value=admission.mobile_number if admission else self.initial_enquiry_data.get("mobile_number", ""),
             keyboard_type=ft.KeyboardType.PHONE,
             prefix_icon=ft.Icons.PHONE,
+            max_length=10,
             expand=True,
             on_change=lambda _: self._on_identity_input_changed(),
         )
@@ -206,9 +210,10 @@ class AdmissionFormModal(ft.AlertDialog):
             label="Contact 2 (Secondary Mobile) *",
             hint_text="10-digit alternate mobile number (Must differ from Contact 1)",
             border_radius=AppTheme.RADIUS_MD,
-            value=getattr(admission, "student_secondary_mobile", None) or getattr(admission, "secondary_mobile", None) or "",
+            value=(getattr(admission, "student_secondary_mobile", None) or getattr(admission, "secondary_mobile", None) or "") if admission else self.initial_enquiry_data.get("secondary_mobile", ""),
             keyboard_type=ft.KeyboardType.PHONE,
             prefix_icon=ft.Icons.PHONE_ANDROID,
+            max_length=10,
             expand=True,
             on_change=lambda _: self._on_identity_input_changed(),
         )
@@ -242,7 +247,7 @@ class AdmissionFormModal(ft.AlertDialog):
                 ft.DropdownOption(key="FEMALE", text="Female"),
                 ft.DropdownOption(key="OTHER", text="Other"),
             ],
-            value=admission.gender.upper() if (admission and admission.gender) else "MALE",
+            value=admission.gender.upper() if (admission and admission.gender) else (self.initial_enquiry_data.get("gender", "MALE") or "MALE").upper(),
             border_radius=AppTheme.RADIUS_MD,
             expand=True,
         )
@@ -254,6 +259,7 @@ class AdmissionFormModal(ft.AlertDialog):
             value=admission.aadhaar_number if admission else "",
             keyboard_type=ft.KeyboardType.NUMBER,
             prefix_icon=ft.Icons.FINGERPRINT,
+            max_length=12,
             expand=True,
             on_change=lambda _: self._clear_field_error(self.aadhaar_input),
         )
@@ -261,7 +267,7 @@ class AdmissionFormModal(ft.AlertDialog):
             label="Village / City *",
             hint_text="e.g. Chandwad",
             border_radius=AppTheme.RADIUS_MD,
-            value=admission.village if admission else "Chandwad",
+            value=admission.village if admission else self.initial_enquiry_data.get("village", "Chandwad"),
             on_change=lambda _: self._on_village_changed(),
             expand=True,
         )
@@ -269,7 +275,7 @@ class AdmissionFormModal(ft.AlertDialog):
             label="Residential Address",
             hint_text="e.g. Near Ganesh Temple, Phule Nagar",
             border_radius=AppTheme.RADIUS_MD,
-            value=admission.address if admission else "",
+            value=admission.address if admission else self.initial_enquiry_data.get("address", ""),
             expand=True,
             on_change=lambda _: self._clear_field_error(self.address_input),
         )
@@ -411,7 +417,11 @@ class AdmissionFormModal(ft.AlertDialog):
             style=ft.ButtonStyle(bgcolor=AppTheme.SUCCESS, color=AppTheme.SURFACE),
             on_click=self.handle_confirm_flow,
         )
-        self.cancel_btn = ft.TextButton(content=ft.Text("Cancel"), on_click=self.close_modal)
+        self.cancel_btn = ft.OutlinedButton(
+            content=ft.Row([ft.Icon(ft.Icons.ARROW_BACK, size=16), ft.Text("◀ Cancel / Go Back")], spacing=6),
+            tooltip="Close admission form and return to previous step",
+            on_click=self.close_modal,
+        )
 
         # Build Main Workspace Layout
         self._build_content_layout()
@@ -567,20 +577,23 @@ class AdmissionFormModal(ft.AlertDialog):
     def _show_success(self, msg: str) -> None:
         self._show_toast(msg, is_success=True)
 
+    def _set_control_error(self, control: ft.Control, message: Optional[str]) -> None:
+        if isinstance(control, ft.Dropdown):
+            control.error_text = message
+        elif hasattr(control, "error"):
+            control.error = message
+        elif hasattr(control, "error_text"):
+            control.error_text = message
+
     def _clear_field_error(self, control: ft.Control) -> None:
-        if hasattr(control, "error_text") and control.error_text:
-            control.error_text = None
-            self._safe_update()
+        self._set_control_error(control, None)
+        self._safe_update()
 
     def _on_identity_input_changed(self) -> None:
-        if self.first_name_input.error_text:
-            self.first_name_input.error_text = None
-        if self.last_name_input.error_text:
-            self.last_name_input.error_text = None
-        if self.mobile_input.error_text:
-            self.mobile_input.error_text = None
-        if self.secondary_mobile_input.error_text:
-            self.secondary_mobile_input.error_text = None
+        self._set_control_error(self.first_name_input, None)
+        self._set_control_error(self.last_name_input, None)
+        self._set_control_error(self.mobile_input, None)
+        self._set_control_error(self.secondary_mobile_input, None)
 
         self._trigger_duplicate_check()
 
@@ -711,26 +724,31 @@ class AdmissionFormModal(ft.AlertDialog):
         self._safe_update()
 
     def _on_student_search_change(self, e: ft.ControlEvent) -> None:
-        query = (e.control.value or "").strip()
-        if len(query) < 2:
-            self.student_search_results.controls.clear()
-            self._safe_update()
-            return
+        try:
+            query = (e.control.value or "").strip()
+            if len(query) < 2:
+                self.student_search_results.controls.clear()
+                self._safe_update()
+                return
 
-        results = self.student_controller.search_students(query)
-        tiles = []
-        for s in results[:6]:
-            sec_text = f", Alt: {s.secondary_mobile}" if s.secondary_mobile else ""
-            tiles.append(
-                ft.ListTile(
-                    title=ft.Text(s.display_name, size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
-                    subtitle=ft.Text(f"Mobile: {s.mobile_number or N/A}{sec_text} • Village: {s.village or Chandwad} • ID: #{s.id}", size=AppTheme.SIZE_CAPTION),
-                    leading=ft.Icon(ft.Icons.PERSON, color=AppTheme.PRIMARY),
-                    on_click=lambda _, sid=s.id: self._select_existing_student(sid),
+            results = self.student_controller.search_students(query)
+            tiles = []
+            for s in results[:6]:
+                sec_text = f", Alt: {s.secondary_mobile}" if s.secondary_mobile else ""
+                mob_text = s.mobile_number or "N/A"
+                vil_text = s.village or "Chandwad"
+                tiles.append(
+                    ft.ListTile(
+                        title=ft.Text(s.display_name, size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                        subtitle=ft.Text(f"Mobile: {mob_text}{sec_text} • Village: {vil_text} • ID: #{s.id}", size=AppTheme.SIZE_CAPTION),
+                        leading=ft.Icon(ft.Icons.PERSON, color=AppTheme.PRIMARY),
+                        on_click=lambda _, sid=s.id: self._select_existing_student(sid),
+                    )
                 )
-            )
-        self.student_search_results.controls = tiles
-        self._safe_update()
+            self.student_search_results.controls = tiles
+            self._safe_update()
+        except Exception as exc:
+            LogService.error(f"Student search change error: {exc}", context=self.__class__.__name__)
 
     def _select_existing_student(self, student_id: int) -> None:
         st = self.student_controller.get_student(student_id)
@@ -923,17 +941,18 @@ class AdmissionFormModal(ft.AlertDialog):
 
     # ── Field-Level Validation UX ──
     def _validate_fields(self, is_confirm: bool = False) -> bool:
-        """Enforces field-level validation and highlights offending inputs with explicit error text."""
+        """Enforces field-level validation and highlights offending inputs with explicit error text and section location."""
         has_error = False
+        location_errors: list[str] = []
 
         # Clear existing error flags
-        self.first_name_input.error_text = None
-        self.last_name_input.error_text = None
-        self.mobile_input.error_text = None
-        self.secondary_mobile_input.error_text = None
-        self.course_dropdown.error_text = None
-        self.village_input.error_text = None
-        self.aadhaar_input.error_text = None
+        self._set_control_error(self.first_name_input, None)
+        self._set_control_error(self.last_name_input, None)
+        self._set_control_error(self.mobile_input, None)
+        self._set_control_error(self.secondary_mobile_input, None)
+        self._set_control_error(self.course_dropdown, None)
+        self._set_control_error(self.village_input, None)
+        self._set_control_error(self.aadhaar_input, None)
 
         first_name = (self.first_name_input.value or "").strip()
         last_name = (self.last_name_input.value or "").strip()
@@ -946,46 +965,57 @@ class AdmissionFormModal(ft.AlertDialog):
         if not self.selected_student_id:
             # Mandatory Identity Rules for New Student Creation
             if not first_name or len(first_name) < 2:
-                self.first_name_input.error_text = "First name is required (min 2 chars)"
+                self._set_control_error(self.first_name_input, "First name is required (min 2 chars)")
+                location_errors.append("[Section 1 - Student Identity]: First Name is required (minimum 2 letters)")
                 has_error = True
 
             if not last_name or len(last_name) < 2:
-                self.last_name_input.error_text = "Surname / Last name is required (min 2 chars)"
+                self._set_control_error(self.last_name_input, "Surname / Last name is required (min 2 chars)")
+                location_errors.append("[Section 1 - Student Identity]: Surname / Last name is required (minimum 2 letters)")
                 has_error = True
 
             if not c1:
-                self.mobile_input.error_text = "Primary mobile number is required"
+                self._set_control_error(self.mobile_input, "Primary mobile number is required")
+                location_errors.append("[Section 1 - Student Identity]: Contact 1 (Primary Mobile) is required")
                 has_error = True
             elif not re.match(r"^[6-9][0-9]{9}$", c1):
-                self.mobile_input.error_text = "Must be a valid 10-digit Indian mobile number"
+                self._set_control_error(self.mobile_input, "Must be a valid 10-digit Indian mobile number")
+                location_errors.append(f"[Section 1 - Student Identity]: Contact 1 must be a valid 10-digit mobile number (got {len(c1)} digits)")
                 has_error = True
 
             if not c2:
-                self.secondary_mobile_input.error_text = "Secondary mobile number is required"
+                self._set_control_error(self.secondary_mobile_input, "Secondary mobile number is required")
+                location_errors.append("[Section 1 - Student Identity]: Contact 2 (Secondary Mobile) is required")
                 has_error = True
             elif not re.match(r"^[6-9][0-9]{9}$", c2):
-                self.secondary_mobile_input.error_text = "Must be a valid 10-digit Indian mobile number"
+                self._set_control_error(self.secondary_mobile_input, "Must be a valid 10-digit Indian mobile number")
+                location_errors.append(f"[Section 1 - Student Identity]: Contact 2 must be a valid 10-digit mobile number (got {len(c2)} digits)")
                 has_error = True
             elif c1 and c2 and c1 == c2:
-                self.secondary_mobile_input.error_text = "Secondary mobile cannot be identical to Primary"
+                self._set_control_error(self.secondary_mobile_input, "Secondary mobile cannot be identical to Primary")
+                location_errors.append("[Section 1 - Student Identity]: Secondary mobile cannot be identical to Primary")
                 has_error = True
 
             if not village and not address:
-                self.village_input.error_text = "At least Village or Residential Address is required"
+                self._set_control_error(self.village_input, "At least Village or Residential Address is required")
+                location_errors.append("[Section 2 - Location & Residence]: At least Village OR Address is required")
                 has_error = True
 
         if not self.course_dropdown.value:
-            self.course_dropdown.error_text = "Please select a Course"
+            self._set_control_error(self.course_dropdown, "Please select a Course")
+            location_errors.append("[Section 4 - Course & Batch]: Please select an enrolled Course")
             has_error = True
 
         if aadhaar:
             digits = re.sub(r"\D", "", aadhaar)
             if len(digits) != 12:
-                self.aadhaar_input.error_text = "Aadhaar must be exactly 12 digits"
+                self._set_control_error(self.aadhaar_input, "Aadhaar must be exactly 12 digits")
+                location_errors.append(f"[Section 2 - KYC Identification]: Aadhaar must be exactly 12 digits (got {len(digits)} digits)")
                 has_error = True
 
         if has_error:
-            self._show_error("Please correct the highlighted errors before proceeding.")
+            summary_msg = "Please fix the missing/invalid fields:\n" + "\n".join(f"• {e}" for e in location_errors)
+            self._show_error(summary_msg)
             self._safe_update()
             return False
 
@@ -1057,8 +1087,17 @@ class AdmissionFormModal(ft.AlertDialog):
             payload = self._gather_form_payload(AdmissionStatus.DRAFT)
             if self.is_edit_mode and self.admission:
                 self.controller.update_admission(self.admission.id, payload)
+                adm_id = self.admission.id
             else:
-                self.controller.create_admission(payload)
+                adm_id = self.controller.create_admission(payload)
+
+            if getattr(self, "initial_enquiry_id", None) and adm_id:
+                try:
+                    from modules.enquiry.controller import EnquiryController
+                    EnquiryController().service.mark_converted(self.initial_enquiry_id, adm_id)
+                except Exception as enq_ex:
+                    LogService.warning(f"Could not convert enquiry {self.initial_enquiry_id}: {enq_ex}", context="AdmissionFormModal")
+
             self.close_modal()
             self.on_saved()
         except (ValidationError, ConflictError, ServiceError) as ex:
@@ -1083,6 +1122,13 @@ class AdmissionFormModal(ft.AlertDialog):
                 adm_id = self.admission.id
             else:
                 adm_id = self.controller.create_admission(payload)
+
+            if getattr(self, "initial_enquiry_id", None) and adm_id:
+                try:
+                    from modules.enquiry.controller import EnquiryController
+                    EnquiryController().service.mark_converted(self.initial_enquiry_id, adm_id)
+                except Exception as enq_ex:
+                    LogService.warning(f"Could not convert enquiry {self.initial_enquiry_id}: {enq_ex}", context="AdmissionFormModal")
 
             adm = self.controller.get_admission(adm_id)
 

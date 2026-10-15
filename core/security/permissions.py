@@ -28,6 +28,9 @@ class Permission(str, Enum):
     BATCH_MANAGE = "BATCH_MANAGE"
     BATCH_DELETE = "BATCH_DELETE"
 
+    # Settings & Institute Administration
+    SETTINGS_MANAGE = "SETTINGS_MANAGE"
+
 
 class SecurityPermission(str, Enum):
     """

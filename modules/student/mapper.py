@@ -17,8 +17,14 @@ class StudentMapper:
     @staticmethod
     def to_dto(row: Mapping[str, Any]) -> StudentDTO:
         """Maps a database row dictionary to StudentDTO."""
-        raw_fee = row.get("latest_course_base_fee")
-        base_fee_val = float(raw_fee) if raw_fee is not None else None
+        raw_agreed = row.get("latest_agreed_fee")
+        raw_base = row.get("latest_course_base_fee")
+        fee_val = float(raw_agreed) if raw_agreed is not None else (float(raw_base) if raw_base is not None else None)
+
+        has_adm = bool(row.get("latest_admission_id"))
+        paid_raw = row.get("latest_paid_amount")
+        paid_val = float(paid_raw) if paid_raw is not None and has_adm else (0.0 if has_adm else None)
+        pending_val = max(0.0, (fee_val or 0.0) - (paid_val or 0.0)) if fee_val is not None and paid_val is not None else None
 
         return StudentDTO(
             id=int(row["id"]),
@@ -49,9 +55,9 @@ class StudentMapper:
             latest_admission_seq=int(row["latest_admission_seq"]) if row.get("latest_admission_seq") else None,
             admission_status=str(row["latest_admission_status"]) if row.get("latest_admission_status") else None,
             latest_admission_date=str(row["latest_admission_date"]) if row.get("latest_admission_date") else None,
-            total_fee=base_fee_val,
-            paid_amount=None,      # Pending Finance Engine
-            pending_amount=None,   # Pending Finance Engine
+            total_fee=fee_val,
+            paid_amount=paid_val,
+            pending_amount=pending_val,
         )
 
     @staticmethod

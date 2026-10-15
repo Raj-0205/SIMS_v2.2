@@ -58,11 +58,20 @@ class ReportsHome(ft.Container):
                     ],
                     spacing=2,
                 ),
-                ft.ElevatedButton(
-                    "Export CSV (17 Columns)",
-                    icon=ft.Icons.DOWNLOAD,
-                    style=ft.ButtonStyle(bgcolor=AppTheme.SUCCESS, color=AppTheme.SURFACE),
-                    on_click=self.handle_export_csv,
+                ft.Row(
+                    controls=[
+                        ft.FilledButton(
+                            "Export Excel (.xlsx)",
+                            icon=ft.Icons.TABLE_VIEW,
+                            style=ft.ButtonStyle(
+                                bgcolor=AppTheme.PRIMARY,
+                                color=AppTheme.SURFACE,
+                                shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+                            ),
+                            on_click=self.handle_export_excel,
+                        ),
+                    ],
+                    spacing=AppTheme.PAD_SM,
                 ),
             ],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -139,18 +148,22 @@ class ReportsHome(ft.Container):
         self._set_tab(self.active_tab)
 
     def handle_export_csv(self, e: ft.ControlEvent) -> None:
+        """Delegates export to professional Excel (.xlsx) format per template specifications."""
+        self.handle_export_excel(e)
+
+    def handle_export_excel(self, e: ft.ControlEvent) -> None:
         try:
             status_param = None if self.selected_status == "ALL" else self.selected_status
-            path = self.controller.export_filtered_fees_report_csv(
+            path = self.controller.export_filtered_fees_report_excel(
                 course_id=self.selected_course_id,
                 status=status_param,
                 search=self.search_text,
                 sort_by=self.sort_by,
             )
-            self.show_toast(f"Report exported successfully: {path.name}", is_success=True)
+            self.show_toast(f"Excel Report (.xlsx) exported successfully: {path.name}", is_success=True)
             open_path_externally(path.parent)
         except Exception as ex:
-            self.show_toast(f"Export error: {ex}", is_error=True)
+            self.show_toast(f"Excel export error: {ex}", is_error=True)
 
     def _build_active_tab(self) -> ft.Control:
         if self.active_tab == 0:

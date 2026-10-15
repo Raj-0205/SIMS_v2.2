@@ -120,6 +120,7 @@ class StudentFormModal(ft.AlertDialog):
             border_radius=AppTheme.RADIUS_MD,
             text_size=AppTheme.SIZE_BODY,
             prefix_icon=ft.Icons.PHONE,
+            max_length=10,
             expand=True,
         )
 
@@ -140,6 +141,7 @@ class StudentFormModal(ft.AlertDialog):
             value=student.aadhaar_number if student and student.aadhaar_number else "",
             border_radius=AppTheme.RADIUS_MD,
             text_size=AppTheme.SIZE_BODY,
+            max_length=12,
             expand=True,
         )
 
@@ -232,15 +234,16 @@ class StudentFormModal(ft.AlertDialog):
             on_click=self.handle_submit,
         )
 
-        self.cancel_btn = ft.TextButton(
-            content=ft.Text("Cancel"),
-            style=ft.ButtonStyle(color=AppTheme.TEXT_SECONDARY),
+        self.cancel_btn = ft.OutlinedButton(
+            content=ft.Row([ft.Icon(ft.Icons.ARROW_BACK, size=16), ft.Text("◀ Cancel / Go Back")], spacing=6),
+            tooltip="Close student form and return to previous step",
             on_click=self.close_modal,
         )
 
         # Modal Layout
         self.content = ft.Container(
-            width=700,
+            width=760,
+            padding=ft.Padding(24, 16, 24, 16),
             content=ft.Column(
                 controls=[
                     self.error_container,
@@ -251,14 +254,22 @@ class StudentFormModal(ft.AlertDialog):
                     self.address_input,
                     ft.Row(controls=[self.qualification_input, self.blood_group_dropdown], spacing=AppTheme.PAD_SM),
                 ],
-                spacing=AppTheme.PAD_SM,
+                spacing=AppTheme.PAD_MD,
                 tight=True,
                 scroll=ft.ScrollMode.AUTO,
             ),
         )
 
-        self.actions = [self.cancel_btn, self.submit_btn]
-        self.actions_alignment = ft.MainAxisAlignment.END
+        self.actions = [
+            ft.Row(
+                controls=[
+                    self.cancel_btn,
+                    ft.Container(expand=True),
+                    self.submit_btn,
+                ],
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            )
+        ]
 
     @property
     def safe_page(self) -> Optional[ft.Page]:
@@ -307,15 +318,28 @@ class StudentFormModal(ft.AlertDialog):
         qualification = (self.qualification_input.value or "").strip()
         blood_group = self.blood_group_dropdown.value
 
-        if not first_name:
-            self._show_error("First name is required.")
+        import re
+
+        if not first_name or len(first_name) < 2:
+            self._show_error("[Section 1 - Identity]: First name is required (min 2 characters).")
             return
-        if not last_name:
-            self._show_error("Last name is required.")
+        if not last_name or len(last_name) < 2:
+            self._show_error("[Section 1 - Identity]: Last name / Surname is required (min 2 characters).")
             return
         if not mobile:
-            self._show_error("Mobile number is required.")
+            self._show_error("[Section 2 - Contact]: Mobile number is required.")
             return
+
+        clean_mobile = re.sub(r"\D", "", mobile)
+        if len(clean_mobile) != 10:
+            self._show_error(f"[Section 2 - Contact]: Mobile number must be exactly 10 digits (got {len(clean_mobile)} digits).")
+            return
+
+        if aadhaar:
+            clean_aadhaar = re.sub(r"\D", "", aadhaar)
+            if len(clean_aadhaar) != 12:
+                self._show_error(f"[Section 2 - Identity / KYC]: Aadhaar number must be exactly 12 digits (got {len(clean_aadhaar)} digits).")
+                return
 
         self.submit_btn.disabled = True
         self.submit_btn_text.value = "Saving..."

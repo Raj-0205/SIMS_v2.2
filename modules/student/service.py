@@ -438,21 +438,30 @@ class StudentService(BaseService):
             admission_rows = self.repository.get_student_admissions(student_id)
             admissions = []
             all_payments = []
-            for r in admission_rows:
-                adm_id = int(r["admission_id"])
-                p_rows = self.repository.execute_fetchall(
-                    "SELECT * FROM payments WHERE admission_id = ? ORDER BY installment_number ASC, id ASC;",
-                    (adm_id,)
+            if admission_rows:
+                adm_ids = [int(r["admission_id"]) for r in admission_rows]
+                placeholders = ",".join("?" for _ in adm_ids)
+                p_rows_all = self.repository.execute_fetchall(
+                    f"SELECT * FROM payments WHERE admission_id IN ({placeholders}) ORDER BY installment_number ASC, id ASC;",
+                    tuple(adm_ids)
                 )
-                all_payments.extend(p_rows)
-                inst_dict: dict[int, float] = {}
-                tot_p = 0.0
-                for p in p_rows:
-                    inum = int(p.get("installment_number") or 1)
-                    amt = float(p.get("amount") or 0.0)
-                    inst_dict[inum] = inst_dict.get(inum, 0.0) + amt
-                    tot_p += amt
-                admissions.append(StudentMapper.to_admission_dto(r, installments=inst_dict, total_paid=tot_p))
+                all_payments.extend(p_rows_all)
+
+                payments_by_adm: dict[int, list[Any]] = {}
+                for p in p_rows_all:
+                    payments_by_adm.setdefault(int(p["admission_id"]), []).append(p)
+
+                for r in admission_rows:
+                    adm_id = int(r["admission_id"])
+                    p_rows = payments_by_adm.get(adm_id, [])
+                    inst_dict: dict[int, float] = {}
+                    tot_p = 0.0
+                    for p in p_rows:
+                        inum = int(p.get("installment_number") or 1)
+                        amt = float(p.get("amount") or 0.0)
+                        inst_dict[inum] = inst_dict.get(inum, 0.0) + amt
+                        tot_p += amt
+                    admissions.append(StudentMapper.to_admission_dto(r, installments=inst_dict, total_paid=tot_p))
 
             rcp_rows = self.repository.execute_fetchall(
                 """
@@ -605,6 +614,8 @@ class StudentService(BaseService):
             "Admission No",
             "Student Name",
             "Mobile Number",
+            "Secondary Mobile",
+            "Village",
             "Email",
             "Current Course",
             "Admission Date",
@@ -620,6 +631,8 @@ class StudentService(BaseService):
                 s.candidate_number or "—",
                 s.display_name,
                 s.mobile_number or "—",
+                s.secondary_mobile or "—",
+                s.village or "—",
                 s.email or "—",
                 s.current_course or "—",
                 s.latest_admission_date[:10] if s.latest_admission_date else (s.created_at[:10] if s.created_at else "—"),
@@ -631,19 +644,64 @@ class StudentService(BaseService):
             for s in students
         ]
 
-        metadata = {
-            "Module": "SIMS v2.2 Student Management System",
-            "Export Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "Total Records": len(students),
-            "Search Query": filter_dto.query or "None",
-            "Status Filter": filter_dto.status or "All",
-        }
-
         return ExcelExporter.export_to_csv(
             headers=headers,
             rows=rows,
             output_path=path,
-            metadata=metadata,
+        )
+
+    def export_students_excel(
+        self, filter_dto: StudentFilterDTO, target_path: Optional[str | Path] = None
+    ) -> Path:
+        """Exports filtered student records into a styled Microsoft Excel (.xlsx) workbook."""
+        students = self.export_students_data(filter_dto)
+        default_dir = Path("exports/students")
+        default_name = f"student_directory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        path = Path(target_path) if target_path else default_dir / default_name
+
+        headers = [
+            "ID",
+            "Admission No",
+            "Student Name",
+            "Mobile Number",
+            "Secondary Mobile",
+            "Village",
+            "Email",
+            "Current Course",
+            "Admission Date",
+            "Status",
+            "Base Fee",
+            "Paid Amount",
+            "Pending Amount",
+        ]
+
+        rows = [
+            [
+                s.id,
+                s.candidate_number or "—",
+                s.display_name,
+                s.mobile_number or "—",
+                s.secondary_mobile or "—",
+                s.village or "—",
+                s.email or "—",
+                s.current_course or "—",
+                s.latest_admission_date[:10] if s.latest_admission_date else (s.created_at[:10] if s.created_at else "—"),
+                s.status_label,
+                float(s.total_fee) if s.total_fee is not None else "—",
+                float(s.paid_amount) if s.paid_amount is not None else "—",
+                float(s.pending_amount) if s.pending_amount is not None else "—",
+            ]
+            for s in students
+        ]
+
+        return ExcelExporter.export_to_excel(
+            headers=headers,
+            rows=rows,
+            output_path=path,
+            sheet_name="Students",
+            title="SUDHARM INFOTECH - STUDENT DIRECTORY",
+            subtitle=f"Generated on {datetime.now().strftime('%d-%b-%Y %I:%M %p')} • Total Students: {len(students)}",
+            include_totals=True,
         )
 
     def export_students_pdf(

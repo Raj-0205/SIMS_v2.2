@@ -14,6 +14,7 @@ from modules.course.views.course_home import CourseHome
 from modules.batch.views.batch_home import BatchHome
 from modules.reports.views.reports_home import ReportsHome
 from modules.settings.views.settings_home import SettingsHome
+from modules.enquiry.views.enquiry_home import EnquiryHome
 from modules.admission.controller import AdmissionController
 from modules.admission.dto import AdmissionSummaryDTO
 from ui.screens.control_center import ControlCenterScreen
@@ -158,6 +159,7 @@ class DashboardHome(ft.Container):
                     ft.Divider(height=12),
                     ft.Row(
                         controls=[
+                            ft.OutlinedButton("Walk-ins & Enquiries", icon=ft.Icons.SUPPORT_AGENT, on_click=lambda _: self.on_navigate("/enquiries")),
                             ft.OutlinedButton("Students Directory", icon=ft.Icons.PEOPLE, on_click=lambda _: self.on_navigate("/students")),
                             ft.OutlinedButton("Admissions Form", icon=ft.Icons.APP_REGISTRATION, on_click=lambda _: self.on_navigate("/admissions")),
                             ft.OutlinedButton("Course Catalog", icon=ft.Icons.MENU_BOOK, on_click=lambda _: self.on_navigate("/courses")),
@@ -395,6 +397,8 @@ class DashboardScreen(ft.Row):
         try:
             if route == "/dashboard":
                 view = DashboardHome(on_navigate=self.on_route_request)
+            elif route == "/enquiries":
+                view = EnquiryHome()
             elif route == "/students":
                 view = StudentHome()
             elif route == "/admissions":

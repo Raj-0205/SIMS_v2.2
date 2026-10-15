@@ -31,6 +31,7 @@ class NavigationMenu(ft.NavigationRail):
 
         self.routes = [
             "/dashboard",
+            "/enquiries",
             "/students",
             "/admissions",
             "/courses",
@@ -43,6 +44,10 @@ class NavigationMenu(ft.NavigationRail):
             ft.NavigationRailDestination(
                 icon=ft.Icons.DASHBOARD,
                 label="Dashboard",
+            ),
+            ft.NavigationRailDestination(
+                icon=ft.Icons.SUPPORT_AGENT,
+                label="Enquiries",
             ),
             ft.NavigationRailDestination(
                 icon=ft.Icons.PEOPLE,

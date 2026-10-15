@@ -66,8 +66,9 @@ class BatchRepository(BaseRepository):
         offset: int = 0,
         course_id: Optional[int] = None,
         status: Optional[str] = None,
+        search: Optional[str] = None,
     ) -> list[dict[str, Any]]:
-        """Fetches paginated batches with optional course and status filters."""
+        """Fetches paginated batches with optional course, status, and search filters."""
         conditions: list[str] = []
         params: list[Any] = []
 
@@ -78,6 +79,11 @@ class BatchRepository(BaseRepository):
         if status and status.strip() and status.strip().upper() != "ALL":
             conditions.append("b.status = ?")
             params.append(status.strip().upper())
+
+        if search and search.strip():
+            term = f"%{search.strip()}%"
+            conditions.append("(b.batch_name LIKE ? OR c.name LIKE ? OR b.timing LIKE ?)")
+            params.extend([term, term, term])
 
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         sql = f"""
@@ -95,23 +101,49 @@ class BatchRepository(BaseRepository):
         self,
         course_id: Optional[int] = None,
         status: Optional[str] = None,
+        search: Optional[str] = None,
     ) -> int:
         """Returns total count of batches matching optional filters."""
         conditions: list[str] = []
         params: list[Any] = []
 
         if course_id is not None and int(course_id) > 0:
-            conditions.append("course_id = ?")
+            conditions.append("b.course_id = ?")
             params.append(int(course_id))
 
         if status and status.strip() and status.strip().upper() != "ALL":
-            conditions.append("status = ?")
+            conditions.append("b.status = ?")
             params.append(status.strip().upper())
 
+        if search and search.strip():
+            term = f"%{search.strip()}%"
+            conditions.append("(b.batch_name LIKE ? OR c.name LIKE ? OR b.timing LIKE ?)")
+            params.extend([term, term, term])
+
         where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-        sql = f"SELECT COUNT(*) AS total FROM batches {where_clause};"
+        sql = f"SELECT COUNT(*) AS total FROM batches b JOIN courses c ON c.id = b.course_id {where_clause};"
         row = self.execute_fetchone(sql, params)
         return int(row["total"]) if row else 0
+
+    def get_kpi_counts(self) -> dict[str, int]:
+        """Calculates aggregate KPI counts across all batches."""
+        sql = """
+            SELECT
+                COUNT(*) AS total,
+                SUM(CASE WHEN UPPER(status) = 'OPEN' THEN 1 ELSE 0 END) AS open_count,
+                SUM(CASE WHEN UPPER(status) = 'FULL' THEN 1 ELSE 0 END) AS full_count,
+                SUM(CASE WHEN UPPER(status) = 'COMPLETED' THEN 1 ELSE 0 END) AS completed_count
+            FROM batches;
+        """
+        row = self.execute_fetchone(sql)
+        if not row:
+            return {"total": 0, "open": 0, "full": 0, "completed": 0}
+        return {
+            "total": int(row.get("total") or 0),
+            "open": int(row.get("open_count") or 0),
+            "full": int(row.get("full_count") or 0),
+            "completed": int(row.get("completed_count") or 0),
+        }
 
     def list_by_course(
         self,

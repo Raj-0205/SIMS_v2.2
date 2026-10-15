@@ -201,6 +201,20 @@ class AdmissionController:
         path = self.service.export_admissions_csv(dto, target_path=target_path)
         return str(path)
 
+    def export_admissions_excel(self, raw_filter: Mapping[str, Any], target_path: Optional[str] = None) -> str:
+        raw_sorts = raw_filter.get("sorts") or raw_filter.get("sort_keys") or [("id", "desc")]
+        sort_keys = list(raw_sorts)
+        dto = AdmissionFilterDTO(
+            query=raw_filter.get("query"),
+            course_id=int(raw_filter["course_id"]) if raw_filter.get("course_id") and str(raw_filter["course_id"]) != "ALL" else None,
+            status=raw_filter.get("status") if raw_filter.get("status") and raw_filter.get("status") != "ALL" else None,
+            year=int(raw_filter["year"]) if raw_filter.get("year") and str(raw_filter["year"]) != "ALL" else None,
+            month=int(raw_filter["month"]) if raw_filter.get("month") and str(raw_filter["month"]) != "ALL" else None,
+            sort_keys=sort_keys,
+        )
+        path = self.service.export_admissions_excel(dto, target_path=target_path)
+        return str(path)
+
     def export_admissions_pdf(self, raw_filter: Mapping[str, Any], target_path: Optional[str] = None) -> str:
         raw_sorts = raw_filter.get("sorts") or raw_filter.get("sort_keys") or [("id", "desc")]
         sort_keys = list(raw_sorts)

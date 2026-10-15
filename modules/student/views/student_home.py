@@ -3,6 +3,7 @@
 from __future__ import annotations
 import asyncio
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 import flet as ft
 
@@ -13,6 +14,7 @@ from modules.student.controller import StudentController
 from modules.student.dto import StudentDTO
 from modules.student.views.student_form_modal import StudentFormModal
 from modules.student.views.student_workspace_dialog import StudentWorkspaceDialog
+from shared.utils.os_helper import open_path_externally
 from ui.themes.theme import AppTheme
 
 __all__ = ["StudentHome"]
@@ -153,13 +155,15 @@ class StudentHome(ft.Container):
                 ),
                 ft.Row(
                     controls=[
-                        ft.OutlinedButton(
-                            content=ft.Text("Export CSV", size=AppTheme.SIZE_CAPTION),
+                        ft.FilledButton(
+                            content=ft.Text("Export Excel (.xlsx)", size=AppTheme.SIZE_CAPTION),
                             icon=ft.Icons.TABLE_VIEW,
                             style=ft.ButtonStyle(
+                                bgcolor=AppTheme.PRIMARY,
+                                color=AppTheme.SURFACE,
                                 shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
                             ),
-                            on_click=self.handle_export_csv,
+                            on_click=self.handle_export_excel,
                         ),
                         ft.OutlinedButton(
                             content=ft.Text("Export PDF", size=AppTheme.SIZE_CAPTION),
@@ -1045,9 +1049,8 @@ class StudentHome(ft.Container):
 
     # ══════════════════════════════════════════════════════════════════════
     # 14. EXPORT HANDLERS
-    # ══════════════════════════════════════════════════════════════════════
-    def handle_export_csv(self, e: ft.ControlEvent) -> None:
-        """Exports currently filtered and sorted student dataset to Excel CSV format."""
+    def handle_export_excel(self, e: ft.ControlEvent) -> None:
+        """Exports currently filtered and sorted student dataset to styled Microsoft Excel (.xlsx) format."""
         try:
             filters = {
                 "query": self.current_query or None,
@@ -1059,11 +1062,16 @@ class StudentHome(ft.Container):
                 "sort_by": self.sort_keys[0][0] if self.sort_keys else "id",
                 "sort_dir": self.sort_keys[0][1] if self.sort_keys else "desc",
             }
-            path = self.controller.export_students_csv(filters)
-            self.show_snackbar(f"Student data exported to CSV: {path}")
+            path = self.controller.export_students_excel(filters)
+            self.show_snackbar(f"Student data exported to Excel (.xlsx): {path}")
+            open_path_externally(Path(path).parent)
         except Exception as ex:
-            LogService.error(f"Error exporting CSV: {ex}", context=self.__class__.__name__)
-            self.show_snackbar("Failed to export student CSV data.", is_error=True)
+            LogService.error(f"Error exporting Excel: {ex}", context=self.__class__.__name__)
+            self.show_snackbar("Failed to export student Excel data.", is_error=True)
+
+    def handle_export_csv(self, e: ft.ControlEvent) -> None:
+        """Delegates export to professional Excel (.xlsx) format per template specifications."""
+        self.handle_export_excel(e)
 
     def handle_export_pdf(self, e: ft.ControlEvent) -> None:
         """Exports currently filtered and sorted student dataset to PDF report format."""

@@ -231,6 +231,7 @@ class BatchService(BaseService):
         offset: int = 0,
         course_id: Optional[int] = None,
         status: Optional[str] = None,
+        search: Optional[str] = None,
     ) -> tuple[list[BatchDTO], int]:
         """Returns paginated batches and total count matching optional filters."""
         limit_val = max(1, min(limit, 200))
@@ -242,8 +243,9 @@ class BatchService(BaseService):
                 offset=offset_val,
                 course_id=course_id,
                 status=status,
+                search=search,
             )
-            total_count = self.repository.count(course_id=course_id, status=status)
+            total_count = self.repository.count(course_id=course_id, status=status, search=search)
             return [BatchMapper.to_dto(r) for r in rows], total_count
 
     def list_batches_by_course(
@@ -278,4 +280,9 @@ class BatchService(BaseService):
                 available_capacity=available_capacity,
                 status=status_val,
             )
+
+    def get_kpi_counts(self) -> dict[str, int]:
+        """Calculates aggregate KPI counts across all batches."""
+        with self.unit_of_work():
+            return self.repository.get_kpi_counts()
 

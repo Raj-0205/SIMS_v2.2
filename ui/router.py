@@ -1,11 +1,12 @@
-# ui/router.py
-
+from typing import Any
 import flet as ft
 from ui.screens.login import LoginScreen
-from ui.screens.dashboard import DashboardScreen
+from ui.screens.dashboard import DashboardScreen, ErrorRecoveryView
 from ui.screens.recovery import PasswordRecoveryScreen
 from ui.screens.break_glass import BreakGlassClaimScreen, BreakGlassRemediationScreen
 from core.security.auth import AuthService
+from core.security.context import SecurityContext
+from core.security.session import SessionManager
 from core.security.roles import Role
 
 __all__ = ["AppRouter"]
@@ -21,6 +22,7 @@ class AppRouter:
         "/dashboard",
         "/students",
         "/admissions",
+        "/enquiries",
         "/courses",
         "/fees",
         "/batch",
@@ -31,8 +33,61 @@ class AppRouter:
     def __init__(self, page: ft.Page) -> None:
         self.page = page
         self.page.on_route_change = self.handle_route_change
+        self.page.on_error = self.handle_global_error
         self.dashboard = None
         self._route_history: list[str] = []
+
+    def handle_global_error(self, e: Any) -> None:
+        """Global exception barrier. Prevents blank screen crashes and provides a Back-Step button."""
+        import logging
+        err_msg = str(getattr(e, "data", e) or "An unexpected UI error occurred.")
+        logging.getLogger("sims.ui").error(f"Global UI Error trapped by Router: {err_msg}")
+
+        # Safely dismiss stuck dialogs
+        try:
+            if hasattr(self.page, "dialog") and self.page.dialog:
+                self.page.dialog.open = False
+                self.page.dialog = None
+            if hasattr(self.page, "pop_dialog"):
+                self.page.pop_dialog()
+        except Exception:
+            pass
+
+        # If dashboard is active, mount the recovery view in its content host
+        if self.dashboard and hasattr(self.dashboard, "content_host"):
+            current_route = self.page.route or "/dashboard"
+            recovery_view = ErrorRecoveryView(
+                route=current_route,
+                error_message=err_msg,
+                on_retry=lambda: self.dashboard.mount_view(current_route),
+                on_back=self.go_back,
+                on_dashboard=lambda: self.request_navigation("/dashboard"),
+            )
+            self.dashboard.content_host.mount(recovery_view)
+            try:
+                self.page.update()
+            except Exception:
+                pass
+        else:
+            fallback_view = ft.View(
+                route="/error",
+                controls=[
+                    ErrorRecoveryView(
+                        route=self.page.route or "/error",
+                        error_message=err_msg,
+                        on_retry=lambda: self.request_navigation("/dashboard"),
+                        on_back=self.go_back,
+                        on_dashboard=lambda: self.request_navigation("/dashboard"),
+                    )
+                ],
+                padding=0,
+            )
+            self.page.views.clear()
+            self.page.views.append(fallback_view)
+            try:
+                self.page.update()
+            except Exception:
+                pass
 
     def request_navigation(self, route: str) -> None:
         """Sole owner of actual navigation requests triggered by child components."""
@@ -53,15 +108,38 @@ class AppRouter:
 
     def handle_route_change(self, e: ft.RouteChangeEvent) -> None:
         route = e.route
-        is_auth = AuthService.is_authenticated(self.page)
-        session = AuthService._get_session(self.page)
-        user_role = str(AuthService._session_get(session, "role", "") or "").strip().upper()
+        user_sess = SessionManager.get_session(self.page)
+        if user_sess and user_sess.is_valid():
+            is_auth = True
+            SecurityContext.set_current_user(
+                user_sess.user_id,
+                user_sess.username,
+                user_sess.role,
+                user_sess.security_version,
+                user_sess.security_stamp,
+            )
+            user_role = str(user_sess.role).strip().upper()
+        else:
+            is_auth = AuthService.is_authenticated(self.page)
+            session = AuthService._get_session(self.page)
+            user_role = str(AuthService._session_get(session, "role", "") or "").strip().upper()
+            if is_auth and session:
+                user_id = AuthService._session_get(session, "user_id")
+                username = AuthService._session_get(session, "username")
+                role = AuthService._session_get(session, "role")
+                sec_ver = AuthService._session_get(session, "security_version")
+                sec_stamp = AuthService._session_get(session, "security_stamp")
+                SecurityContext.set_current_user(user_id, username, role, sec_ver, sec_stamp)
+            else:
+                SecurityContext.clear()
 
         target_route = route
 
         # 1. Logout Interception
         if target_route == "/logout":
             AuthService.logout(self.page)
+            SessionManager.destroy_session(self.page)
+            SecurityContext.clear()
             target_route = "/login"
             is_auth = False
 

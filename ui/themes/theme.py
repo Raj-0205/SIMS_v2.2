@@ -31,6 +31,9 @@ class AppTheme:
     SUCCESS: str = "#10B981"          # Emerald Green
     SUCCESS_LIGHT: str = "#ECFDF5"    # Emerald Tint
     
+    INFO: str = "#2563EB"             # Information Blue
+    INFO_LIGHT: str = "#EFF6FF"       # Information Light Tint
+
     WARNING: str = "#F59E0B"          # Warm Amber
     
     DANGER: str = "#EF4444"           # Crimson Red

@@ -460,6 +460,7 @@ class TestDualTierAuthentication(unittest.TestCase):
             Permission.BATCH_CREATE,
             Permission.BATCH_MANAGE,
             Permission.BATCH_DELETE,
+            Permission.SETTINGS_MANAGE,
         }
 
         # Administrator possesses all privileged permissions

@@ -1,6 +1,7 @@
 # modules/admission/views/admission_home.py
 
 from __future__ import annotations
+from pathlib import Path
 from typing import Optional, Any
 import flet as ft
 
@@ -12,6 +13,7 @@ from modules.admission.dto import AdmissionDTO
 from modules.admission.views.admission_form_modal import AdmissionFormModal
 from modules.admission.views.admission_workspace_dialog import AdmissionWorkspaceDialog
 from modules.course.controller import CourseController
+from shared.utils.os_helper import open_path_externally
 
 __all__ = ["AdmissionHome"]
 
@@ -84,10 +86,28 @@ class AdmissionHome(ft.Container):
             on_click=lambda e: self.load_data(),
         )
 
+        self.export_excel_btn = ft.FilledButton(
+            content=ft.Text("Export Excel (.xlsx)", size=AppTheme.SIZE_CAPTION),
+            icon=ft.Icons.TABLE_VIEW,
+            style=ft.ButtonStyle(
+                bgcolor=AppTheme.PRIMARY,
+                color=AppTheme.SURFACE,
+                shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+            ),
+            on_click=self.handle_export_excel,
+        )
+
         header_row = ft.Row(
             controls=[
                 ft.Column(controls=[self.title_text, self.subtitle_text], spacing=2),
-                ft.Row(controls=[self.refresh_btn, self.new_adm_btn], spacing=AppTheme.PAD_SM),
+                ft.Row(
+                    controls=[
+                        self.export_excel_btn,
+                        self.refresh_btn,
+                        self.new_adm_btn,
+                    ],
+                    spacing=AppTheme.PAD_SM,
+                ),
             ],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         )
@@ -611,3 +631,43 @@ class AdmissionHome(ft.Container):
         )
 
         p.show_dialog(dialog)
+
+    # ----------------------------------------------------
+    # Export Handlers
+    # ----------------------------------------------------
+    def _show_toast(self, message: str, is_error: bool = False, is_success: bool = False) -> None:
+        p = self.safe_page
+        if not p:
+            return
+        snack = ft.SnackBar(
+            content=ft.Text(message, color=AppTheme.SURFACE),
+            bgcolor=AppTheme.DANGER if is_error else (AppTheme.SUCCESS if is_success else AppTheme.PRIMARY),
+        )
+        p.overlay.append(snack)
+        snack.open = True
+        try:
+            p.update()
+        except RuntimeError:
+            pass
+
+    def handle_export_excel(self, e: ft.ControlEvent) -> None:
+        """Exports currently filtered admission dataset to styled Microsoft Excel (.xlsx) format."""
+        try:
+            filters: dict[str, Any] = {}
+            if self.search_query:
+                filters["query"] = self.search_query
+            if self.selected_status != "ALL":
+                filters["status"] = self.selected_status
+            if self.selected_course_id:
+                filters["course_id"] = self.selected_course_id
+
+            path = self.controller.export_admissions_excel(filters)
+            self._show_toast(f"Admissions data exported to Excel (.xlsx): {path}", is_success=True)
+            open_path_externally(Path(path).parent)
+        except Exception as ex:
+            LogService.error(f"Error exporting admissions to Excel: {ex}", context=self.__class__.__name__)
+            self._show_toast("Failed to export admissions Excel data.", is_error=True)
+
+    def handle_export_csv(self, e: ft.ControlEvent) -> None:
+        """Delegates export to professional Excel (.xlsx) format per template specifications."""
+        self.handle_export_excel(e)
