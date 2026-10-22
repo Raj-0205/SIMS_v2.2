@@ -11,6 +11,8 @@ from core.database.transaction import TransactionManager
 from core.exceptions import AuthenticationError, ConflictError, ValidationError
 from core.logger.service import LogService
 from core.security.audit import SecurityAuditRepository
+from core.security.authorization import AuthorizationService
+from core.security.permissions import SecurityPermission
 from core.security.otp import OTPService, OTPPurpose
 from infrastructure.notification.service import NotificationService
 from modules.users.repository import UserRepository
@@ -71,6 +73,7 @@ class EmailChangeService:
         Initiates a dual-verification email change workflow.
         Dispatches two distinct OTP codes: one to current email, one to new email.
         """
+        AuthorizationService.enforce(SecurityPermission.SECURITY_EMAIL_UPDATE)
         with _transaction():
             repo = user_repo or UserRepository()
             otp = otp_service or OTPService(repo)
@@ -281,6 +284,7 @@ class EmailChangeService:
         Finalizes the email change once both verification steps are complete.
         Rotates the security stamp, terminating any other active sessions.
         """
+        AuthorizationService.enforce(SecurityPermission.SECURITY_EMAIL_UPDATE)
         with _transaction():
             repo = user_repo or UserRepository()
             auditor = audit_repo or SecurityAuditRepository()

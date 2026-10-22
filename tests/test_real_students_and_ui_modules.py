@@ -70,6 +70,8 @@ class RealMockPage:
         self.overlay = []
         self.views = []
         self.route = "/dashboard"
+        self.width = 1280
+        self.height = 800
 
     def update(self) -> None:
         pass

@@ -120,7 +120,8 @@ class PasswordRecoveryScreen(ft.Container):
         )
 
         self._render_view()
-        self.content = self.card_container
+        self.selection_area = ft.SelectionArea(content=self.card_container)
+        self.content = self.selection_area
 
     def _safe_update(self) -> None:
         try:

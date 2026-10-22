@@ -105,7 +105,8 @@ class BreakGlassClaimScreen(ft.Container):
                 ],
             ),
         )
-        self.content = self.card_container
+        self.selection_area = ft.SelectionArea(content=self.card_container)
+        self.content = self.selection_area
 
     def _safe_update(self) -> None:
         try:
@@ -216,7 +217,8 @@ class BreakGlassRemediationScreen(ft.Container):
         )
 
         self._check_lease_and_render()
-        self.content = self.card_container
+        self.selection_area = ft.SelectionArea(content=self.card_container)
+        self.content = self.selection_area
 
     def _safe_update(self) -> None:
         try:

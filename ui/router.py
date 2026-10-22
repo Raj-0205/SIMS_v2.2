@@ -21,6 +21,7 @@ class AppRouter:
     PROTECTED_ROUTES = {
         "/dashboard",
         "/students",
+        "/attendance",
         "/admissions",
         "/enquiries",
         "/courses",
@@ -34,8 +35,101 @@ class AppRouter:
         self.page = page
         self.page.on_route_change = self.handle_route_change
         self.page.on_error = self.handle_global_error
+        self.page.on_keyboard_event = self.handle_keyboard_event
         self.dashboard = None
         self._route_history: list[str] = []
+
+    def _get_active_dialog(self) -> Optional[Any]:
+        """Returns the topmost open dialog from page._dialogs or page.dialog."""
+        if hasattr(self.page, "_dialogs") and hasattr(self.page._dialogs, "controls"):
+            dlg = next((d for d in reversed(self.page._dialogs.controls) if getattr(d, "open", False)), None)
+            if dlg:
+                return dlg
+        if hasattr(self.page, "dialog") and self.page.dialog and getattr(self.page.dialog, "open", False):
+            return self.page.dialog
+        return None
+
+    def handle_keyboard_event(self, e: Any) -> None:
+        """Global keyboard shortcut router for enterprise workflow ergonomics."""
+        key = str(getattr(e, "key", "")).lower()
+
+        # F11: Toggle Fullscreen
+        if key == "f11":
+            try:
+                if hasattr(self.page, "window") and hasattr(self.page.window, "full_screen"):
+                    self.page.window.full_screen = not self.page.window.full_screen
+                elif hasattr(self.page, "window_full_screen"):
+                    self.page.window_full_screen = not getattr(self.page, "window_full_screen", False)
+                self.page.update()
+            except Exception:
+                pass
+            return
+
+        # ESC: Close active popup/dialog ONLY. Never navigate away or close background work!
+        if key in ("escape", "esc"):
+            dlg = self._get_active_dialog()
+            if dlg:
+                if hasattr(dlg, "handle_escape") and callable(dlg.handle_escape):
+                    try:
+                        if dlg.handle_escape():
+                            return
+                    except Exception:
+                        pass
+                try:
+                    if hasattr(dlg, "handle_cancel") and callable(dlg.handle_cancel):
+                        dlg.handle_cancel(None)
+                    elif hasattr(dlg, "close_modal") and callable(dlg.close_modal):
+                        dlg.close_modal(None)
+                    elif hasattr(dlg, "close_dialog") and callable(dlg.close_dialog):
+                        dlg.close_dialog(None)
+                    elif hasattr(dlg, "close_workspace") and callable(dlg.close_workspace):
+                        dlg.close_workspace(None)
+                    elif hasattr(dlg, "on_dismiss") and callable(dlg.on_dismiss):
+                        dlg.on_dismiss(None)
+                    elif hasattr(self.page, "pop_dialog"):
+                        self.page.pop_dialog()
+                    else:
+                        dlg.open = False
+                        self.page.update()
+                    return
+                except Exception:
+                    pass
+            elif hasattr(self.page, "pop_dialog"):
+                try:
+                    self.page.pop_dialog()
+                except Exception:
+                    pass
+
+            # If no popup is open, do NOTHING. Preserve active background work and current route.
+            return
+
+        # ENTER: Trigger active modal submit / primary action
+        if key in ("enter", "numpad enter", "return"):
+            dlg = self._get_active_dialog()
+            if dlg:
+                if hasattr(dlg, "handle_enter") and callable(dlg.handle_enter):
+                    try:
+                        if dlg.handle_enter():
+                            return
+                    except Exception:
+                        pass
+                for attr in ("handle_submit", "handle_save", "handle_confirm", "on_confirm", "primary_action"):
+                    action = getattr(dlg, attr, None)
+                    if callable(action):
+                        try:
+                            action(None)
+                            return
+                        except Exception:
+                            pass
+                for btn_attr in ("submit_btn", "save_btn", "confirm_btn", "upload_btn"):
+                    btn = getattr(dlg, btn_attr, None)
+                    if btn and getattr(btn, "on_click", None) and not getattr(btn, "disabled", False):
+                        try:
+                            btn.on_click(None)
+                            return
+                        except Exception:
+                            pass
+
 
     def handle_global_error(self, e: Any) -> None:
         """Global exception barrier. Prevents blank screen crashes and provides a Back-Step button."""

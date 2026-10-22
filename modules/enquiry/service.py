@@ -14,6 +14,9 @@ from modules.enquiry.dto import (
     EnquiryDTO,
     EnquiryFilterDTO,
     EnquirySummaryDTO,
+    EnquiryCategorySummaryDTO,
+    CreateFollowUpDTO,
+    FollowUpDTO,
     VillagePeerDTO,
 )
 from modules.enquiry.repository import EnquiryRepository
@@ -21,6 +24,7 @@ from modules.enquiry.repository import EnquiryRepository
 __all__ = ["EnquiryService"]
 
 VALID_STATUSES = {"NEW", "CONTACTED", "VISITED", "CONVERTED", "CLOSED"}
+VALID_CATEGORIES = {"HOT", "WARM", "COLD", "LOST", "CONVERTED"}
 
 
 class EnquiryService(BaseService):
@@ -53,6 +57,9 @@ class EnquiryService(BaseService):
         if dto.status and dto.status not in VALID_STATUSES:
             raise ValidationError(f"Invalid status '{dto.status}'. Must be one of {sorted(VALID_STATUSES)}.")
 
+        if getattr(dto, "category", None) and dto.category not in VALID_CATEGORIES:
+            raise ValidationError(f"Invalid category '{dto.category}'. Must be one of {sorted(VALID_CATEGORIES)}.")
+
     def _validate_update_dto(self, dto: UpdateEnquiryDTO) -> None:
         if not dto.id or dto.id <= 0:
             raise ValidationError("A valid Enquiry ID is required.")
@@ -67,6 +74,9 @@ class EnquiryService(BaseService):
 
         if dto.status and dto.status not in VALID_STATUSES:
             raise ValidationError(f"Invalid status '{dto.status}'. Must be one of {sorted(VALID_STATUSES)}.")
+
+        if getattr(dto, "category", None) and dto.category not in VALID_CATEGORIES:
+            raise ValidationError(f"Invalid category '{dto.category}'. Must be one of {sorted(VALID_CATEGORIES)}.")
 
     def create_enquiry(self, dto: CreateEnquiryDTO) -> int:
         self._validate_create_dto(dto)
@@ -106,6 +116,104 @@ class EnquiryService(BaseService):
                 converted=counts.get("converted", 0),
                 closed=counts.get("closed", 0),
             )
+
+    def get_category_summary(self) -> EnquiryCategorySummaryDTO:
+        """Calculates lead counts across categories (Hot, Warm, Cold, Lost) and follow-up queues."""
+        with self.unit_of_work():
+            counts = self.repo.get_category_summary()
+            return EnquiryCategorySummaryDTO(
+                total=counts.get("total", 0),
+                hot=counts.get("hot", 0),
+                warm=counts.get("warm", 0),
+                cold=counts.get("cold", 0),
+                lost=counts.get("lost", 0),
+                converted=counts.get("converted", 0),
+                today_followup=counts.get("today_followup", 0),
+                overdue_followup=counts.get("overdue_followup", 0),
+            )
+
+    def record_follow_up(self, dto: CreateFollowUpDTO) -> int:
+        """Records a new call/conversation log and automatically syncs the parent enquiry."""
+        if not dto.enquiry_id or dto.enquiry_id <= 0:
+            raise ValidationError("Valid enquiry ID is required.")
+        if not dto.discussion_notes or not dto.discussion_notes.strip():
+            raise ValidationError("Follow-up discussion notes are required.")
+        if dto.category_after_call and dto.category_after_call not in VALID_CATEGORIES:
+            raise ValidationError(f"Invalid category '{dto.category_after_call}'.")
+
+        with self.unit_of_work():
+            existing = self.repo.get_by_id(dto.enquiry_id)
+            if not existing:
+                raise NotFoundError(f"Enquiry with ID {dto.enquiry_id} does not exist.")
+
+            # 1. Insert follow-up entry
+            follow_up_id = self.repo.create_follow_up(dto)
+
+            # 2. Update parent status & category
+            update_status = existing.get("status") or "NEW"
+            if dto.category_after_call == "LOST":
+                update_status = "CLOSED"
+            elif dto.category_after_call == "CONVERTED":
+                update_status = "CONVERTED"
+            elif update_status == "NEW":
+                update_status = "CONTACTED"
+
+            # 3. Append note to parent notes
+            updated_notes = existing.get("notes") or ""
+            timestamp_str = datetime.now().strftime("%d-%b %H:%M")
+            counselor = dto.counselor_name or "Staff"
+            new_remark = f"[{timestamp_str} by {counselor}]: {dto.discussion_notes.strip()}"
+            combined_notes = f"{new_remark}\n{updated_notes}".strip() if updated_notes else new_remark
+
+            update_dto = UpdateEnquiryDTO(
+                id=existing["id"],
+                student_name=existing["student_name"],
+                mobile_number=existing["mobile_number"],
+                alternate_mobile=existing.get("alternate_mobile"),
+                email=existing.get("email"),
+                village=existing.get("village"),
+                address=existing.get("address"),
+                course_id=existing.get("course_id"),
+                interested_course=existing.get("interested_course"),
+                qualification=existing.get("qualification"),
+                gender=existing.get("gender") or "MALE",
+                status=update_status,
+                category=dto.category_after_call,
+                preferred_timing=existing.get("preferred_timing") or "ANY",
+                source=existing.get("source") or "WALK_IN",
+                follow_up_date=dto.next_follow_up_date or existing.get("follow_up_date"),
+                notes=combined_notes,
+                counselor_name=dto.counselor_name or existing.get("counselor_name"),
+                converted_admission_id=existing.get("converted_admission_id"),
+                loss_reason=dto.loss_reason or existing.get("loss_reason"),
+            )
+            self.repo.update(update_dto)
+            return follow_up_id
+
+    def get_follow_ups(self, enquiry_id: int) -> list[FollowUpDTO]:
+        """Retrieves chronological call logs for an enquiry."""
+        with self.unit_of_work():
+            rows = self.repo.get_follow_ups(enquiry_id)
+            return [
+                FollowUpDTO(
+                    id=r["id"],
+                    enquiry_id=r["enquiry_id"],
+                    follow_up_date=str(r.get("follow_up_date") or ""),
+                    call_type=r.get("call_type") or "PHONE",
+                    discussion_notes=r.get("discussion_notes") or "",
+                    category_after_call=r.get("category_after_call") or "WARM",
+                    next_follow_up_date=str(r.get("next_follow_up_date") or "") if r.get("next_follow_up_date") else None,
+                    counselor_name=r.get("counselor_name"),
+                    created_at=str(r.get("created_at") or ""),
+                )
+                for r in rows
+            ]
+
+    def search_for_admission(self, query: str = "", limit: int = 15) -> list[EnquiryDTO]:
+        """Searches enquiries to allow 1-click candidate selection and auto-fill inside the Admission Form."""
+        with self.unit_of_work():
+            rows = self.repo.search_for_admission(query, limit)
+            return [self._map_row_to_dto(r) for r in rows]
 
     def delete_enquiry(self, enquiry_id: int) -> bool:
         with self.unit_of_work():
@@ -151,6 +259,7 @@ class EnquiryService(BaseService):
             "first_name": first_name,
             "middle_name": middle_name,
             "last_name": last_name,
+            "student_name": enquiry.student_name,
             "mobile_number": enquiry.mobile_number,
             "secondary_mobile": enquiry.alternate_mobile or "",
             "email": enquiry.email or "",
@@ -158,8 +267,12 @@ class EnquiryService(BaseService):
             "address": enquiry.address or "",
             "gender": enquiry.gender or "MALE",
             "course_id": enquiry.course_id,
+            "interested_course": enquiry.interested_course or enquiry.course_name,
             "qualification": enquiry.qualification or "",
             "notes": enquiry.notes or "",
+            "category": enquiry.category,
+            "preferred_timing": enquiry.preferred_timing,
+            "source": enquiry.source,
             "enquiry_id": enquiry.id,
         }
 
@@ -177,11 +290,14 @@ class EnquiryService(BaseService):
             qualification=row.get("qualification"),
             gender=row.get("gender") or "MALE",
             status=row.get("status") or "NEW",
+            category=row.get("category") or "WARM",
+            preferred_timing=row.get("preferred_timing") or "ANY",
             source=row.get("source") or "WALK_IN",
             follow_up_date=row.get("follow_up_date"),
             notes=row.get("notes"),
             counselor_name=row.get("counselor_name"),
             converted_admission_id=row.get("converted_admission_id"),
+            loss_reason=row.get("loss_reason"),
             created_at=str(row.get("created_at") or ""),
             updated_at=str(row.get("updated_at") or ""),
             course_name=row.get("course_name"),
@@ -195,6 +311,8 @@ class EnquiryService(BaseService):
         export_filter = EnquiryFilterDTO(
             query=dto.query,
             status=dto.status,
+            category=dto.category,
+            follow_up_filter=dto.follow_up_filter,
             course_id=dto.course_id,
             village=dto.village,
             date_from=dto.date_from,
@@ -212,6 +330,8 @@ class EnquiryService(BaseService):
             "SR.NO",
             "ENQUIRY DATE",
             "STUDENT NAME",
+            "CATEGORY",
+            "TIMING",
             "MOBILE NO",
             "ALTERNATE NO",
             "EMAIL",
@@ -231,6 +351,8 @@ class EnquiryService(BaseService):
                 idx,
                 str(enq.created_at)[:10] if enq.created_at else "—",
                 enq.student_name,
+                getattr(enq, "category", "WARM") or "WARM",
+                getattr(enq, "preferred_timing", "ANY") or "ANY",
                 enq.mobile_number or "—",
                 enq.alternate_mobile or "—",
                 enq.email or "—",
@@ -263,6 +385,8 @@ class EnquiryService(BaseService):
         export_filter = EnquiryFilterDTO(
             query=dto.query,
             status=dto.status,
+            category=dto.category,
+            follow_up_filter=dto.follow_up_filter,
             course_id=dto.course_id,
             village=dto.village,
             date_from=dto.date_from,

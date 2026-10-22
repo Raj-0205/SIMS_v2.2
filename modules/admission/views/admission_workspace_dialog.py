@@ -168,11 +168,20 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
         return ft.Row(controls=buttons, spacing=AppTheme.PAD_XS)
 
     def _switch_tab(self, idx: int) -> None:
-        self.active_tab_index = idx
-        self.tab_buttons_row = self._build_tab_bar()
-        self.tab_content_area.content = self._build_active_tab_content()
-        self.content.content.controls[0] = self.tab_buttons_row
-        self._safe_update()
+        try:
+            self.active_tab_index = idx
+            self.tab_buttons_row = self._build_tab_bar()
+            self.tab_content_area.content = self._build_active_tab_content()
+            self.content.content.controls[0] = self.tab_buttons_row
+            self._safe_update()
+        except Exception as ex:
+            LogService.error(f"Error switching to tab {idx}: {ex}", context=self.__class__.__name__)
+            self.tab_content_area.content = ft.Container(
+                content=ft.Text(f"Failed to load tab: {ex}", color=AppTheme.DANGER, size=AppTheme.SIZE_BODY),
+                alignment=ft.Alignment.CENTER,
+                padding=ft.Padding(0, 40, 0, 40),
+            )
+            self._safe_update()
 
     @property
     def safe_page(self) -> Optional[ft.Page]:
@@ -324,7 +333,7 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
                             ),
                             ft.Text(f"₹{p.amount:,.2f}", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD, color=AppTheme.SUCCESS),
                             ft.Text(f"Mode: {p.payment_mode}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
-                            ft.Text(f"Date: {p.payment_date[:16]}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
+                            ft.Text(f"Date: {str(p.payment_date or '')[:16]}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
                             ft.Text(f"Collector: {p.collector_name or '—'}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
                         ],
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -356,7 +365,7 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
                             ft.Column(
                                 controls=[
                                     ft.Text(f"Receipt #{r.receipt_number}", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
-                                    ft.Text(f"Issued: {r.receipt_date[:16]}  |  Installment 0{r.installment_number}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
+                                    ft.Text(f"Issued: {str(r.receipt_date or '')[:16]}  |  Installment 0{r.installment_number}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
                                 ],
                                 spacing=2,
                             ),
@@ -407,7 +416,7 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
                                 ],
                                 spacing=AppTheme.PAD_SM,
                             ),
-                            ft.Text(f"Linked: {f.get('friendship_date', '')[:10]}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
+                            ft.Text(f"Linked: {str(f.get('friendship_date') or '')[:10]}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
                         ],
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -421,46 +430,94 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
         return ft.Column(controls=rows, spacing=AppTheme.PAD_SM, scroll=ft.ScrollMode.AUTO)
 
     def _build_timeline_tab(self) -> ft.Control:
-        timeline = self.workspace_dto.timeline
+        timeline = self.workspace_dto.timeline if self.workspace_dto else []
+        if not timeline:
+            return ft.Container(
+                content=ft.Column(
+                    controls=[
+                        ft.Icon(ft.Icons.HISTORY, size=48, color=AppTheme.TEXT_MUTED),
+                        ft.Text("No activity or timeline events recorded yet.", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_MUTED),
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    spacing=AppTheme.PAD_SM,
+                ),
+                alignment=ft.Alignment.CENTER,
+                padding=ft.Padding(0, 40, 0, 40),
+            )
+
         rows = []
         for ev in timeline:
-            color = AppTheme.PRIMARY if ev["event_type"] == "REGISTRATION" else (AppTheme.SUCCESS if ev["event_type"] == "PAYMENT" else AppTheme.SECONDARY)
-            icon = ft.Icons.APP_REGISTRATION if ev["event_type"] == "REGISTRATION" else (ft.Icons.PAID if ev["event_type"] == "PAYMENT" else ft.Icons.RECEIPT)
+            event_type = str(ev.get("event_type") or "").upper()
+            if event_type in ("REGISTRATION", "CREATED"):
+                color = AppTheme.PRIMARY
+                icon = ft.Icons.APP_REGISTRATION
+            elif event_type == "PAYMENT":
+                color = AppTheme.SUCCESS
+                icon = ft.Icons.PAID
+            elif event_type == "RECEIPT":
+                color = AppTheme.INFO
+                icon = ft.Icons.RECEIPT_LONG
+            elif event_type in ("CANCELLED", "CANCELLATION", "DELETED"):
+                color = AppTheme.DANGER
+                icon = ft.Icons.CANCEL_OUTLINED
+            elif event_type in ("UPDATE", "UPDATED", "EDIT"):
+                color = AppTheme.WARNING
+                icon = ft.Icons.EDIT_NOTE
+            else:
+                color = AppTheme.SECONDARY
+                icon = ft.Icons.HISTORY
+
+            ts = str(ev.get("timestamp") or "")
+            ts_display = ts[:16] if len(ts) >= 16 else ts
+            title = ev.get("title") or "Activity Event"
+            description = ev.get("description") or ""
 
             rows.append(
-                ft.Row(
-                    controls=[
-                        ft.Icon(icon, size=18, color=color),
-                        ft.Column(
-                            controls=[
-                                ft.Row(
-                                    controls=[
-                                        ft.Text(ev["title"], size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
-                                        ft.Text(ev["timestamp"][:16], size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
-                                    ],
-                                    spacing=AppTheme.PAD_SM,
-                                ),
-                                ft.Text(ev["description"], size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
-                            ],
-                            spacing=2,
-                            expand=True,
-                        ),
-                    ],
-                    spacing=AppTheme.PAD_SM,
-                    vertical_alignment=ft.CrossAxisAlignment.START,
+                ft.Container(
+                    content=ft.Row(
+                        controls=[
+                            ft.Container(
+                                content=ft.Icon(icon, size=18, color=color),
+                                bgcolor=color + "1A" if color.startswith("#") and len(color) == 7 else AppTheme.SURFACE_VARIANT,
+                                padding=ft.Padding(8, 8, 8, 8),
+                                border_radius=AppTheme.RADIUS_SM,
+                            ),
+                            ft.Column(
+                                controls=[
+                                    ft.Row(
+                                        controls=[
+                                            ft.Text(title, size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                                            ft.Text(ts_display, size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
+                                        ],
+                                        spacing=AppTheme.PAD_SM,
+                                    ),
+                                    ft.Text(description, size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
+                                ],
+                                spacing=2,
+                                expand=True,
+                            ),
+                        ],
+                        spacing=AppTheme.PAD_SM,
+                        vertical_alignment=ft.CrossAxisAlignment.START,
+                    ),
+                    padding=ft.Padding(AppTheme.PAD_SM, AppTheme.PAD_SM, AppTheme.PAD_SM, AppTheme.PAD_SM),
+                    border=ft.Border.all(1, AppTheme.BORDER),
+                    border_radius=AppTheme.RADIUS_MD,
                 )
             )
 
-        return ft.Column(controls=rows, spacing=AppTheme.PAD_MD, scroll=ft.ScrollMode.AUTO)
+        return ft.Column(controls=rows, spacing=AppTheme.PAD_SM, scroll=ft.ScrollMode.AUTO)
 
     def _open_receipt_dialog(self, receipt) -> None:
         p = self.safe_page
-        if p:
+        if p and self.workspace_dto and self.workspace_dto.admission:
             dlg = ReceiptDialog(
                 receipt=receipt,
                 student_name=self.workspace_dto.admission.student_name,
                 candidate_number=self.workspace_dto.admission.admission_number,
                 course_name=self.workspace_dto.admission.course_name,
+                mobile_number=self.workspace_dto.admission.mobile_number,
             )
             p.show_dialog(dlg)
 
@@ -662,8 +719,8 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
 
     def close_dialog(self, _=None) -> None:
         p = self.safe_page
-        if p:
+        if p and hasattr(p, "pop_dialog"):
             try:
                 p.pop_dialog()
-            except RuntimeError:
+            except Exception:
                 pass

@@ -25,6 +25,26 @@ class ExcelExporter:
     numeric/currency alignment, mobile number preservation, and automated totals rows.
     """
 
+    @staticmethod
+    def sanitize_formula_injection(val: Any) -> str:
+        """Neutralizes spreadsheet formula injection (CWE-1236)."""
+        if val is None:
+            return ""
+        if isinstance(val, (int, float, bool)):
+            return str(val)
+        s = str(val)
+        if not s:
+            return ""
+        # Preserve legitimate numbers formatted as strings
+        try:
+            float(s.strip().replace(",", ""))
+            return s
+        except ValueError:
+            pass
+        if s.startswith(("=", "+", "-", "@", "\t", "\r")):
+            return f"'{s}"
+        return s
+
     @classmethod
     def export_to_csv(
         cls,
@@ -54,12 +74,7 @@ class ExcelExporter:
 
             # Data rows
             for row in rows:
-                clean_row = []
-                for cell in row:
-                    if cell is None:
-                        clean_row.append("")
-                    else:
-                        clean_row.append(str(cell))
+                clean_row = [cls.sanitize_formula_injection(cell) for cell in row]
                 writer.writerow(clean_row)
 
         return path
@@ -235,12 +250,12 @@ class ExcelExporter:
                     if isinstance(raw_val, (int, float)) and "SR.NO" in str(headers[col_idx - 1]).upper():
                         cell.value = int(raw_val)
                     else:
-                        cell.value = str(raw_val)
+                        cell.value = cls.sanitize_formula_injection(raw_val)
                     cell.alignment = ALIGN_CENTER
 
                 # General text (Names, Addresses, Notes, Courses)
                 else:
-                    cell.value = str(raw_val)
+                    cell.value = cls.sanitize_formula_injection(raw_val)
                     cell.alignment = ALIGN_LEFT
 
             current_row += 1

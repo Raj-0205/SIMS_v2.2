@@ -16,6 +16,7 @@ from modules.student.views.student_form_modal import StudentFormModal
 from modules.student.views.student_workspace_dialog import StudentWorkspaceDialog
 from shared.utils.os_helper import open_path_externally
 from ui.themes.theme import AppTheme
+from ui.widgets.badge import StatusBadge
 
 __all__ = ["StudentHome"]
 
@@ -77,6 +78,10 @@ class StudentHome(ft.Container):
         self.total_count: int = 0
         self.students: list[StudentDTO] = []
 
+        # ── View State (Controls Visibility & Auto-Fit Screen) ──
+        self.show_controls_panel: bool = True
+        self.auto_fit_screen: bool = True
+
         # ── Internal Cache & Debounce ──
         self._search_generation: int = 0
         self._course_options: dict[int, str] = {}
@@ -86,15 +91,27 @@ class StudentHome(ft.Container):
         self.search_section = self._build_search_section()
         self.filters_section = self._build_filters_section()
         self.sort_section = self._build_sort_section()
-        self.table_container = ft.Container(expand=True)
+        self.controls_panel = ft.Column(
+            controls=[
+                self.search_section,
+                self.filters_section,
+                self.sort_section,
+            ],
+            spacing=AppTheme.PAD_SM,
+            visible=True,
+            animate_size=ft.Animation(250, ft.AnimationCurve.EASE_OUT),
+            animate_opacity=ft.Animation(200, ft.AnimationCurve.EASE_IN_OUT),
+        )
+        self.table_container = ft.Container(
+            expand=True,
+            animate_size=ft.Animation(250, ft.AnimationCurve.EASE_OUT),
+        )
         self.pagination_bar = self._build_pagination_bar()
 
         self.content = ft.Column(
             controls=[
                 self.header,
-                self.search_section,
-                self.filters_section,
-                self.sort_section,
+                self.controls_panel,
                 self.table_container,
                 self.pagination_bar,
             ],
@@ -102,10 +119,33 @@ class StudentHome(ft.Container):
             expand=True,
         )
 
+    @property
+    def safe_page(self) -> Optional[ft.Page]:
+        try:
+            return self.page
+        except RuntimeError:
+            return None
+
+    def _safe_update(self) -> None:
+        p = self.safe_page
+        if p:
+            try:
+                self.update()
+            except RuntimeError:
+                pass
+
     def did_mount(self) -> None:
         """Called when the control is mounted to the page tree."""
         self._populate_course_filter()
         self._apply_current_state()
+        p = self.safe_page
+        if p:
+            def _on_page_resize(e):
+                if not getattr(self, "page", None) and not getattr(self, "_root_page", None):
+                    return
+                if getattr(self, "auto_fit_screen", True):
+                    self._apply_current_state()
+            p.on_resize = _on_page_resize
 
     def show_snackbar(self, message: str, is_error: bool = False) -> None:
         """Displays transient feedback snackbar to the user using Flet's show_dialog."""
@@ -133,6 +173,26 @@ class StudentHome(ft.Container):
             color=AppTheme.TEXT_SECONDARY,
         )
 
+        self.toggle_controls_btn = ft.OutlinedButton(
+            content=ft.Text("Hide Controls", size=AppTheme.SIZE_CAPTION),
+            icon=ft.Icons.FILTER_ALT_OFF,
+            tooltip="Hide search, filter, and sort controls",
+            style=ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+            ),
+            on_click=self.handle_toggle_controls,
+        )
+
+        self.toggle_autofit_btn = ft.OutlinedButton(
+            content=ft.Text("Auto-Fit: ON", size=AppTheme.SIZE_CAPTION),
+            icon=ft.Icons.FIT_SCREEN,
+            tooltip="Auto-fit table to available screen width (Click to toggle)",
+            style=ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+            ),
+            on_click=self.handle_toggle_autofit,
+        )
+
         return ft.Row(
             controls=[
                 ft.Row(
@@ -155,6 +215,8 @@ class StudentHome(ft.Container):
                 ),
                 ft.Row(
                     controls=[
+                        self.toggle_controls_btn,
+                        self.toggle_autofit_btn,
                         ft.FilledButton(
                             content=ft.Text("Export Excel (.xlsx)", size=AppTheme.SIZE_CAPTION),
                             icon=ft.Icons.TABLE_VIEW,
@@ -172,6 +234,15 @@ class StudentHome(ft.Container):
                                 shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
                             ),
                             on_click=self.handle_export_pdf,
+                        ),
+                        ft.OutlinedButton(
+                            content=ft.Text("Attendance", size=AppTheme.SIZE_CAPTION),
+                            icon=ft.Icons.CO_PRESENT,
+                            tooltip="Open Batch Attendance Management",
+                            style=ft.ButtonStyle(
+                                shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+                            ),
+                            on_click=lambda _: self._open_attendance(),
                         ),
                         ft.IconButton(
                             icon=ft.Icons.REFRESH,
@@ -197,6 +268,37 @@ class StudentHome(ft.Container):
             ],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         )
+
+    def _open_attendance(self) -> None:
+        p = self.safe_page
+        if p:
+            p.go("/attendance")
+
+    def handle_toggle_controls(self, e=None) -> None:
+        self.show_controls_panel = not self.show_controls_panel
+        self.controls_panel.visible = self.show_controls_panel
+        if self.show_controls_panel:
+            self.toggle_controls_btn.content = ft.Text("Hide Controls", size=AppTheme.SIZE_CAPTION)
+            self.toggle_controls_btn.icon = ft.Icons.FILTER_ALT_OFF
+            self.toggle_controls_btn.tooltip = "Hide search, filter, and sort controls"
+        else:
+            self.toggle_controls_btn.content = ft.Text("Show Controls", size=AppTheme.SIZE_CAPTION)
+            self.toggle_controls_btn.icon = ft.Icons.FILTER_ALT
+            self.toggle_controls_btn.tooltip = "Show search, filter, and sort controls"
+        self._safe_update()
+
+    def handle_toggle_autofit(self, e=None) -> None:
+        self.auto_fit_screen = not self.auto_fit_screen
+        if self.auto_fit_screen:
+            self.toggle_autofit_btn.content = ft.Text("Auto-Fit: ON", size=AppTheme.SIZE_CAPTION)
+            self.toggle_autofit_btn.icon = ft.Icons.FIT_SCREEN
+            self.toggle_autofit_btn.tooltip = "Auto-fit table to available screen width (Click to toggle)"
+        else:
+            self.toggle_autofit_btn.content = ft.Text("Auto-Fit: OFF", size=AppTheme.SIZE_CAPTION)
+            self.toggle_autofit_btn.icon = ft.Icons.FIT_SCREEN_OUTLINED
+            self.toggle_autofit_btn.tooltip = "Table in compact mode (Click to enable auto-fit)"
+        self._apply_current_state()
+        self._safe_update()
 
     # ══════════════════════════════════════════════════════════════════════
     # 2. SEARCH BAR — Full-width, prominent, centered
@@ -591,6 +693,7 @@ class StudentHome(ft.Container):
 
     def load_data(self) -> None:
         """Public lifecycle alias for _apply_current_state."""
+        self._populate_course_filter()
         self._apply_current_state()
 
     # ══════════════════════════════════════════════════════════════════════
@@ -797,10 +900,44 @@ class StudentHome(ft.Container):
         except Exception as ex:
             LogService.warning(f"Could not load course options for filter: {ex}", context=self.__class__.__name__)
 
+    def _compute_column_spacing(self, num_columns: int = 8, base_content_width: int = 920) -> tuple[int, int]:
+        """
+        Calculates optimal column spacing and horizontal margin to proportionately
+        fill 100% of available screen width when auto_fit_screen is enabled.
+        """
+        if not getattr(self, "auto_fit_screen", True):
+            return 18, 14
+
+        p = self.safe_page
+        screen_w = p.width if (p and p.width and p.width > 300) else 1920
+
+        # Account for navigation sidebar (68px compact / 0px closed), padding, and container borders
+        sidebar_w = 68
+        container_pad = 64
+        avail_w = max(base_content_width + 100, screen_w - sidebar_w - container_pad)
+
+        gaps = max(1, num_columns - 1)
+        extra_w = avail_w - base_content_width - 36
+        if extra_w > 0:
+            spacing = max(18, min(150, int(extra_w / gaps)))
+            return spacing, 18
+        return 18, 14
+
     # ══════════════════════════════════════════════════════════════════════
     # 11. DATA TABLE
     # ══════════════════════════════════════════════════════════════════════
     def _build_data_table(self) -> ft.Container:
+        col_specs = [
+            ("Admission ID", 120),
+            ("Student Name", 190),
+            ("Mobile Number", 120),
+            ("Course", 140),
+            ("Admission Date", 110),
+            ("Status", 100),
+            ("Total Fee", 110),
+            ("Actions", 100),
+        ]
+
         rows = []
         for student in self.students:
             status_text = student.status_label
@@ -814,82 +951,111 @@ class StudentHome(ft.Container):
                 ft.DataRow(
                     cells=[
                         ft.DataCell(
-                            ft.Text(
-                                adm_display,
-                                weight=ft.FontWeight.BOLD if student.candidate_number else ft.FontWeight.NORMAL,
-                                size=AppTheme.SIZE_BODY,
-                                color=AppTheme.PRIMARY if student.candidate_number else AppTheme.TEXT_MUTED,
+                            ft.Container(
+                                content=ft.Text(
+                                    adm_display,
+                                    weight=ft.FontWeight.BOLD if student.candidate_number else ft.FontWeight.NORMAL,
+                                    size=AppTheme.SIZE_BODY,
+                                    color=AppTheme.PRIMARY if student.candidate_number else AppTheme.TEXT_MUTED,
+                                    no_wrap=True,
+                                ),
+                                width=120,
                             ),
                             on_double_tap=lambda e, s=student: self.handle_open_workspace(s.id),
                         ),
                         ft.DataCell(
-                            ft.Row(
-                                controls=[
-                                    ft.Icon(ft.Icons.ACCOUNT_CIRCLE, size=18, color=AppTheme.PRIMARY),
-                                    ft.Text(student.display_name, weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_PRIMARY),
-                                ],
-                                spacing=6,
+                            ft.Container(
+                                content=ft.Row(
+                                    controls=[
+                                        ft.Icon(ft.Icons.ACCOUNT_CIRCLE, size=18, color=AppTheme.PRIMARY),
+                                        ft.Text(student.display_name, weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_PRIMARY, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS),
+                                    ],
+                                    spacing=6,
+                                ),
+                                width=190,
                             ),
                             on_double_tap=lambda e, s=student: self.handle_open_workspace(s.id),
                         ),
-                        ft.DataCell(ft.Text(student.mobile_number or "—", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_PRIMARY)),
                         ft.DataCell(
-                            ft.Text(
-                                student.current_course or "Not Enrolled",
-                                color=AppTheme.TEXT_PRIMARY if student.current_course else AppTheme.TEXT_MUTED,
-                                size=AppTheme.SIZE_BODY,
-                                weight=ft.FontWeight.W_500 if student.current_course else ft.FontWeight.NORMAL,
-                            )
-                        ),
-                        ft.DataCell(
-                            ft.Text(
-                                (student.latest_admission_date or student.created_at)[:10] if (student.latest_admission_date or student.created_at) else "—",
-                                size=AppTheme.SIZE_CAPTION,
-                                color=AppTheme.TEXT_SECONDARY,
+                            ft.Container(
+                                content=ft.Text(student.mobile_number or "—", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_PRIMARY, no_wrap=True),
+                                width=120,
                             )
                         ),
                         ft.DataCell(
                             ft.Container(
-                                content=ft.Text(status_text, size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=status_fg),
-                                bgcolor=status_bg,
-                                padding=ft.Padding(left=8, top=2, right=8, bottom=2),
-                                border_radius=AppTheme.RADIUS_SM,
+                                content=ft.Text(
+                                    student.current_course or "Not Enrolled",
+                                    color=AppTheme.TEXT_PRIMARY if student.current_course else AppTheme.TEXT_MUTED,
+                                    size=AppTheme.SIZE_BODY,
+                                    weight=ft.FontWeight.W_500 if student.current_course else ft.FontWeight.NORMAL,
+                                    no_wrap=True,
+                                    overflow=ft.TextOverflow.ELLIPSIS,
+                                ),
+                                width=140,
                             )
                         ),
                         ft.DataCell(
-                            ft.Text(
-                                student.fee_display,
-                                size=AppTheme.SIZE_BODY,
-                                weight=ft.FontWeight.W_500,
-                                color=AppTheme.TEXT_PRIMARY if student.total_fee is not None else AppTheme.TEXT_MUTED,
+                            ft.Container(
+                                content=ft.Text(
+                                    (student.latest_admission_date or student.created_at)[:10] if (student.latest_admission_date or student.created_at) else "—",
+                                    size=AppTheme.SIZE_CAPTION,
+                                    color=AppTheme.TEXT_SECONDARY,
+                                    no_wrap=True,
+                                ),
+                                width=110,
                             )
                         ),
                         ft.DataCell(
-                            ft.Row(
-                                controls=[
-                                    ft.IconButton(
-                                        icon=ft.Icons.OPEN_IN_NEW,
-                                        icon_color=AppTheme.PRIMARY,
-                                        icon_size=18,
-                                        tooltip="Open Workspace (Double-click)",
-                                        on_click=lambda e, s=student: self.handle_open_workspace(s.id),
-                                    ),
-                                    ft.IconButton(
-                                        icon=ft.Icons.EDIT_OUTLINED,
-                                        icon_color=AppTheme.TEXT_SECONDARY,
-                                        icon_size=18,
-                                        tooltip="Edit Profile",
-                                        on_click=lambda e, s=student: self.handle_edit_student(s),
-                                    ),
-                                    ft.IconButton(
-                                        icon=ft.Icons.DELETE_OUTLINE,
-                                        icon_color=AppTheme.DANGER,
-                                        icon_size=18,
-                                        tooltip="Delete Student",
-                                        on_click=lambda e, s=student: self.handle_delete_student(s),
-                                    ),
-                                ],
-                                spacing=2,
+                            ft.Container(
+                                content=StatusBadge(
+                                    label=status_text,
+                                    variant="success" if is_active else ("danger" if status_text in ("DROPPED", "CANCELLED") else "primary"),
+                                ),
+                                width=100,
+                            )
+                        ),
+                        ft.DataCell(
+                            ft.Container(
+                                content=ft.Text(
+                                    student.fee_display,
+                                    size=AppTheme.SIZE_BODY,
+                                    weight=ft.FontWeight.W_500,
+                                    color=AppTheme.TEXT_PRIMARY if student.total_fee is not None else AppTheme.TEXT_MUTED,
+                                    no_wrap=True,
+                                ),
+                                width=110,
+                            )
+                        ),
+                        ft.DataCell(
+                            ft.Container(
+                                content=ft.Row(
+                                    controls=[
+                                        ft.IconButton(
+                                            icon=ft.Icons.OPEN_IN_NEW,
+                                            icon_color=AppTheme.PRIMARY,
+                                            icon_size=18,
+                                            tooltip="Open Workspace (Double-click)",
+                                            on_click=lambda e, s=student: self.handle_open_workspace(s.id),
+                                        ),
+                                        ft.IconButton(
+                                            icon=ft.Icons.EDIT_OUTLINED,
+                                            icon_color=AppTheme.TEXT_SECONDARY,
+                                            icon_size=18,
+                                            tooltip="Edit Profile",
+                                            on_click=lambda e, s=student: self.handle_edit_student(s),
+                                        ),
+                                        ft.IconButton(
+                                            icon=ft.Icons.DELETE_OUTLINE,
+                                            icon_color=AppTheme.DANGER,
+                                            icon_size=18,
+                                            tooltip="Delete Student",
+                                            on_click=lambda e, s=student: self.handle_delete_student(s),
+                                        ),
+                                    ],
+                                    spacing=2,
+                                ),
+                                width=100,
                             )
                         ),
                     ],
@@ -897,34 +1063,73 @@ class StudentHome(ft.Container):
                 )
             )
 
-        table = ft.DataTable(
+        col_spacing, horiz_margin = self._compute_column_spacing(num_columns=8, base_content_width=990)
+        header_table = ft.DataTable(
             columns=[
-                ft.DataColumn(ft.Text("Admission ID", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY)),
-                ft.DataColumn(ft.Text("Student Name", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY)),
-                ft.DataColumn(ft.Text("Mobile Number", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY)),
-                ft.DataColumn(ft.Text("Course", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY)),
-                ft.DataColumn(ft.Text("Admission Date", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY)),
-                ft.DataColumn(ft.Text("Status", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY)),
-                ft.DataColumn(ft.Text("Total Fee", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY)),
-                ft.DataColumn(ft.Text("Actions", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY)),
+                ft.DataColumn(ft.Container(content=ft.Text(label, weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY), width=w))
+                for label, w in col_specs
+            ],
+            rows=[],
+            heading_row_color=AppTheme.SURFACE_VARIANT,
+            heading_row_height=44,
+            column_spacing=col_spacing,
+            horizontal_margin=horiz_margin,
+            border=ft.Border.all(1, AppTheme.BORDER),
+            border_radius=ft.BorderRadius(AppTheme.RADIUS_MD, AppTheme.RADIUS_MD, 0, 0),
+            vertical_lines=ft.BorderSide(0.5, AppTheme.BORDER),
+            horizontal_lines=ft.BorderSide(0.5, AppTheme.BORDER),
+        )
+
+        body_table = ft.DataTable(
+            columns=[
+                ft.DataColumn(ft.Container(width=w))
+                for _, w in col_specs
             ],
             rows=rows,
-            heading_row_color=AppTheme.SURFACE_VARIANT,
+            heading_row_height=0,
+            divider_thickness=0,
             data_row_min_height=44,
             data_row_max_height=52,
-            column_spacing=18,
-            horizontal_margin=14,
+            column_spacing=col_spacing,
+            horizontal_margin=horiz_margin,
+            border=ft.Border.all(1, AppTheme.BORDER),
+            border_radius=ft.BorderRadius(0, 0, AppTheme.RADIUS_MD, AppTheme.RADIUS_MD),
+            vertical_lines=ft.BorderSide(0.5, AppTheme.BORDER),
+            horizontal_lines=ft.BorderSide(0.5, AppTheme.BORDER),
+        )
+
+        total_cols_w = sum(w for _, w in col_specs)
+        total_table_w = total_cols_w + (len(col_specs) - 1) * col_spacing + 2 * horiz_margin
+
+        body_wrapper = ft.Container(
+            content=ft.ListView(
+                controls=[body_table],
+                expand=True,
+            ),
+            expand=True,
+            width=total_table_w,
+        )
+
+        table_column = ft.Column(
+            controls=[
+                header_table,
+                body_wrapper,
+            ],
+            spacing=0,
+            width=total_table_w,
         )
 
         return ft.Container(
-            content=ft.ListView(
-                controls=[table],
+            content=ft.Row(
+                controls=[table_column],
+                scroll=ft.ScrollMode.AUTO,
                 expand=True,
             ),
             bgcolor=AppTheme.SURFACE,
             border_radius=AppTheme.RADIUS_MD,
             border=ft.Border.all(1, AppTheme.BORDER),
             expand=True,
+            animate_size=ft.Animation(250, ft.AnimationCurve.EASE_OUT),
         )
 
     # ══════════════════════════════════════════════════════════════════════

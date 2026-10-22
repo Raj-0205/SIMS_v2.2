@@ -243,6 +243,9 @@ class StudentService(BaseService):
                 context=self.__class__.__name__,
             )
 
+        from core.cache.fees_cache import FeesCacheManager
+        FeesCacheManager.invalidate(f"Student updated #{dto.id}")
+
     def add_student_note(self, student_id: int, note_text: str, actor_name: str = "ADMIN") -> None:
         """Adds an internal note for a student enclosed in unit_of_work."""
         if not student_id or student_id <= 0:
@@ -281,6 +284,9 @@ class StudentService(BaseService):
                 details=f"Added friend student ID #{friend_student_id}.",
             )
 
+        from core.cache.fees_cache import FeesCacheManager
+        FeesCacheManager.invalidate(f"Student friendship added {student_id} <-> {friend_student_id}")
+
     def remove_student_friend(self, student_id: int, friend_student_id: int) -> None:
         """Removes a friend connection within unit_of_work."""
         with self.unit_of_work():
@@ -292,6 +298,9 @@ class StudentService(BaseService):
                 actor_name="ADMIN",
                 details=f"Removed friend student ID #{friend_student_id}.",
             )
+
+        from core.cache.fees_cache import FeesCacheManager
+        FeesCacheManager.invalidate(f"Student friendship removed {student_id} <-> {friend_student_id}")
 
     def upload_student_document(
         self,
@@ -409,6 +418,9 @@ class StudentService(BaseService):
                 f"Student ID {student_id} permanently deleted by Administrator.",
                 context=self.__class__.__name__,
             )
+
+        from core.cache.fees_cache import FeesCacheManager
+        FeesCacheManager.invalidate(f"Student deleted #{student_id}")
 
     def get_student(self, student_id: int) -> StudentDTO:
         if not student_id or student_id <= 0:

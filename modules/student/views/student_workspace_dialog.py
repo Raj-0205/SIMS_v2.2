@@ -3,6 +3,7 @@
 from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
+import shutil
 import subprocess
 from typing import Any, Callable, Optional
 import webbrowser
@@ -13,12 +14,21 @@ from core.exceptions import ValidationError, ServiceError
 from modules.student.controller import StudentController
 from modules.student.dto import StudentDTO, StudentWorkspaceDTO
 from modules.student.views.student_form_modal import StudentFormModal
+from modules.attendance.constants import AttendanceHealth, HEALTH_BG_COLORS, HEALTH_COLORS
+from modules.attendance.service import AttendanceService
 from shared.utils.formatting import format_whatsapp_url, format_file_size
-from shared.utils.file_dialog import pick_file
+from shared.utils.file_dialog import (
+    pick_file,
+    pick_save_file,
+    pick_file_async,
+    pick_save_file_async,
+    cancel_active_picker,
+)
 from shared.utils.os_helper import open_path_externally
 from ui.themes.theme import AppTheme
 
 __all__ = ["StudentWorkspaceDialog"]
+
 
 
 class StudentWorkspaceDialog(ft.AlertDialog):
@@ -43,6 +53,11 @@ class StudentWorkspaceDialog(ft.AlertDialog):
 
         self.load_workspace_data()
         self.active_tab_index: int = 0
+        self._active_upload_doc: Optional[dict[str, str]] = None
+        self._upload_panel_selected_path: Optional[Path] = None
+        self._upload_panel_selected_bytes: Optional[bytes] = None
+        self._upload_panel_status_text: Optional[ft.Text] = None
+        self._upload_now_btn: Optional[ft.ElevatedButton] = None
 
         # Top Notification Toast Banner
         self.toast_banner = ft.Container(
@@ -135,19 +150,35 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             f"{student.last_name[0] if student.last_name else ''}"
         ).upper() or "ST"
 
-        avatar = ft.Container(
-            width=54,
-            height=54,
-            bgcolor=AppTheme.PRIMARY,
-            border_radius=AppTheme.RADIUS_PILL,
-            alignment=ft.Alignment.CENTER,
-            content=ft.Text(
+        has_photo = bool(student.photo_path and Path(student.photo_path).is_file())
+        if has_photo:
+            avatar_content = ft.Image(
+                src=student.photo_path,
+                width=54,
+                height=54,
+                fit="cover",
+                border_radius=AppTheme.RADIUS_PILL,
+            )
+
+        else:
+            avatar_content = ft.Text(
                 initials,
                 size=20,
                 weight=ft.FontWeight.BOLD,
                 color=AppTheme.SURFACE,
-            ),
+            )
+
+        avatar = ft.Container(
+            width=54,
+            height=54,
+            bgcolor=AppTheme.PRIMARY if not has_photo else AppTheme.BACKGROUND,
+            border_radius=AppTheme.RADIUS_PILL,
+            border=ft.Border.all(2, AppTheme.PRIMARY if has_photo else AppTheme.BORDER),
+            alignment=ft.Alignment.CENTER,
+            content=avatar_content,
+            clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
         )
+
 
         status_text = student.status_label
         is_active = status_text in ("ACTIVE", "CONFIRMED", "ENROLLED")
@@ -227,6 +258,14 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             LogService.warning(f"Could not open WhatsApp URL: {ex}", context="StudentWorkspace")
 
     def _build_tab_bar(self) -> ft.Row:
+        att_rate_str = "—"
+        try:
+            h_dto = AttendanceService().get_student_attendance_health(self.student_id)
+            if h_dto.total_sessions_conducted > 0:
+                att_rate_str = f"{h_dto.attendance_percentage}%"
+        except Exception:
+            pass
+
         tabs_spec = [
             (0, "Overview", ft.Icons.PERSON_OUTLINE),
             (1, f"Admissions ({len(self.workspace_data.admissions)})", ft.Icons.SCHOOL_OUTLINED),
@@ -235,6 +274,7 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             (4, f"Village Friends ({len(self.workspace_data.friends)})", ft.Icons.GROUP_OUTLINED),
             (5, "Documents", ft.Icons.FOLDER_OPEN_OUTLINED),
             (6, "History & Notes", ft.Icons.TIMELINE_OUTLINED),
+            (7, f"Attendance ({att_rate_str})", ft.Icons.FACT_CHECK_OUTLINED),
         ]
 
         buttons = []
@@ -265,6 +305,11 @@ class StudentWorkspaceDialog(ft.AlertDialog):
         return ft.Row(controls=buttons, spacing=4, scroll=ft.ScrollMode.AUTO)
 
     def _switch_tab(self, index: int) -> None:
+        if self._active_upload_doc is not None:
+            cancel_active_picker()
+            self._active_upload_doc = None
+            self._upload_panel_selected_path = None
+            self._upload_panel_selected_bytes = None
         self.active_tab_index = index
         self.tab_buttons_row.controls = self._build_tab_bar().controls
         self.tab_content_area.content = self._build_active_tab_content()
@@ -285,6 +330,8 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             return self._build_documents_tab()
         elif self.active_tab_index == 6:
             return self._build_history_tab()
+        elif self.active_tab_index == 7:
+            return self._build_attendance_tab()
         return ft.Text("Tab not found")
 
     # ── TAB 1: OVERVIEW ──
@@ -341,6 +388,63 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                     info_row("Admission Status", student.admission_status or "REGISTERED", ft.Icons.CHECK_CIRCLE_OUTLINE),
                     info_row("Latest Admission No.", student.latest_admission_number or "None", ft.Icons.BADGE),
                     info_row("Registration Date", student.created_at[:10] if student.created_at else "N/A", ft.Icons.CALENDAR_TODAY),
+                ],
+                spacing=AppTheme.PAD_XS,
+            ),
+            bgcolor=AppTheme.SURFACE,
+            padding=AppTheme.PAD_MD,
+            border_radius=AppTheme.RADIUS_MD,
+            border=ft.Border.all(1, AppTheme.BORDER),
+            expand=True,
+        )
+
+        # Attendance Health Card
+        try:
+            att_health = AttendanceService().get_student_attendance_health(student.id)
+            health_color = att_health.health_color
+            health_bg = att_health.health_bg_color
+            health_label = f"{att_health.health_status} ({att_health.attendance_percentage}%)"
+            sessions_conducted_str = str(att_health.total_sessions_conducted)
+            present_str = str(att_health.total_present)
+            absent_str = str(att_health.total_absent)
+            pct_str = f"{att_health.attendance_percentage}%"
+        except Exception:
+            health_color = "#059669"
+            health_bg = "#ECFDF5"
+            health_label = "EXCELLENT (100%)"
+            sessions_conducted_str = "0"
+            present_str = "0"
+            absent_str = "0"
+            pct_str = "100%"
+
+        health_badge = ft.Container(
+            content=ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.HEALTH_AND_SAFETY, size=13, color=health_color),
+                    ft.Text(health_label, size=11, weight=ft.FontWeight.BOLD, color=health_color),
+                ],
+                spacing=4,
+            ),
+            bgcolor=health_bg,
+            border_radius=AppTheme.RADIUS_PILL,
+            padding=ft.Padding(8, 2, 8, 2),
+        )
+
+        attendance_card = ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Row(
+                        controls=[
+                            ft.Text("Attendance Health", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                            health_badge,
+                        ],
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    ),
+                    ft.Divider(height=1, color=AppTheme.BORDER),
+                    info_row("Overall Attendance", pct_str, ft.Icons.PIE_CHART_OUTLINE),
+                    info_row("Sessions Conducted", sessions_conducted_str, ft.Icons.CALENDAR_MONTH),
+                    info_row("Sessions Present", present_str, ft.Icons.CHECK_CIRCLE_OUTLINE),
+                    info_row("Sessions Absent", absent_str, ft.Icons.CANCEL_OUTLINED),
                 ],
                 spacing=AppTheme.PAD_XS,
             ),
@@ -427,7 +531,7 @@ class StudentWorkspaceDialog(ft.AlertDialog):
         return ft.Container(
             content=ft.ListView(
                 controls=[
-                    ft.Row(controls=[personal_card, academic_card], spacing=AppTheme.PAD_MD),
+                    ft.Row(controls=[personal_card, academic_card, attendance_card], spacing=AppTheme.PAD_MD),
                     notes_card,
                 ],
                 spacing=AppTheme.PAD_MD,
@@ -523,7 +627,15 @@ class StudentWorkspaceDialog(ft.AlertDialog):
         )
 
         return ft.Container(
-            content=ft.ListView(controls=[table], expand=True),
+            content=ft.ListView(
+                controls=[
+                    ft.Row(
+                        controls=[table],
+                        scroll=ft.ScrollMode.AUTO,
+                    )
+                ],
+                expand=True,
+            ),
             bgcolor=AppTheme.SURFACE,
             padding=AppTheme.PAD_MD,
             border_radius=AppTheme.RADIUS_MD,
@@ -585,7 +697,15 @@ class StudentWorkspaceDialog(ft.AlertDialog):
         )
 
         return ft.Container(
-            content=ft.ListView(controls=[table], expand=True),
+            content=ft.ListView(
+                controls=[
+                    ft.Row(
+                        controls=[table],
+                        scroll=ft.ScrollMode.AUTO,
+                    )
+                ],
+                expand=True,
+            ),
             bgcolor=AppTheme.SURFACE,
             padding=AppTheme.PAD_MD,
             border_radius=AppTheme.RADIUS_MD,
@@ -666,7 +786,15 @@ class StudentWorkspaceDialog(ft.AlertDialog):
         )
 
         return ft.Container(
-            content=ft.ListView(controls=[table], expand=True),
+            content=ft.ListView(
+                controls=[
+                    ft.Row(
+                        controls=[table],
+                        scroll=ft.ScrollMode.AUTO,
+                    )
+                ],
+                expand=True,
+            ),
             bgcolor=AppTheme.SURFACE,
             padding=AppTheme.PAD_MD,
             border_radius=AppTheme.RADIUS_MD,
@@ -795,7 +923,7 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                 controls=[
                     top_add_bar,
                     ft.Text(f"Confirmed Village Friends ({len(friends)})", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
-                    table if friends else ft.Text("No village friends linked yet. Search and link above.", color=AppTheme.TEXT_MUTED),
+                    ft.Row(controls=[table], scroll=ft.ScrollMode.AUTO) if friends else ft.Text("No village friends linked yet. Search and link above.", color=AppTheme.TEXT_MUTED),
                 ],
                 spacing=AppTheme.PAD_MD,
                 expand=True,
@@ -803,103 +931,222 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             expand=True,
         )
 
-    # ── TAB 6: DOCUMENTS (REAL FILE SELECTION & <= 100 KB VALIDATION) ──
+    # ── TAB 6: DOCUMENTS (DOWNLOAD & UPLOAD NEW WITH ADMISSION FORM RULES) ──
     def _build_documents_tab(self) -> ft.Container:
         student = self.workspace_data.student
 
-        def trigger_upload(doc_type: str):
-            """Uses cross-platform file dialog to select real file and upload under <= 100 KB check."""
-            try:
-                p = pick_file(title=f"Select Student {doc_type.title()} (<= 100 KB)", allowed_extensions=[".jpg", ".jpeg", ".png"])
-                if not p or not p.is_file():
+        # If user opened the in-app upload panel, render it instead of the 2-card summary
+        if self._active_upload_doc is not None:
+            return self._build_upload_panel(
+                doc_title=self._active_upload_doc["doc_title"],
+                doc_type=self._active_upload_doc["doc_type"],
+            )
+
+        def trigger_upload_panel(doc_title: str, doc_type: str):
+            """Switches view to the in-app upload panel (modal, non-blocking with Cancel button)."""
+            self._active_upload_doc = {"doc_title": doc_title, "doc_type": doc_type}
+            self._upload_panel_selected_path = None
+            self._upload_panel_selected_bytes = None
+            self.tab_content_area.content = self._build_active_tab_content()
+            self._safe_update()
+
+        def trigger_download(doc_title: str, doc_type: str, file_path: Optional[str]):
+            """Allows user to download official student document asynchronously without UI freeze."""
+            if not file_path or not Path(file_path).is_file():
+                self.show_toast(f"{doc_title} file not found on disk.", is_error=True)
+                return
+
+            src = Path(file_path)
+            ext = src.suffix.lower() or ".jpg"
+            clean_name = f"student_{student.id}_{doc_type.lower()}{ext}"
+
+            def _on_save_chosen(dest: Optional[Path]):
+                if not dest:
                     return
+                try:
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src, dest)
+                    self.show_toast(f"✓ {doc_title} downloaded successfully to {dest.name}", is_success=True)
+                    open_path_externally(dest.parent)
+                except Exception as ex:
+                    LogService.error(f"Error downloading {doc_title}: {ex}", context="StudentWorkspace")
+                    self.show_toast(f"Download failed: {ex}", is_error=True)
 
-                if p.suffix.lower() not in (".jpg", ".jpeg", ".png"):
-                    self.show_toast("Invalid file format. Only JPG, JPEG, and PNG images are allowed.", is_error=True)
-                    return
+            pick_save_file_async(
+                title=f"Save {doc_title} As",
+                default_filename=clean_name,
+                allowed_extensions=[ext],
+                fallback_to_downloads=True,
+                on_result=_on_save_chosen,
+            )
 
-                file_bytes = p.read_bytes()
-                max_bytes = 100 * 1024
-                if len(file_bytes) > max_bytes:
-                    self.show_toast(
-                        f"File size ({len(file_bytes) / 1024:.1f} KB) exceeds the maximum allowed limit of 100 KB.",
-                        is_error=True,
-                    )
-                    return
-
-                self.controller.upload_student_document(
-                    student_id=self.student_id,
-                    doc_type=doc_type,
-                    file_bytes=file_bytes,
-                    filename=p.name,
-                )
-                self.load_workspace_data()
-                self.tab_content_area.content = self._build_active_tab_content()
-                self.show_toast(f"{doc_type.title()} uploaded successfully ({format_file_size(len(file_bytes))}).", is_success=True)
-            except Exception as ex:
-                LogService.error(f"File upload error: {ex}", context="StudentWorkspace")
-                self.show_toast(f"Upload failed: {ex}", is_error=True)
-
-        def trigger_delete(doc_type: str):
+        def trigger_delete(doc_title: str, doc_type: str):
+            """Removes the uploaded student document."""
             try:
                 self.controller.delete_student_document(self.student_id, doc_type)
                 self.load_workspace_data()
+                self.title = self._build_header()
                 self.tab_content_area.content = self._build_active_tab_content()
-                self.show_toast(f"{doc_type.title()} removed.", is_success=True)
+                if self.on_refresh_required:
+                    self.on_refresh_required()
+                self.show_toast(f"{doc_title} removed successfully.", is_success=True)
             except Exception as ex:
+                LogService.error(f"Error deleting {doc_title}: {ex}", context="StudentWorkspace")
                 self.show_toast(str(ex), is_error=True)
 
-        def doc_card(title: str, doc_type: str, file_path: Optional[str], icon: str) -> ft.Container:
-            has_file = bool(file_path and Path(file_path).exists())
+        def doc_card(doc_title: str, doc_type: str, file_path: Optional[str], default_icon: str) -> ft.Container:
+            has_file = bool(file_path and Path(file_path).is_file())
             size_str = format_file_size(Path(file_path).stat().st_size) if has_file else "Not Uploaded"
 
-            actions_row = ft.Row(
-                controls=[
-                    ft.ElevatedButton(
-                        content=ft.Text("Upload" if not has_file else "Replace"),
-                        icon=ft.Icons.UPLOAD_FILE,
-                        style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE),
-                        on_click=lambda _: trigger_upload(doc_type),
-                    ),
-                ],
-                alignment=ft.MainAxisAlignment.CENTER,
-            )
+            # Visual preview area
             if has_file:
-                actions_row.controls.append(
+                if doc_type.upper() == "PHOTO":
+                    preview_ctrl = ft.Container(
+                        content=ft.Image(
+                            src=file_path,
+                            width=140,
+                            height=140,
+                            fit="cover",
+                            border_radius=AppTheme.RADIUS_MD,
+                        ),
+                        width=140,
+                        height=140,
+                        border_radius=AppTheme.RADIUS_MD,
+                        clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+                        border=ft.Border.all(1, AppTheme.BORDER),
+                    )
+                else:
+                    preview_ctrl = ft.Container(
+                        content=ft.Image(
+                            src=file_path,
+                            width=200,
+                            height=80,
+                            fit="contain",
+                        ),
+                        width=200,
+                        height=80,
+                        bgcolor=AppTheme.BACKGROUND,
+                        border_radius=AppTheme.RADIUS_MD,
+                        border=ft.Border.all(1, AppTheme.BORDER),
+                        alignment=ft.Alignment.CENTER,
+                        padding=AppTheme.PAD_XS,
+                    )
+                status_chip = ft.Container(
+                    content=ft.Row(
+                        controls=[
+                            ft.Icon(ft.Icons.CHECK_CIRCLE, size=14, color=AppTheme.SUCCESS),
+                            ft.Text(f"Uploaded ({size_str})", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=AppTheme.SUCCESS),
+                        ],
+                        spacing=4,
+                        alignment=ft.MainAxisAlignment.CENTER,
+                    ),
+                    bgcolor=AppTheme.SUCCESS_LIGHT,
+                    padding=ft.Padding(left=10, top=4, right=10, bottom=4),
+                    border_radius=AppTheme.RADIUS_PILL,
+                )
+            else:
+                h_box = 140 if doc_type.upper() == "PHOTO" else 80
+                w_box = 140 if doc_type.upper() == "PHOTO" else 200
+                preview_ctrl = ft.Container(
+                    content=ft.Column(
+                        controls=[
+                            ft.Icon(default_icon, size=44, color=AppTheme.TEXT_MUTED),
+                            ft.Text(f"No {doc_title} Uploaded", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
+                        ],
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                        spacing=4,
+                    ),
+                    width=w_box,
+                    height=h_box,
+                    bgcolor=AppTheme.BACKGROUND,
+                    border_radius=AppTheme.RADIUS_MD,
+                    border=ft.Border.all(1, AppTheme.BORDER),
+                    alignment=ft.Alignment.CENTER,
+                )
+                status_chip = ft.Container(
+                    content=ft.Text("Not Uploaded", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED, weight=ft.FontWeight.W_500),
+                    bgcolor=AppTheme.BACKGROUND,
+                    padding=ft.Padding(left=10, top=4, right=10, bottom=4),
+                    border_radius=AppTheme.RADIUS_PILL,
+                )
+
+            # Option 1: Download
+            download_btn = ft.OutlinedButton(
+                content=ft.Text("Download"),
+                icon=ft.Icons.DOWNLOAD,
+                disabled=not has_file,
+                tooltip=f"Download {doc_title}" if has_file else f"No {doc_title.lower()} uploaded yet to download",
+                on_click=lambda _: trigger_download(doc_title, doc_type, file_path),
+            )
+
+            # Option 2: Upload New
+            upload_new_btn = ft.ElevatedButton(
+                content=ft.Text("Upload New"),
+                icon=ft.Icons.CLOUD_UPLOAD,
+                style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE),
+                tooltip=f"Upload New {doc_title} (Max 100 KB, JPG/PNG)",
+                on_click=lambda _: trigger_upload_panel(doc_title, doc_type),
+            )
+
+            actions = [download_btn, upload_new_btn]
+            if has_file:
+                actions.append(
                     ft.IconButton(
                         icon=ft.Icons.DELETE_OUTLINE,
                         icon_color=AppTheme.DANGER,
-                        tooltip=f"Remove {title}",
-                        on_click=lambda _: trigger_delete(doc_type),
+                        tooltip=f"Delete {doc_title}",
+                        on_click=lambda _: trigger_delete(doc_title, doc_type),
                     )
                 )
 
             return ft.Container(
                 content=ft.Column(
                     controls=[
-                        ft.Icon(icon, size=40, color=AppTheme.SUCCESS if has_file else AppTheme.PRIMARY),
-                        ft.Text(title, size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
-                        ft.Text(f"Status: {size_str}", size=AppTheme.SIZE_CAPTION, color=AppTheme.SUCCESS if has_file else AppTheme.TEXT_SECONDARY),
+                        ft.Text(doc_title, size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                        status_chip,
                         ft.Container(height=6),
-                        actions_row,
+                        preview_ctrl,
+                        ft.Container(height=8),
+                        ft.Row(
+                            controls=actions,
+                            alignment=ft.MainAxisAlignment.CENTER,
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            spacing=AppTheme.PAD_SM,
+                        ),
                     ],
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     alignment=ft.MainAxisAlignment.CENTER,
-                    spacing=4,
+                    spacing=6,
                 ),
                 bgcolor=AppTheme.SURFACE,
-                padding=AppTheme.PAD_MD,
+                padding=AppTheme.PAD_LG,
                 border_radius=AppTheme.RADIUS_MD,
                 border=ft.Border.all(1, AppTheme.SUCCESS if has_file else AppTheme.BORDER),
-                width=240,
+                width=340,
                 alignment=ft.Alignment.CENTER,
             )
 
         return ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Text("Student Documents & Identity Proofs (Strict Max: 100 KB)", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
-                    ft.Text("Click Upload to select files from file manager. Supported formats: JPG, JPEG, PNG.", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
+                    ft.Row(
+                        controls=[
+                            ft.Icon(ft.Icons.FOLDER_SHARED, size=24, color=AppTheme.PRIMARY),
+                            ft.Column(
+                                controls=[
+                                    ft.Text("Student Documents & Identity Proofs", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                                    ft.Text(
+                                        "Official student photo and signature for identity verification, ID cards, and certificates. (Strict Limit: Max 100 KB, JPG/PNG)",
+                                        size=AppTheme.SIZE_CAPTION,
+                                        color=AppTheme.TEXT_SECONDARY,
+                                    ),
+                                ],
+                                spacing=2,
+                            ),
+                        ],
+                        spacing=AppTheme.PAD_SM,
+                    ),
                     ft.Divider(height=1, color=AppTheme.BORDER),
                     ft.Row(
                         controls=[
@@ -907,6 +1154,24 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                             doc_card("Student Signature", "SIGNATURE", student.signature_path, ft.Icons.DRAW),
                         ],
                         spacing=AppTheme.PAD_LG,
+                        alignment=ft.MainAxisAlignment.START,
+                    ),
+                    ft.Container(height=10),
+                    ft.Container(
+                        content=ft.Row(
+                            controls=[
+                                ft.Icon(ft.Icons.INFO_OUTLINE, size=18, color=AppTheme.PRIMARY),
+                                ft.Text(
+                                    "Document Rules: 1. Max allowed file size is 100 KB.  2. Only JPG, JPEG, and PNG formats are accepted.  3. Download copies official files directly to your device.",
+                                    size=AppTheme.SIZE_CAPTION,
+                                    color=AppTheme.TEXT_SECONDARY,
+                                ),
+                            ],
+                            spacing=AppTheme.PAD_SM,
+                        ),
+                        bgcolor=AppTheme.PRIMARY_LIGHT,
+                        padding=ft.Padding(12, 8, 12, 8),
+                        border_radius=AppTheme.RADIUS_SM,
                     ),
                 ],
                 spacing=AppTheme.PAD_MD,
@@ -914,6 +1179,334 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             padding=AppTheme.PAD_MD,
             expand=True,
         )
+
+    def _build_upload_panel(self, doc_title: str, doc_type: str) -> ft.Container:
+        """
+        Renders a dedicated in-app upload panel directly in the workspace dialog.
+        Features live preview, explicit Cancel button, non-blocking OS picker, and direct file path input.
+        Never freezes the application.
+        """
+        student = self.workspace_data.student
+        max_file_size_bytes = 100 * 1024  # 100 KB exact rule matching admission form
+
+        status_text = ft.Text(
+            "Select a file from your computer or paste the file path below.",
+            size=AppTheme.SIZE_CAPTION,
+            color=AppTheme.TEXT_SECONDARY,
+        )
+        self._upload_panel_status_text = status_text
+
+        preview_image_container = ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Icon(ft.Icons.CLOUD_UPLOAD_OUTLINED, size=48, color=AppTheme.PRIMARY),
+                    ft.Text(f"No {doc_title} Selected", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_MUTED, weight=ft.FontWeight.W_500),
+                    ft.Text("Click 'Browse Files...' or paste file path", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
+                ],
+                alignment=ft.MainAxisAlignment.CENTER,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=4,
+            ),
+            width=260,
+            height=160,
+            bgcolor=AppTheme.BACKGROUND,
+            border_radius=AppTheme.RADIUS_MD,
+            border=ft.Border.all(1, AppTheme.BORDER),
+            alignment=ft.Alignment.CENTER,
+            padding=AppTheme.PAD_SM,
+        )
+
+        validation_chip = ft.Container(
+            content=ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.RULE, size=14, color=AppTheme.PRIMARY),
+                    ft.Text("Max 100 KB • JPG, JPEG, PNG only", size=AppTheme.SIZE_CAPTION, color=AppTheme.PRIMARY, weight=ft.FontWeight.W_500),
+                ],
+                spacing=6,
+                alignment=ft.MainAxisAlignment.CENTER,
+            ),
+            bgcolor=AppTheme.PRIMARY_LIGHT,
+            padding=ft.Padding(12, 6, 12, 6),
+            border_radius=AppTheme.RADIUS_PILL,
+        )
+
+        def handle_cancel(_=None):
+            cancel_active_picker()
+            self._active_upload_doc = None
+            self._upload_panel_selected_path = None
+            self._upload_panel_selected_bytes = None
+            self.tab_content_area.content = self._build_active_tab_content()
+            self._safe_update()
+            self.show_toast(f"Upload of {doc_title} cancelled.")
+
+        def trigger_upload_action(_=None) -> bool:
+            if not self._upload_panel_selected_path or not self._upload_panel_selected_bytes:
+                self.show_toast("No valid file selected to upload.", is_error=True)
+                return False
+
+            try:
+                self.controller.upload_student_document(
+                    student_id=self.student_id,
+                    doc_type=doc_type,
+                    file_bytes=self._upload_panel_selected_bytes,
+                    filename=self._upload_panel_selected_path.name,
+                )
+                self.load_workspace_data()
+                self._active_upload_doc = None
+                self._upload_panel_selected_path = None
+                self._upload_panel_selected_bytes = None
+                self.title = self._build_header()
+                self.tab_content_area.content = self._build_active_tab_content()
+                if self.on_refresh_required:
+                    self.on_refresh_required()
+                self.show_toast(
+                    f"✓ {doc_title} uploaded successfully.",
+                    is_success=True,
+                )
+                self._safe_update()
+                return True
+            except Exception as ex:
+                LogService.error(f"File upload error for {doc_title}: {ex}", context="StudentWorkspace")
+                self.show_toast(f"Upload failed: {ex}", is_error=True)
+                return False
+
+        self._trigger_upload_now = trigger_upload_action
+
+        upload_now_btn = ft.ElevatedButton(
+            content=ft.Text(f"Upload {doc_title} Now"),
+            icon=ft.Icons.CHECK_CIRCLE,
+            style=ft.ButtonStyle(bgcolor=AppTheme.SUCCESS, color=ft.Colors.WHITE),
+            disabled=True,
+            on_click=trigger_upload_action,
+        )
+        self._upload_now_btn = upload_now_btn
+
+        cancel_btn = ft.OutlinedButton(
+            content=ft.Text("Cancel"),
+            icon=ft.Icons.CLOSE,
+            on_click=handle_cancel,
+        )
+
+        path_input = ft.TextField(
+            label="File Path (Optional manual input)",
+            hint_text="/path/to/image.jpg",
+            dense=True,
+            expand=True,
+            border_color=AppTheme.BORDER,
+        )
+
+        def validate_and_apply_file(p: Path):
+            try:
+                if not p.is_file():
+                    status_text.value = f"File not found: {p}"
+                    status_text.color = AppTheme.DANGER
+                    upload_now_btn.disabled = True
+                    self._safe_update()
+                    return
+
+                if p.suffix.lower() not in (".jpg", ".jpeg", ".png"):
+                    status_text.value = f"Invalid format '{p.suffix}'. Only JPG, JPEG, and PNG images are allowed."
+                    status_text.color = AppTheme.DANGER
+                    upload_now_btn.disabled = True
+                    self._safe_update()
+                    return
+
+                raw_bytes = p.read_bytes()
+                if len(raw_bytes) > max_file_size_bytes:
+                    status_text.value = f"File size ({len(raw_bytes) / 1024:.1f} KB) exceeds the maximum allowed limit of 100 KB."
+                    status_text.color = AppTheme.DANGER
+                    upload_now_btn.disabled = True
+                    self._safe_update()
+                    return
+
+                self._upload_panel_selected_path = p
+                self._upload_panel_selected_bytes = raw_bytes
+                path_input.value = str(p)
+                status_text.value = f"✓ Ready to upload: {p.name} ({format_file_size(len(raw_bytes))})"
+                status_text.color = AppTheme.SUCCESS
+
+                validation_chip.bgcolor = AppTheme.SUCCESS_LIGHT
+                validation_chip.content = ft.Row(
+                    controls=[
+                        ft.Icon(ft.Icons.CHECK_CIRCLE, size=14, color=AppTheme.SUCCESS),
+                        ft.Text(
+                            f"Valid Image ({format_file_size(len(raw_bytes))} / 100 KB max)",
+                            size=AppTheme.SIZE_CAPTION,
+                            color=AppTheme.SUCCESS,
+                            weight=ft.FontWeight.BOLD,
+                        ),
+                    ],
+                    spacing=4,
+                    alignment=ft.MainAxisAlignment.CENTER,
+                )
+
+                fit_mode = "contain" if doc_type.upper() == "SIGNATURE" else "cover"
+                preview_image_container.content = ft.Image(
+                    src=str(p),
+                    width=260,
+                    height=160,
+                    fit=fit_mode,
+                    border_radius=AppTheme.RADIUS_MD,
+                )
+                preview_image_container.border = ft.Border.all(2, AppTheme.SUCCESS)
+                upload_now_btn.disabled = False
+                self._safe_update()
+            except Exception as ex:
+                status_text.value = f"Error reading file: {ex}"
+                status_text.color = AppTheme.DANGER
+                upload_now_btn.disabled = True
+                self._safe_update()
+
+        def handle_browse_click(_):
+            status_text.value = "Waiting for file selection from file dialog... You can click Cancel anytime."
+            status_text.color = AppTheme.PRIMARY
+            self._safe_update()
+
+            def _on_file_chosen(res_path: Optional[Path]):
+                if not res_path:
+                    status_text.value = "File picker closed without selecting a file."
+                    status_text.color = AppTheme.TEXT_SECONDARY
+                    self._safe_update()
+                    return
+                validate_and_apply_file(res_path)
+
+            pick_file_async(
+                title=f"Select {doc_title} (Max 100 KB, JPG/PNG)",
+                allowed_extensions=[".jpg", ".jpeg", ".png"],
+                on_result=_on_file_chosen,
+            )
+
+        def handle_load_manual(_=None):
+            val = (path_input.value or "").strip()
+            if not val:
+                status_text.value = "Please enter or paste a valid file path first."
+                status_text.color = AppTheme.DANGER
+                self._safe_update()
+                return
+            validate_and_apply_file(Path(val))
+
+        path_input.on_submit = handle_load_manual
+        load_btn = ft.OutlinedButton("Load", icon=ft.Icons.CHECK, on_click=handle_load_manual)
+
+        browse_btn = ft.ElevatedButton(
+            content=ft.Text("Browse Files..."),
+            icon=ft.Icons.FOLDER_OPEN,
+            style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE),
+            tooltip="Open desktop file chooser (Modal in front of app, non-blocking)",
+            on_click=handle_browse_click,
+        )
+
+        # If a file was already chosen in state, populate it
+        if self._upload_panel_selected_path and self._upload_panel_selected_bytes:
+            validate_and_apply_file(self._upload_panel_selected_path)
+
+        panel = ft.Container(
+            content=ft.Column(
+                controls=[
+                    # Breadcrumb & Navigation
+                    ft.Row(
+                        controls=[
+                            ft.TextButton(
+                                content=ft.Row(
+                                    controls=[
+                                        ft.Icon(ft.Icons.ARROW_BACK, size=16, color=AppTheme.PRIMARY),
+                                        ft.Text("Back to Documents", size=AppTheme.SIZE_BODY, color=AppTheme.PRIMARY, weight=ft.FontWeight.W_500),
+                                    ],
+                                    spacing=4,
+                                ),
+                                on_click=handle_cancel,
+                            ),
+                            ft.Text(f"Upload New {doc_title}", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                        ],
+                        alignment=ft.MainAxisAlignment.START,
+                        spacing=AppTheme.PAD_SM,
+                    ),
+                    ft.Divider(height=1, color=AppTheme.BORDER),
+                    # Main content row: Preview on left, Controls on right
+                    ft.Row(
+                        controls=[
+                            # Left Preview Column
+                            ft.Column(
+                                controls=[
+                                    preview_image_container,
+                                    ft.Container(height=4),
+                                    validation_chip,
+                                ],
+                                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                spacing=4,
+                            ),
+                            # Right Controls Column
+                            ft.Column(
+                                controls=[
+                                    ft.Text("Option 1: Choose File", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
+                                    ft.Row(
+                                        controls=[
+                                            browse_btn,
+                                            ft.Text("Opens dialog in front. Non-blocking (no app freeze).", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
+                                        ],
+                                        spacing=AppTheme.PAD_SM,
+                                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                    ),
+                                    ft.Container(height=6),
+                                    ft.Text("Option 2: Direct File Path", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
+                                    ft.Row(
+                                        controls=[
+                                            path_input,
+                                            load_btn,
+                                        ],
+                                        spacing=AppTheme.PAD_SM,
+                                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                    ),
+                                    ft.Container(height=4),
+                                    status_text,
+                                    ft.Divider(height=1, color=AppTheme.BORDER),
+                                    # Action Buttons
+                                    ft.Row(
+                                        controls=[
+                                            cancel_btn,
+                                            upload_now_btn,
+                                        ],
+                                        spacing=AppTheme.PAD_MD,
+                                        alignment=ft.MainAxisAlignment.END,
+                                    ),
+                                ],
+                                spacing=8,
+                                expand=True,
+                            ),
+                        ],
+                        spacing=AppTheme.PAD_LG,
+                        vertical_alignment=ft.CrossAxisAlignment.START,
+                    ),
+                    ft.Container(height=8),
+                    # Bottom info note
+                    ft.Container(
+                        content=ft.Row(
+                            controls=[
+                                ft.Icon(ft.Icons.SHIELD, size=16, color=AppTheme.PRIMARY),
+                                ft.Text(
+                                    "Admissions Rule Applied: Student photo and signature must be under 100 KB in JPG or PNG format. Pressing Escape or clicking Cancel returns to documents immediately without freezing.",
+                                    size=AppTheme.SIZE_CAPTION,
+                                    color=AppTheme.TEXT_SECONDARY,
+                                ),
+                            ],
+                            spacing=AppTheme.PAD_SM,
+                        ),
+                        bgcolor=AppTheme.PRIMARY_LIGHT,
+                        padding=ft.Padding(12, 8, 12, 8),
+                        border_radius=AppTheme.RADIUS_SM,
+                    ),
+                ],
+                spacing=AppTheme.PAD_MD,
+            ),
+            bgcolor=AppTheme.SURFACE,
+            padding=AppTheme.PAD_MD,
+            border_radius=AppTheme.RADIUS_MD,
+            border=ft.Border.all(1, AppTheme.PRIMARY),
+            expand=True,
+        )
+
+        return panel
+
 
     # ── TAB 7: HISTORY & TIMELINE ──
     def _build_history_tab(self) -> ft.Container:
@@ -993,10 +1586,181 @@ class StudentWorkspaceDialog(ft.AlertDialog):
 
         return [edit_btn, close_btn]
 
+    # ── TAB 8: ATTENDANCE & HEALTH ──
+    def _build_attendance_tab(self) -> ft.Container:
+        """Renders comprehensive attendance health timeline and history for this student."""
+        try:
+            h_dto = AttendanceService().get_student_attendance_health(self.student_id)
+        except Exception as exc:
+            LogService.error(f"Error loading student attendance tab: {exc}", context="StudentWorkspace")
+            return ft.Container(content=ft.Text("Could not load attendance health metrics."))
+
+        health_badge = ft.Container(
+            content=ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.HEALTH_AND_SAFETY, size=14, color=h_dto.health_color),
+                    ft.Text(f"{h_dto.health_status} ({h_dto.attendance_percentage}%)", size=12, weight=ft.FontWeight.BOLD, color=h_dto.health_color),
+                ],
+                spacing=4,
+            ),
+            bgcolor=h_dto.health_bg_color,
+            border_radius=AppTheme.RADIUS_PILL,
+            padding=ft.Padding(10, 4, 10, 4),
+        )
+
+        stat_card = ft.Container(
+            content=ft.Row(
+                controls=[
+                    ft.Column(
+                        controls=[
+                            ft.Text("Attendance Health", size=11, color=AppTheme.TEXT_SECONDARY),
+                            health_badge,
+                        ],
+                        spacing=4,
+                    ),
+                    ft.VerticalDivider(width=1, color=AppTheme.BORDER),
+                    ft.Column(
+                        controls=[
+                            ft.Text("Total Sessions", size=11, color=AppTheme.TEXT_SECONDARY),
+                            ft.Text(str(h_dto.total_sessions_conducted), size=18, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
+                        ],
+                        spacing=2,
+                    ),
+                    ft.VerticalDivider(width=1, color=AppTheme.BORDER),
+                    ft.Column(
+                        controls=[
+                            ft.Text("Present Sessions", size=11, color=AppTheme.TEXT_SECONDARY),
+                            ft.Text(str(h_dto.total_present), size=18, weight=ft.FontWeight.BOLD, color="#059669"),
+                        ],
+                        spacing=2,
+                    ),
+                    ft.VerticalDivider(width=1, color=AppTheme.BORDER),
+                    ft.Column(
+                        controls=[
+                            ft.Text("Absent Sessions", size=11, color=AppTheme.TEXT_SECONDARY),
+                            ft.Text(str(h_dto.total_absent), size=18, weight=ft.FontWeight.BOLD, color="#DC2626"),
+                        ],
+                        spacing=2,
+                    ),
+                ],
+                alignment=ft.MainAxisAlignment.SPACE_AROUND,
+            ),
+            bgcolor=AppTheme.SURFACE_VARIANT,
+            padding=ft.Padding(14, 10, 14, 10),
+            border_radius=AppTheme.RADIUS_MD,
+            border=ft.Border.all(1, AppTheme.BORDER),
+        )
+
+        # History session logs
+        if not h_dto.recent_history:
+            empty_history = ft.Container(
+                content=ft.Column(
+                    controls=[
+                        ft.Icon(ft.Icons.EVENT_BUSY, size=40, color=AppTheme.TEXT_MUTED),
+                        ft.Text("No attendance records found for this student.", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_SECONDARY),
+                        ft.Text("Attendance sessions marked in batch rosters will appear here.", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
+                    ],
+                    horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    spacing=6,
+                ),
+                padding=ft.Padding(0, 30, 0, 30),
+                alignment=ft.Alignment(0, 0),
+            )
+            table_content = empty_history
+        else:
+            rows = []
+            for item in h_dto.recent_history:
+                is_p = (item["status"] == "PRESENT")
+                badge = ft.Container(
+                    content=ft.Text(
+                        item["status"],
+                        size=11,
+                        weight=ft.FontWeight.BOLD,
+                        color="#059669" if is_p else "#DC2626",
+                    ),
+                    bgcolor="#ECFDF5" if is_p else "#FEF2F2",
+                    border_radius=AppTheme.RADIUS_PILL,
+                    padding=ft.Padding(8, 2, 8, 2),
+                )
+                rows.append(
+                    ft.DataRow(
+                        cells=[
+                            ft.DataCell(ft.Text(item["date"], size=11, weight=ft.FontWeight.W_500)),
+                            ft.DataCell(ft.Text(item["batch_name"], size=11, weight=ft.FontWeight.BOLD)),
+                            ft.DataCell(ft.Text(item["timing"] or "—", size=11)),
+                            ft.DataCell(ft.Text(item["course_name"] or "—", size=11)),
+                            ft.DataCell(ft.Text(item["mode"], size=11)),
+                            ft.DataCell(badge),
+                        ]
+                    )
+                )
+
+            history_table = ft.DataTable(
+                columns=[
+                    ft.DataColumn(ft.Text("Session Date", weight=ft.FontWeight.BOLD, size=11)),
+                    ft.DataColumn(ft.Text("Batch", weight=ft.FontWeight.BOLD, size=11)),
+                    ft.DataColumn(ft.Text("Timing", weight=ft.FontWeight.BOLD, size=11)),
+                    ft.DataColumn(ft.Text("Course", weight=ft.FontWeight.BOLD, size=11)),
+                    ft.DataColumn(ft.Text("Mode", weight=ft.FontWeight.BOLD, size=11)),
+                    ft.DataColumn(ft.Text("Status", weight=ft.FontWeight.BOLD, size=11)),
+                ],
+                rows=rows,
+                heading_row_color=AppTheme.SURFACE_VARIANT,
+                heading_row_height=38,
+                data_row_min_height=40,
+                border=ft.Border.all(1, AppTheme.BORDER),
+                border_radius=AppTheme.RADIUS_MD,
+                vertical_lines=ft.BorderSide(0.5, AppTheme.BORDER),
+                horizontal_lines=ft.BorderSide(0.5, AppTheme.BORDER),
+            )
+            table_content = ft.ListView(controls=[history_table], expand=True)
+
+        return ft.Container(
+            content=ft.Column(
+                controls=[
+                    stat_card,
+                    ft.Text("Attendance History & Session Logs:", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                    ft.Container(content=table_content, expand=True),
+                ],
+                spacing=12,
+                expand=True,
+            ),
+            expand=True,
+        )
+
     def close_workspace(self, e: Optional[ft.ControlEvent] = None) -> None:
+        cancel_active_picker()
+        self._active_upload_doc = None
+        self._upload_panel_selected_path = None
+        self._upload_panel_selected_bytes = None
+        self.open = False
         p = self.safe_page
         if p:
             try:
-                p.pop_dialog()
+                if hasattr(p, "pop_dialog"):
+                    p.pop_dialog()
+                else:
+                    p.dialog = None
+                    p.update()
             except RuntimeError:
                 pass
+
+    def handle_escape(self) -> bool:
+        """Handles Escape shortcut: cancels active upload panel if open, otherwise closes workspace."""
+        if self._active_upload_doc is not None:
+            cancel_active_picker()
+            self._active_upload_doc = None
+            self._upload_panel_selected_path = None
+            self._upload_panel_selected_bytes = None
+            self.tab_content_area.content = self._build_active_tab_content()
+            self._safe_update()
+            self.show_toast("Upload cancelled.")
+            return True
+        self.close_workspace()
+        return True
+
+    def handle_enter(self) -> bool:
+        """Handles Enter shortcut: triggers upload if a valid file is loaded in upload panel."""
+        if self._active_upload_doc is not None and hasattr(self, "_trigger_upload_now") and callable(self._trigger_upload_now):
+            return bool(self._trigger_upload_now())
+        return False

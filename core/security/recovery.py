@@ -17,6 +17,9 @@ from core.database.transaction import TransactionManager
 from core.exceptions import AuthenticationError, RateLimitExceededError, ValidationError
 from core.logger.service import LogService
 from core.security.audit import SecurityAuditRepository
+from core.security.authorization import AuthorizationService
+from core.security.context import SecurityContext
+from core.security.permissions import SecurityPermission
 from infrastructure.notification.service import NotificationService
 from modules.users.repository import UserRepository
 
@@ -58,7 +61,7 @@ def _enforce_global_rate_limit() -> None:
     now = time.time()
     cutoff = now - _GLOBAL_WINDOW_SECONDS
     global _GLOBAL_BREAK_GLASS_ATTEMPTS
-    _GLOBAL_BREAK_GLASS_ATTEMPTS = [t for t in _GLOBAL_BREAK_GLASS_ATTEMPTS if t > cutoff]
+    _GLOBAL_BREAK_GLASS_ATTEMPTS = [t for t in _GLOBAL_BREAK_GLASS_ATTEMPTS if t > cutoff][-(_GLOBAL_MAX_ATTEMPTS * 2):]
     if len(_GLOBAL_BREAK_GLASS_ATTEMPTS) >= _GLOBAL_MAX_ATTEMPTS:
         LogService.warning("Global break-glass rate limit exceeded.", context="BREAK_GLASS")
         raise RateLimitExceededError(
@@ -183,9 +186,16 @@ class RecoveryKeyService:
             return key_id, canonical, formatted
 
     @classmethod
-    def rotate_recovery_key(cls, user_id: int, reason: str = "ROTATION") -> dict[str, Any]:
+    def rotate_recovery_key(cls, user_id: int, reason: str = "ROTATION", actor_role: Optional[str] = None) -> dict[str, Any]:
         """Issues a new active recovery key and revokes old keys."""
         with _transaction():
+            role = actor_role or SecurityContext.get_current_role()
+            if not role:
+                repo = UserRepository()
+                user = repo.get_by_id(user_id)
+                if user:
+                    role = user.get("role")
+            AuthorizationService.enforce(SecurityPermission.SECURITY_RECOVERY_MANAGE, actor_role=role)
             formatted_key, identifier, status = cls.issue_recovery_key(user_id, send_email=True)
             canonical = cls.canonicalize_key(formatted_key)
             return {

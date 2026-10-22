@@ -11,6 +11,8 @@ from modules.course.dto import CourseDTO
 from modules.course.views.course_form_modal import CourseFormModal
 from modules.course.views.course_fee_dialog import CourseFeeDialog
 from modules.course.views.course_detail_dialog import CourseDetailDialog
+from ui.widgets.hover_card import HoverCard
+from ui.widgets.badge import StatusBadge
 
 __all__ = ["CourseHome"]
 
@@ -116,31 +118,29 @@ class CourseHome(ft.Column):
         )
 
     def _kpi_card(self, label: str, value_ctrl: ft.Text, icon: str, icon_color: str) -> ft.Control:
-        return ft.Container(
-            expand=True,
+        return HoverCard(
             content=ft.Row(
                 controls=[
                     ft.Container(
                         content=ft.Icon(icon, color=icon_color, size=24),
-                        bgcolor=AppTheme.SURFACE_VARIANT,
-                        padding=ft.Padding(8, 8, 8, 8),
+                        bgcolor=icon_color + "1A",
+                        padding=ft.Padding(10, 10, 10, 10),
                         border_radius=AppTheme.RADIUS_MD,
                     ),
                     ft.Column(
                         controls=[
                             value_ctrl,
-                            ft.Text(label, size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
+                            ft.Text(label, size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY, weight=ft.FontWeight.W_500),
                         ],
-                        spacing=0,
+                        spacing=1,
                     ),
                 ],
                 spacing=12,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
-            bgcolor=AppTheme.SURFACE,
-            padding=ft.Padding(14, 12, 14, 12),
+            padding=ft.Padding(16, 12, 16, 12),
             border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
+            expand=True,
         )
 
     def _build_filter_bar(self) -> None:
@@ -260,7 +260,7 @@ class CourseHome(ft.Column):
         elif "OFFICE" in cat_upper:
             cat_color = "#0D9488"  # Teal
 
-        card_content = ft.Container(
+        card_content = HoverCard(
             content=ft.Column(
                 controls=[
                     # Header: Name, Code, Category Chip
@@ -275,11 +275,9 @@ class CourseHome(ft.Column):
                                 overflow=ft.TextOverflow.ELLIPSIS,
                                 expand=True,
                             ),
-                            ft.Container(
-                                content=ft.Text(f"● {status_text}", size=10, weight=ft.FontWeight.BOLD, color=status_color),
-                                bgcolor=AppTheme.SURFACE_VARIANT,
-                                padding=ft.Padding(6, 2, 6, 2),
-                                border_radius=AppTheme.RADIUS_SM,
+                            StatusBadge(
+                                label=status_text,
+                                variant="success" if course.is_active else "neutral",
                             ),
                         ],
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -380,22 +378,12 @@ class CourseHome(ft.Column):
                 ],
                 spacing=8,
             ),
-            bgcolor=AppTheme.SURFACE,
             padding=ft.Padding(14, 12, 14, 12),
             border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
-            shadow=ft.BoxShadow(
-                spread_radius=0,
-                blur_radius=4,
-                color="#0F172A0A",
-                offset=ft.Offset(0, 2),
-            ),
-        )
-
-        return ft.Container(
-            content=card_content,
             col={"xs": 12, "sm": 6, "md": 4, "lg": 4, "xl": 3},
         )
+
+        return card_content
 
     def _handle_add_course(self, e: ft.ControlEvent) -> None:
         p = self.safe_page

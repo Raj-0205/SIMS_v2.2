@@ -483,6 +483,10 @@ class AdmissionService(BaseService):
                     f"Initial payment amount (₹{init_amount:,.2f}) cannot exceed final payable course fee (₹{final_fee:,.2f})."
                 )
 
+            # Auto-transition to COMPLETED if full tuition is paid upfront
+            if is_confirming and final_fee > 0 and init_amount >= final_fee:
+                target_status = AdmissionStatus.COMPLETED
+
             # 3. Resolve or Create Student Profile
             student_id, student_info = self._validate_personal_info(dto)
 
@@ -490,7 +494,7 @@ class AdmissionService(BaseService):
             photo_path, signature_path = self._validate_documents(dto, student_id)
 
             # 5. State Restriction: Prevent duplicate concurrent active admissions for the SAME course
-            if target_status in (AdmissionStatus.DRAFT, AdmissionStatus.REGISTERED, AdmissionStatus.CONFIRMED):
+            if target_status in (AdmissionStatus.DRAFT, AdmissionStatus.REGISTERED, AdmissionStatus.CONFIRMED, AdmissionStatus.COMPLETED):
                 if self.repository.has_active_admission_for_course(student_id, dto.course_id):
                     raise ConflictError(f"Student already has an active admission for course '{course['name']}'.")
 
@@ -590,7 +594,7 @@ class AdmissionService(BaseService):
                         self.friendship_repo.add_friendship(student_id, friend_id, admission_id)
 
             # 12. Activity Log (B20)
-            action_name = "CONFIRMED" if is_confirming else "CREATED"
+            action_name = "COMPLETED" if target_status == AdmissionStatus.COMPLETED else ("CONFIRMED" if is_confirming else "CREATED")
             self.activity_repo.insert(
                 "ADMISSION",
                 admission_id,
@@ -604,7 +608,11 @@ class AdmissionService(BaseService):
                 f"Admission created successfully: ID #{admission_id}, Number {candidate_number}, Status: {target_status.value}",
                 context=self.__class__.__name__,
             )
-            return admission_id
+
+        from core.cache.fees_cache import FeesCacheManager
+        FeesCacheManager.invalidate(f"Admission created #{admission_id}")
+
+        return admission_id
 
     def update_admission(self, dto: AdmissionUpdateDTO) -> None:
         """Updates an existing admission record."""
@@ -613,11 +621,43 @@ class AdmissionService(BaseService):
             if not existing:
                 raise ValidationError(f"Admission with ID {dto.id} not found.")
 
+            agreed_fee = float(dto.agreed_fee or 0.0)
+            if agreed_fee < 0:
+                raise ValidationError("Agreed fee cannot be negative.")
+
+            discount = float(dto.discount or 0.0)
+            if discount < 0:
+                raise ValidationError("Discount cannot be negative.")
+            if discount > agreed_fee:
+                raise ValidationError("Discount cannot exceed agreed fee.")
+
+            final_fee = max(0.0, agreed_fee - discount)
+            total_paid = float(self.payment_repo.get_total_paid_for_admission(dto.id) or 0.0)
+            if final_fee < total_paid:
+                raise ValidationError(
+                    f"Final fee (₹{final_fee:,.2f}) cannot be less than total amount already paid (₹{total_paid:,.2f})."
+                )
+
+            target_status = dto.status
+            pending = max(0.0, final_fee - total_paid)
+            if target_status == AdmissionStatus.COMPLETED and pending > 0:
+                raise ValidationError(
+                    f"Cannot mark admission as COMPLETED while a balance of ₹{pending:,.2f} is pending."
+                )
+
+            if target_status == AdmissionStatus.CANCELLED and existing.get("status") != AdmissionStatus.CANCELLED.value:
+                raise ValidationError(
+                    "Direct transition to CANCELLED via update is disallowed. Use the cancel_admission workflow."
+                )
+
+            if target_status == AdmissionStatus.CONFIRMED and pending == 0.0 and total_paid > 0:
+                target_status = AdmissionStatus.COMPLETED
+
             data = {
                 "batch_id": dto.batch_id if dto.batch_id and dto.batch_id > 0 else None,
-                "agreed_fee": dto.agreed_fee,
-                "discount": dto.discount,
-                "status": dto.status.value,
+                "agreed_fee": agreed_fee,
+                "discount": discount,
+                "status": target_status.value,
                 "remarks": dto.remarks.strip() if dto.remarks else None,
                 "institution_id": dto.institution_id if dto.institution_id and dto.institution_id > 0 else None,
                 "institution_name": dto.institution_name,
@@ -637,6 +677,9 @@ class AdmissionService(BaseService):
             }
             self.repository.update(dto.id, data)
             self.activity_repo.insert("ADMISSION", dto.id, "UPDATED", details=f"Updated admission ID {dto.id}")
+
+        from core.cache.fees_cache import FeesCacheManager
+        FeesCacheManager.invalidate(f"Admission updated #{dto.id}")
 
     def get_admission(self, admission_id: int) -> AdmissionDTO:
         with self.unit_of_work():
@@ -664,13 +707,15 @@ class AdmissionService(BaseService):
             timeline = []
             logs = self.activity_repo.get_logs_for_entity("ADMISSION", admission_id)
             for l in logs:
+                action = str(l.get("action") or "").upper()
                 timeline.append({
-                    "timestamp": l["created_at"],
-                    "title": f"Admission {l['action'].capitalize()}",
-                    "description": l.get("details") or f"Admission was {l['action'].lower()}.",
-                    "event_type": l["action"],
+                    "timestamp": l.get("created_at"),
+                    "title": f"Admission {action.capitalize()}",
+                    "description": l.get("details") or f"Admission was {action.lower()}.",
+                    "event_type": action,
                 })
-            if not timeline:
+            has_reg = any(t.get("event_type") in ("REGISTRATION", "CREATED") for t in timeline)
+            if not has_reg and adm.created_at:
                 timeline.append({
                     "timestamp": adm.created_at,
                     "title": "Admission Registered",
@@ -691,7 +736,7 @@ class AdmissionService(BaseService):
                     "description": f"Official receipt issued for ₹{r.amount_paid:,.2f}.",
                     "event_type": "RECEIPT",
                 })
-            timeline.sort(key=lambda x: str(x["timestamp"]), reverse=True)
+            timeline.sort(key=lambda x: str(x.get("timestamp") or ""), reverse=True)
 
             batches = self.batch_repo.list(course_id=adm.course_id, limit=50)
 
@@ -732,6 +777,9 @@ class AdmissionService(BaseService):
         with self.unit_of_work():
             self.friendship_repo.add_friendship(student_id, friend_student_id, admission_id)
             self.activity_repo.insert("STUDENT", student_id, "FRIEND_ADDED", details=f"Linked friend ID {friend_student_id}")
+
+        from core.cache.fees_cache import FeesCacheManager
+        FeesCacheManager.invalidate(f"Admission friendship linked {student_id} <-> {friend_student_id}")
 
     def get_active_institutions(self) -> list[dict[str, Any]]:
         with self.unit_of_work():
@@ -841,7 +889,11 @@ class AdmissionService(BaseService):
                 details=f"Admission {adm.admission_number} ({adm.course_name}) cancelled. Reason: {reason.strip()}",
             )
             LogService.info(f"Admission #{adm.admission_number} cancelled. Reason: {reason.strip()}", context="AdmissionService")
-            return True
+
+        from core.cache.fees_cache import FeesCacheManager
+        FeesCacheManager.invalidate(f"Admission cancelled #{admission_id}")
+
+        return True
 
     def get_deletion_impact(self, admission_id: int) -> dict[str, Any]:
         """Calculates full dependency impact before destructive deletion by Administrator."""
@@ -881,6 +933,9 @@ class AdmissionService(BaseService):
                 details=f"Permanently deleted admission {adm.admission_number} ({adm.course_name}) for student '{adm.student_name}'.",
             )
             LogService.info(f"Admission #{adm.admission_number} permanently deleted by Administrator.", context="AdmissionService")
+
+        from core.cache.fees_cache import FeesCacheManager
+        FeesCacheManager.invalidate(f"Admission deleted #{admission_id}")
 
     def export_admissions_csv(self, dto: AdmissionFilterDTO, target_path: Optional[str | Path] = None) -> Path:
         """Exports filtered admissions into Excel-compatible CSV with installment breakdown."""
@@ -947,7 +1002,7 @@ class AdmissionService(BaseService):
                 rows.append([
                     idx,
                     a.course_name,
-                    a.created_at[:10],
+                    str(a.created_at)[:10] if a.created_at else "—",
                     a.admission_number,
                     a.student_name,
                     a.mobile_number or "—",
@@ -1092,7 +1147,7 @@ class AdmissionService(BaseService):
                 a.mobile_number or "—",
                 a.course_name,
                 a.batch_name or "—",
-                a.created_at[:10],
+                str(a.created_at)[:10] if a.created_at else "—",
                 a.status,
                 f"{a.agreed_fee:,.0f}",
                 f"{a.total_paid:,.0f}",

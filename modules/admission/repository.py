@@ -291,10 +291,10 @@ class AdmissionRepository(BaseRepository):
         sql = """
             SELECT 
                 COUNT(*) AS total_admissions,
-                SUM(CASE WHEN status = 'CONFIRMED' THEN 1 ELSE 0 END) AS confirmed_count,
-                SUM(CASE WHEN status = 'REGISTERED' THEN 1 ELSE 0 END) AS registered_count,
-                SUM(CASE WHEN status = 'DRAFT' THEN 1 ELSE 0 END) AS draft_count,
-                SUM(CASE WHEN DATE(created_at) = DATE('now', 'localtime') THEN 1 ELSE 0 END) AS today_admissions,
+                COALESCE(SUM(CASE WHEN status = 'CONFIRMED' THEN 1 ELSE 0 END), 0) AS confirmed_count,
+                COALESCE(SUM(CASE WHEN status = 'REGISTERED' THEN 1 ELSE 0 END), 0) AS registered_count,
+                COALESCE(SUM(CASE WHEN status = 'DRAFT' THEN 1 ELSE 0 END), 0) AS draft_count,
+                COALESCE(SUM(CASE WHEN DATE(created_at) = DATE('now', 'localtime') THEN 1 ELSE 0 END), 0) AS today_admissions,
                 COALESCE(SUM(agreed_fee - discount), 0.0) AS total_revenue
             FROM admissions;
         """
@@ -311,18 +311,18 @@ class AdmissionRepository(BaseRepository):
         pay_row = self.execute_fetchone(pay_sql)
         pay_stats = dict(pay_row or {})
 
-        total_rev = float(stats.get("total_revenue", 0.0))
-        total_coll = float(pay_stats.get("total_collection", 0.0))
+        total_rev = float(stats.get("total_revenue") or 0.0)
+        total_coll = float(pay_stats.get("total_collection") or 0.0)
         total_pending = max(0.0, total_rev - total_coll)
 
         return {
-            "total_admissions": int(stats.get("total_admissions", 0)),
-            "confirmed_count": int(stats.get("confirmed_count", 0)),
-            "registered_count": int(stats.get("registered_count", 0)),
-            "draft_count": int(stats.get("draft_count", 0)),
-            "today_admissions": int(stats.get("today_admissions", 0)),
+            "total_admissions": int(stats.get("total_admissions") or 0),
+            "confirmed_count": int(stats.get("confirmed_count") or 0),
+            "registered_count": int(stats.get("registered_count") or 0),
+            "draft_count": int(stats.get("draft_count") or 0),
+            "today_admissions": int(stats.get("today_admissions") or 0),
             "total_revenue": total_rev,
-            "today_collection": float(pay_stats.get("today_collection", 0.0)),
+            "today_collection": float(pay_stats.get("today_collection") or 0.0),
             "total_pending": total_pending,
         }
 

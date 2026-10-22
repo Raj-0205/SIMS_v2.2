@@ -20,7 +20,7 @@ from modules.course.controller import CourseController
 from modules.batch.controller import BatchController
 from modules.receipts.controller import ReceiptController
 from shared.utils.formatting import format_title_case, format_file_size, normalize_mobile
-from shared.utils.file_dialog import pick_file
+from shared.utils.file_dialog import pick_file, pick_file_async
 from ui.themes.theme import AppTheme
 
 __all__ = ["AdmissionFormModal"]
@@ -66,7 +66,7 @@ class AdmissionFormModal(ft.AlertDialog):
         self.selected_student_id: Optional[int] = admission.student_id if admission else None
         self.selected_course_id: Optional[int] = admission.course_id if admission else (int(self.initial_enquiry_data["course_id"]) if self.initial_enquiry_data.get("course_id") else None)
         self.selected_batch_id: Optional[int] = admission.batch_id if admission else None
-        self.base_course_fee: float = admission.course_fee if admission else 0.0
+        self.base_course_fee: float = (admission.agreed_fee if (admission and admission.agreed_fee > 0) else admission.course_fee) if admission else 0.0
         self.enrollment_mode: str = "existing" if (self.is_edit_mode and admission) else "new"
         self.selected_friend_ids: list[int] = []
         self.suggested_friends: list[FriendSuggestionDTO] = []
@@ -155,6 +155,18 @@ class AdmissionFormModal(ft.AlertDialog):
                 ft.Segment(value="existing", label=ft.Text("Select Existing Student", size=AppTheme.SIZE_BODY), icon=ft.Icon(ft.Icons.PERSON_SEARCH, size=16)),
             ],
             on_change=self._on_mode_change,
+            visible=not self.is_edit_mode,
+        )
+
+        self.import_enquiry_btn = ft.OutlinedButton(
+            content=ft.Text("Select from Enquiry Profile"),
+            icon=ft.Icons.PERSON_PIN_CIRCLE,
+            style=ft.ButtonStyle(
+                color=AppTheme.PRIMARY,
+                side=ft.BorderSide(1, AppTheme.PRIMARY),
+            ),
+            tooltip="Pick a prospective student enquiry to auto-fill details",
+            on_click=self._open_enquiry_search_dialog,
             visible=not self.is_edit_mode,
         )
 
@@ -504,7 +516,15 @@ class AdmissionFormModal(ft.AlertDialog):
                 controls=[
                     self.banner_container,
                     self.duplicate_alert_container,
-                    ft.Row(controls=[self.mode_segmented_btn, self.student_search_input], spacing=AppTheme.PAD_SM, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                    ft.Row(
+                        controls=[
+                            self.mode_segmented_btn,
+                            self.import_enquiry_btn,
+                            self.student_search_input,
+                        ],
+                        spacing=AppTheme.PAD_SM,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
                     self.student_search_results,
                     ft.Divider(height=1, color=AppTheme.BORDER),
                     ft.Row(controls=[left_col, ft.VerticalDivider(width=1, color=AppTheme.BORDER), right_col], expand=True, spacing=AppTheme.PAD_MD),
@@ -699,7 +719,7 @@ class AdmissionFormModal(ft.AlertDialog):
 
         self.course_dropdown.value = str(adm.course_id)
         self.selected_course_id = adm.course_id
-        self.base_course_fee = adm.course_fee
+        self.base_course_fee = adm.agreed_fee if (adm and adm.agreed_fee > 0) else adm.course_fee
         self.base_fee_text.value = f"₹{self.base_course_fee:,.2f}"
         self._update_batches_for_course(adm.course_id)
         if adm.batch_id:
@@ -719,6 +739,7 @@ class AdmissionFormModal(ft.AlertDialog):
         is_existing = (mode == "existing")
         self.student_search_input.visible = is_existing
         self.student_search_results.visible = is_existing
+        self.import_enquiry_btn.visible = (not is_existing) and (not self.is_edit_mode)
         if not is_existing:
             self.selected_student_id = None
         self._safe_update()
@@ -794,6 +815,201 @@ class AdmissionFormModal(ft.AlertDialog):
         self.banner_text.value = "✓ Student information auto-filled"
         self._show_success("✓ Student information auto-filled")
         self._safe_update()
+
+    def _select_course_by_id(self, course_id: int) -> None:
+        """Selects course programmatically, calculating fee and loading available batches."""
+        try:
+            self._clear_field_error(self.course_dropdown)
+            self.course_dropdown.value = str(course_id)
+            self.selected_course_id = course_id
+            course = self.course_controller.get_course(course_id)
+            if course:
+                self.base_course_fee = course.base_fee
+                self.base_fee_text.value = f"₹{self.base_course_fee:,.2f}"
+                self._on_fee_calculation_change()
+                self._update_batches_for_course(course_id)
+        except Exception as exc:
+            LogService.warning(f"Could not auto-select course {course_id}: {exc}", context=self.__class__.__name__)
+
+    def apply_enquiry_profile(self, enq: Any) -> None:
+        """
+        Auto-fills admission form fields from an Enquiry profile.
+        Sets initial_enquiry_id so that saving or confirming the admission
+        automatically marks the enquiry as CONVERTED.
+        """
+        self.initial_enquiry_id = getattr(enq, "id", None)
+        self.first_name_input.value = getattr(enq, "first_name", "") or ""
+        self.middle_name_input.value = getattr(enq, "middle_name", "") or ""
+        self.last_name_input.value = getattr(enq, "last_name", "") or ""
+        self.mobile_input.value = getattr(enq, "mobile_number", "") or ""
+
+        sec_mob = getattr(enq, "secondary_mobile", None) or getattr(enq, "alternate_mobile", None)
+        if sec_mob:
+            self.secondary_mobile_input.value = sec_mob
+
+        gen = getattr(enq, "gender", None)
+        if gen:
+            self.gender_dropdown.value = gen.upper()
+
+        vil = getattr(enq, "village", None)
+        if vil:
+            self.village_input.value = vil
+            self._load_friend_suggestions()
+
+        addr = getattr(enq, "address", None)
+        if addr:
+            self.address_input.value = addr
+
+        cid = getattr(enq, "course_id", None)
+        if cid:
+            self._select_course_by_id(cid)
+
+        enq_num = getattr(enq, "enquiry_number", f"#{getattr(enq, 'id', '')}")
+        st_name = getattr(enq, "student_name", f"{getattr(enq, 'first_name', '')} {getattr(enq, 'last_name', '')}".strip())
+        self._show_success(f"✓ Imported enquiry profile #{enq_num} ({st_name}). Fill remaining fields to complete enrollment.")
+        self._trigger_duplicate_check()
+        self._safe_update()
+
+    def _open_enquiry_search_dialog(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Opens quick modal to search and pick an active enquiry profile to auto-fill this admission."""
+        p = self.safe_page
+        if not p:
+            return
+
+        search_field = ft.TextField(
+            hint_text="Search candidate by name, mobile, or enquiry #...",
+            prefix_icon=ft.Icons.SEARCH,
+            autofocus=True,
+            border_radius=AppTheme.RADIUS_MD,
+            expand=True,
+        )
+        results_col = ft.Column(spacing=6, scroll=ft.ScrollMode.AUTO, expand=True)
+
+        def do_search(q: str = ""):
+            results_col.controls.clear()
+            try:
+                from modules.enquiry.controller import EnquiryController
+                enq_ctrl = EnquiryController()
+                items = enq_ctrl.search_for_admission(q)
+                if not items:
+                    results_col.controls.append(
+                        ft.Container(
+                            content=ft.Column(
+                                controls=[
+                                    ft.Icon(ft.Icons.SEARCH_OFF, size=36, color=AppTheme.TEXT_MUTED),
+                                    ft.Text("No active enquiry matched your search.", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_MUTED),
+                                ],
+                                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                                spacing=4,
+                            ),
+                            alignment=ft.Alignment(0, 0),
+                            padding=20,
+                        )
+                    )
+                else:
+                    for item in items:
+                        cat_color = {
+                            "HOT": AppTheme.SUCCESS,
+                            "WARM": AppTheme.WARNING,
+                            "COLD": AppTheme.SECONDARY,
+                            "LOST": AppTheme.DANGER,
+                        }.get(item.category, AppTheme.PRIMARY)
+
+                        results_col.controls.append(
+                            ft.Container(
+                                content=ft.Row(
+                                    controls=[
+                                        ft.CircleAvatar(
+                                            content=ft.Text((item.first_name[:1] if item.first_name else "E").upper(), color=AppTheme.SURFACE),
+                                            bgcolor=cat_color,
+                                            radius=18,
+                                        ),
+                                        ft.Column(
+                                            controls=[
+                                                ft.Row(
+                                                    controls=[
+                                                        ft.Text(f"{item.first_name} {item.last_name or ''}".strip(), weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY),
+                                                        ft.Container(
+                                                            content=ft.Text(item.category or "NEW", size=10, weight=ft.FontWeight.BOLD, color=AppTheme.SURFACE),
+                                                            bgcolor=cat_color,
+                                                            padding=ft.Padding(6, 2, 6, 2),
+                                                            border_radius=AppTheme.RADIUS_SM,
+                                                        ),
+                                                        ft.Text(f"#{item.enquiry_number}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
+                                                    ],
+                                                    spacing=6,
+                                                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                                ),
+                                                ft.Text(
+                                                    f"📞 {item.mobile_number} • Course: {item.course_name or 'Not Assigned'} • Village: {item.village or 'N/A'}",
+                                                    size=AppTheme.SIZE_CAPTION,
+                                                    color=AppTheme.TEXT_SECONDARY,
+                                                ),
+                                            ],
+                                            spacing=2,
+                                            expand=True,
+                                        ),
+                                        ft.ElevatedButton(
+                                            "Select & Auto-fill",
+                                            icon=ft.Icons.CHECK,
+                                            style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE),
+                                            on_click=lambda _, it=item: select_item(it),
+                                        ),
+                                    ],
+                                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                    spacing=AppTheme.PAD_SM,
+                                ),
+                                padding=ft.Padding(12, 10, 12, 10),
+                                border=ft.Border.all(1, AppTheme.BORDER),
+                                border_radius=AppTheme.RADIUS_MD,
+                                bgcolor=AppTheme.SURFACE_VARIANT,
+                            )
+                        )
+            except Exception as ex:
+                results_col.controls.append(ft.Text(f"Error loading enquiries: {ex}", color=AppTheme.DANGER))
+            p.update()
+
+        def select_item(enq_item):
+            try:
+                p.pop_dialog()
+            except Exception:
+                dialog.open = False
+            self.apply_enquiry_profile(enq_item)
+
+        search_field.on_change = lambda ev: do_search(ev.control.value or "")
+
+        dialog = ft.AlertDialog(
+            title=ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.PERSON_PIN_CIRCLE, color=AppTheme.PRIMARY),
+                    ft.Text("Select Enquiry Profile for Admission", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3),
+                ],
+                spacing=AppTheme.PAD_SM,
+            ),
+            content=ft.Container(
+                width=650,
+                height=450,
+                content=ft.Column(
+                    controls=[
+                        search_field,
+                        ft.Text("Active leads (pick a profile to auto-fill registration details):", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
+                        results_col,
+                    ],
+                    spacing=AppTheme.PAD_SM,
+                ),
+            ),
+            actions=[
+                ft.TextButton("Close", on_click=lambda _: p.pop_dialog() if hasattr(p, "pop_dialog") else setattr(dialog, "open", False) or p.update()),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        try:
+            p.show_dialog(dialog)
+        except Exception:
+            p.dialog = dialog
+            dialog.open = True
+            p.update()
+        do_search("")
 
     def _on_village_changed(self) -> None:
         self._clear_field_error(self.village_input)
@@ -876,30 +1092,36 @@ class AdmissionFormModal(ft.AlertDialog):
                 self._show_error("Maximum 3 suggested friends can be selected.")
         self._load_friend_suggestions()
 
-    # ── Real File Pickers (<= 100 KB) ──
+    # ── Real File Pickers (<= 100 KB, Non-blocking) ──
     def _trigger_photo_picker(self, e: ft.ControlEvent) -> None:
-        try:
-            p = pick_file(title="Select Student Photo (Max 100 KB)", allowed_extensions=[".jpg", ".jpeg", ".png"])
+        def _on_photo_selected(p: Optional[Path]) -> None:
             if not p or not p.is_file():
                 return
+            try:
+                if p.suffix.lower() not in (".jpg", ".jpeg", ".png"):
+                    self._show_error("Invalid file format. Only JPG, JPEG, and PNG images are allowed.")
+                    return
 
-            if p.suffix.lower() not in (".jpg", ".jpeg", ".png"):
-                self._show_error("Invalid file format. Only JPG, JPEG, and PNG images are allowed.")
-                return
+                raw_bytes = p.read_bytes()
+                if len(raw_bytes) > self.MAX_FILE_SIZE_BYTES:
+                    self._show_error(f"Photo size ({len(raw_bytes) / 1024:.1f} KB) exceeds the maximum allowed limit of 100 KB.")
+                    return
 
-            raw_bytes = p.read_bytes()
-            if len(raw_bytes) > self.MAX_FILE_SIZE_BYTES:
-                self._show_error(f"Photo size ({len(raw_bytes) / 1024:.1f} KB) exceeds the maximum allowed limit of 100 KB.")
-                return
+                self.photo_bytes = raw_bytes
+                self.photo_filename = p.name
+                self.photo_info_text.value = f"Selected: {p.name} ({format_file_size(len(raw_bytes))})"
+                self.photo_clear_btn.visible = True
+                self._show_success(f"✓ Photo selected: {p.name} ({format_file_size(len(raw_bytes))})")
+                self._safe_update()
+            except Exception as ex:
+                LogService.error(f"Photo picker error: {ex}", context="AdmissionFormModal")
+                self._show_error(f"Photo picker error: {ex}")
 
-            self.photo_bytes = raw_bytes
-            self.photo_filename = p.name
-            self.photo_info_text.value = f"Selected: {p.name} ({format_file_size(len(raw_bytes))})"
-            self.photo_clear_btn.visible = True
-            self._show_success(f"✓ Photo selected: {p.name} ({format_file_size(len(raw_bytes))})")
-        except Exception as ex:
-            LogService.error(f"Photo picker error: {ex}", context="AdmissionFormModal")
-            self._show_error(f"Photo picker error: {ex}")
+        pick_file_async(
+            title="Select Student Photo (Max 100 KB)",
+            allowed_extensions=[".jpg", ".jpeg", ".png"],
+            on_result=_on_photo_selected,
+        )
 
     def _clear_photo(self, e: ft.ControlEvent) -> None:
         self.photo_bytes = None
@@ -909,28 +1131,34 @@ class AdmissionFormModal(ft.AlertDialog):
         self._safe_update()
 
     def _trigger_signature_picker(self, e: ft.ControlEvent) -> None:
-        try:
-            p = pick_file(title="Select Student Signature (Max 100 KB)", allowed_extensions=[".jpg", ".jpeg", ".png"])
+        def _on_sig_selected(p: Optional[Path]) -> None:
             if not p or not p.is_file():
                 return
+            try:
+                if p.suffix.lower() not in (".jpg", ".jpeg", ".png"):
+                    self._show_error("Invalid file format. Only JPG, JPEG, and PNG images are allowed.")
+                    return
 
-            if p.suffix.lower() not in (".jpg", ".jpeg", ".png"):
-                self._show_error("Invalid file format. Only JPG, JPEG, and PNG images are allowed.")
-                return
+                raw_bytes = p.read_bytes()
+                if len(raw_bytes) > self.MAX_FILE_SIZE_BYTES:
+                    self._show_error(f"Signature size ({len(raw_bytes) / 1024:.1f} KB) exceeds the maximum allowed limit of 100 KB.")
+                    return
 
-            raw_bytes = p.read_bytes()
-            if len(raw_bytes) > self.MAX_FILE_SIZE_BYTES:
-                self._show_error(f"Signature size ({len(raw_bytes) / 1024:.1f} KB) exceeds the maximum allowed limit of 100 KB.")
-                return
+                self.signature_bytes = raw_bytes
+                self.signature_filename = p.name
+                self.sig_info_text.value = f"Selected: {p.name} ({format_file_size(len(raw_bytes))})"
+                self.sig_clear_btn.visible = True
+                self._show_success(f"✓ Signature selected: {p.name} ({format_file_size(len(raw_bytes))})")
+                self._safe_update()
+            except Exception as ex:
+                LogService.error(f"Signature picker error: {ex}", context="AdmissionFormModal")
+                self._show_error(f"Signature picker error: {ex}")
 
-            self.signature_bytes = raw_bytes
-            self.signature_filename = p.name
-            self.sig_info_text.value = f"Selected: {p.name} ({format_file_size(len(raw_bytes))})"
-            self.sig_clear_btn.visible = True
-            self._show_success(f"✓ Signature selected: {p.name} ({format_file_size(len(raw_bytes))})")
-        except Exception as ex:
-            LogService.error(f"Signature picker error: {ex}", context="AdmissionFormModal")
-            self._show_error(f"Signature picker error: {ex}")
+        pick_file_async(
+            title="Select Student Signature (Max 100 KB)",
+            allowed_extensions=[".jpg", ".jpeg", ".png"],
+            on_result=_on_sig_selected,
+        )
 
     def _clear_signature(self, e: ft.ControlEvent) -> None:
         self.signature_bytes = None
@@ -1145,7 +1373,7 @@ class AdmissionFormModal(ft.AlertDialog):
                     course_name=adm.course_name,
                     candidate_number=adm.admission_number,
                     total_fee=adm.final_fee,
-                    already_paid=0.0,
+                    already_paid=adm.total_paid,
                     default_amount=500.0,
                     page=root_page,
                     current_status=adm.status,

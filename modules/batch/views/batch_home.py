@@ -12,6 +12,8 @@ from modules.batch.constants import BatchStatus
 from modules.batch.dto import BatchDTO
 from modules.batch.views.batch_form_modal import BatchFormModal
 from modules.course.controller import CourseController
+from ui.widgets.hover_card import HoverCard
+from ui.widgets.badge import StatusBadge
 
 __all__ = ["BatchHome"]
 
@@ -40,6 +42,8 @@ class BatchHome(ft.Container):
         self.total_count: int = 0
         self.current_page: int = 0
         self.page_size: int = 25
+        self.show_controls_panel: bool = True
+        self.auto_fit_screen: bool = True
 
         # Filter States
         self.selected_course_id: Optional[int] = None
@@ -61,6 +65,26 @@ class BatchHome(ft.Container):
             "Manage course schedules, class timings, student capacities, and batch lifecycles.",
             size=AppTheme.SIZE_BODY,
             color=AppTheme.TEXT_SECONDARY,
+        )
+
+        self.toggle_controls_btn = ft.OutlinedButton(
+            content=ft.Text("Hide Controls", size=AppTheme.SIZE_CAPTION),
+            icon=ft.Icons.FILTER_ALT_OFF,
+            tooltip="Hide KPI summary and filter controls",
+            style=ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+            ),
+            on_click=self.handle_toggle_controls,
+        )
+
+        self.toggle_autofit_btn = ft.OutlinedButton(
+            content=ft.Text("Auto-Fit: ON", size=AppTheme.SIZE_CAPTION),
+            icon=ft.Icons.FIT_SCREEN,
+            tooltip="Auto-fit table to available screen width (Click to toggle)",
+            style=ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+            ),
+            on_click=self.handle_toggle_autofit,
         )
 
         self.new_batch_btn = ft.ElevatedButton(
@@ -86,7 +110,15 @@ class BatchHome(ft.Container):
         header_row = ft.Row(
             controls=[
                 ft.Column(controls=[self.title_text, self.subtitle_text], spacing=2),
-                ft.Row(controls=[self.refresh_btn, self.new_batch_btn], spacing=AppTheme.PAD_SM),
+                ft.Row(
+                    controls=[
+                        self.toggle_controls_btn,
+                        self.toggle_autofit_btn,
+                        self.refresh_btn,
+                        self.new_batch_btn,
+                    ],
+                    spacing=AppTheme.PAD_SM,
+                ),
             ],
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         )
@@ -193,7 +225,12 @@ class BatchHome(ft.Container):
             content=ft.Column(
                 controls=[
                     ft.ListView(
-                        controls=[self.data_table],
+                        controls=[
+                            ft.Row(
+                                controls=[self.data_table],
+                                scroll=ft.ScrollMode.AUTO,
+                            )
+                        ],
                         expand=True,
                     ),
                     self.empty_container,
@@ -204,6 +241,7 @@ class BatchHome(ft.Container):
             border_radius=AppTheme.RADIUS_MD,
             padding=AppTheme.PAD_SM,
             expand=True,
+            animate_size=ft.Animation(250, ft.AnimationCurve.EASE_OUT),
         )
 
         # 5. Pagination
@@ -233,13 +271,23 @@ class BatchHome(ft.Container):
             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
         )
 
+        self.controls_panel = ft.Column(
+            controls=[
+                kpis_row,
+                filter_row,
+            ],
+            spacing=AppTheme.PAD_SM,
+            visible=True,
+            animate_size=ft.Animation(250, ft.AnimationCurve.EASE_OUT),
+            animate_opacity=ft.Animation(200, ft.AnimationCurve.EASE_IN_OUT),
+        )
+
         # Assemble Main Layout
         self.content = ft.Column(
             controls=[
                 header_row,
                 ft.Divider(height=1, color=AppTheme.BORDER),
-                kpis_row,
-                filter_row,
+                self.controls_panel,
                 self.table_container,
                 ft.Divider(height=1, color=AppTheme.BORDER),
                 pagination_row,
@@ -248,14 +296,63 @@ class BatchHome(ft.Container):
             expand=True,
         )
 
+    def handle_toggle_controls(self, e=None) -> None:
+        self.show_controls_panel = not self.show_controls_panel
+        self.controls_panel.visible = self.show_controls_panel
+        if self.show_controls_panel:
+            self.toggle_controls_btn.content = ft.Text("Hide Controls", size=AppTheme.SIZE_CAPTION)
+            self.toggle_controls_btn.icon = ft.Icons.FILTER_ALT_OFF
+            self.toggle_controls_btn.tooltip = "Hide KPI summary and filter controls"
+        else:
+            self.toggle_controls_btn.content = ft.Text("Show Controls", size=AppTheme.SIZE_CAPTION)
+            self.toggle_controls_btn.icon = ft.Icons.FILTER_ALT
+            self.toggle_controls_btn.tooltip = "Show KPI summary and filter controls"
+        self._safe_update()
+
+    def handle_toggle_autofit(self, e=None) -> None:
+        self.auto_fit_screen = not self.auto_fit_screen
+        if self.auto_fit_screen:
+            self.toggle_autofit_btn.content = ft.Text("Auto-Fit: ON", size=AppTheme.SIZE_CAPTION)
+            self.toggle_autofit_btn.icon = ft.Icons.FIT_SCREEN
+            self.toggle_autofit_btn.tooltip = "Auto-fit table to available screen width (Click to toggle)"
+        else:
+            self.toggle_autofit_btn.content = ft.Text("Auto-Fit: OFF", size=AppTheme.SIZE_CAPTION)
+            self.toggle_autofit_btn.icon = ft.Icons.FIT_SCREEN_OUTLINED
+            self.toggle_autofit_btn.tooltip = "Table in compact mode (Click to enable auto-fit)"
+        self._render_table()
+        self._safe_update()
+
+    def _compute_column_spacing(self, num_columns: int = 7, base_content_width: int = 850) -> tuple[int, int]:
+        if not getattr(self, "auto_fit_screen", True):
+            return 18, 14
+
+        p = self.safe_page
+        screen_w = p.width if (p and p.width and p.width > 300) else 1920
+
+        sidebar_w = 68
+        container_pad = 64
+        avail_w = max(base_content_width + 100, screen_w - sidebar_w - container_pad)
+
+        gaps = max(1, num_columns - 1)
+        extra_w = avail_w - base_content_width - 36
+        if extra_w > 0:
+            spacing = max(18, min(150, int(extra_w / gaps)))
+            return spacing, 18
+        return 18, 14
+
     def _make_kpi_card(self, title: str, icon: str, color: str, text_ctrl: ft.Text) -> ft.Container:
-        return ft.Container(
+        return HoverCard(
             content=ft.Column(
                 controls=[
                     ft.Row(
                         controls=[
                             ft.Text(title, size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY, weight=ft.FontWeight.W_500),
-                            ft.Icon(icon, color=color, size=18),
+                            ft.Container(
+                                content=ft.Icon(icon, color=color, size=18),
+                                bgcolor=color + "1A",
+                                padding=ft.Padding(6, 6, 6, 6),
+                                border_radius=AppTheme.RADIUS_SM,
+                            ),
                         ],
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     ),
@@ -264,9 +361,6 @@ class BatchHome(ft.Container):
                 ],
                 spacing=2,
             ),
-            bgcolor=AppTheme.SURFACE,
-            border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
             padding=AppTheme.PAD_MD,
             expand=True,
         )
@@ -280,6 +374,15 @@ class BatchHome(ft.Container):
 
     def did_mount(self) -> None:
         self.load_data()
+        p = self.safe_page
+        if p:
+            def _on_page_resize(e):
+                if not getattr(self, "page", None) and not getattr(self, "_root_page", None):
+                    return
+                if getattr(self, "auto_fit_screen", True):
+                    self._render_table()
+                    self._safe_update()
+            p.on_resize = _on_page_resize
 
     def _safe_update(self) -> None:
         p = self.safe_page
@@ -347,15 +450,14 @@ class BatchHome(ft.Container):
         rows: list[ft.DataRow] = []
 
         for b in self.batches:
-            status_val = b.status.value if hasattr(b.status, "value") else str(b.status)
-            color = BATCH_STATUS_COLORS.get(status_val, AppTheme.PRIMARY)
-
-            status_badge = ft.Container(
-                content=ft.Text(status_val, size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.W_600, color=color),
-                bgcolor=color + "1A",
-                padding=ft.Padding(6, 2, 6, 2),
-                border_radius=AppTheme.RADIUS_SM,
-            )
+            status_val = b.status.value if isinstance(b.status, BatchStatus) else str(b.status or "OPEN").upper()
+            variant_map = {
+                BatchStatus.OPEN.value: "success",
+                BatchStatus.FULL.value: "warning",
+                BatchStatus.COMPLETED.value: "primary",
+                BatchStatus.CANCELLED.value: "danger",
+            }
+            status_badge = StatusBadge(label=status_val, variant=variant_map.get(status_val, "primary"))
 
             # Capacity summary
             try:
@@ -405,6 +507,9 @@ class BatchHome(ft.Container):
             )
             rows.append(row)
 
+        col_spacing, horiz_margin = self._compute_column_spacing(num_columns=7, base_content_width=850)
+        self.data_table.column_spacing = col_spacing
+        self.data_table.horizontal_margin = horiz_margin
         self.data_table.rows = rows
         self.empty_container.visible = (len(rows) == 0)
         self.data_table.visible = (len(rows) > 0)

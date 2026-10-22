@@ -172,3 +172,48 @@ def test_fees_report_legacy_compatibility(test_setup):
     ]
     for k in expected_keys:
         assert k in first, f"Missing key {k} in legacy report row"
+
+
+def test_fees_report_micro_chunk_streaming(test_setup):
+    """Verify that get_admission_fees_report_chunk returns exactly 10-row slices with metadata."""
+    reports_ctrl = test_setup["reports_ctrl"]
+    chunk1 = reports_ctrl.get_admission_fees_report_chunk(offset=0, limit=10)
+    assert isinstance(chunk1, dict)
+    assert "rows" in chunk1
+    assert "total_count" in chunk1
+    assert "offset" in chunk1
+    assert "limit" in chunk1
+    assert chunk1["offset"] == 0
+    assert chunk1["limit"] == 10
+    assert len(chunk1["rows"]) <= 10
+    assert chunk1["total_count"] >= 1
+    assert chunk1["rows"][0]["sr_no"] == 1
+
+
+def test_fees_report_chunk_continuous_sr_no_and_stitching(test_setup):
+    """Verify that chunk 1 and chunk 2 stitch together seamlessly with continuous sr_no."""
+    reports_ctrl = test_setup["reports_ctrl"]
+    chunk1 = reports_ctrl.get_admission_fees_report_chunk(offset=0, limit=2)
+    assert len(chunk1["rows"]) >= 1
+    assert chunk1["rows"][0]["sr_no"] == 1
+
+    if chunk1["total_count"] >= 3:
+        chunk2 = reports_ctrl.get_admission_fees_report_chunk(offset=2, limit=2)
+        assert len(chunk2["rows"]) >= 1
+        assert chunk2["rows"][0]["sr_no"] == 3
+        # No overlapping admission IDs
+        c1_ids = {r["admission_id"] for r in chunk1["rows"]}
+        c2_ids = {r["admission_id"] for r in chunk2["rows"]}
+        assert c1_ids.isdisjoint(c2_ids)
+
+
+def test_fees_report_chunk_calculated_sort(test_setup):
+    """Verify chunk streaming works with calculated field sorting (e.g. PENDING, PAID)."""
+    reports_ctrl = test_setup["reports_ctrl"]
+    res = reports_ctrl.get_admission_fees_report_chunk(sort_by="PENDING", offset=0, limit=10)
+    assert "rows" in res
+    assert len(res["rows"]) >= 1
+    rows = res["rows"]
+    for i in range(len(rows) - 1):
+        assert rows[i]["pending_fees"] >= rows[i + 1]["pending_fees"]
+

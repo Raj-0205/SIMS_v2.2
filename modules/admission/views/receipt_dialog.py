@@ -77,7 +77,7 @@ class ReceiptDialog(ft.AlertDialog):
                     ft.Row(
                         controls=[
                             ft.Text(f"Receipt No: {self.receipt.receipt_number}", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY),
-                            ft.Text(f"Date: {self.receipt.receipt_date[:16]}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
+                            ft.Text(f"Date: {str(self.receipt.receipt_date or '')[:16]}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
                         ],
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     ),

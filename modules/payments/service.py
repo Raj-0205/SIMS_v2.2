@@ -187,11 +187,22 @@ class PaymentService(BaseService):
                 f"Payment recorded successfully: ID {payment_id}, Admission {dto.admission_id}, Status {new_status}, Installment {next_inst}, Amount ₹{dto.amount}",
                 context=self.__class__.__name__,
             )
-            return payment_id
+
+        # Invalidate fees cache upon successful transaction commit
+        from core.cache.fees_cache import FeesCacheManager
+        FeesCacheManager.invalidate(f"Payment recorded #{payment_id}")
+
+        return payment_id
 
     def get_payments_for_admission(self, admission_id: int) -> list[PaymentDTO]:
+        from core.cache.fees_cache import FeesCacheManager
+        cached = FeesCacheManager.get_admission_payments(admission_id)
+        if cached is not None:
+            return [PaymentMapper.to_dto(r) for r in cached]
+
         with self.unit_of_work():
             rows = self.repository.get_by_admission_id(admission_id)
+            FeesCacheManager.set_admission_payments(admission_id, [dict(r) for r in rows])
             return [PaymentMapper.to_dto(r) for r in rows]
 
     def get_payments_for_student(self, student_id: int) -> list[PaymentDTO]:

@@ -18,6 +18,7 @@ from modules.admission.activity_log_repository import ActivityLogRepository
 from modules.settings.service import SettingsService
 from modules.users.repository import UserRepository
 from ui.themes.theme import AppTheme
+from ui.widgets import HoverCard
 
 __all__ = ["ControlCenterScreen"]
 
@@ -77,7 +78,7 @@ class ControlCenterScreen(ft.Container):
     def _build_ui(self) -> None:
         username = SecurityContext.get_current_username() or "Administrator"
 
-        header_card = ft.Container(
+        header_card = HoverCard(
             content=ft.Row(
                 controls=[
                     ft.Column(
@@ -123,13 +124,10 @@ class ControlCenterScreen(ft.Container):
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
             padding=AppTheme.PAD_MD,
-            bgcolor=AppTheme.SURFACE,
-            border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
         )
 
         # Quick Actions Card
-        quick_actions = ft.Container(
+        quick_actions = HoverCard(
             content=ft.Column(
                 controls=[
                     ft.Text("Privileged Governance Shortcuts", size=16, weight=ft.FontWeight.BOLD),
@@ -164,13 +162,10 @@ class ControlCenterScreen(ft.Container):
                 spacing=12,
             ),
             padding=AppTheme.PAD_MD,
-            bgcolor=AppTheme.SURFACE,
-            border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
         )
 
         # Security & Credential Governance Section
-        security_section = ft.Container(
+        security_section = HoverCard(
             content=ft.Column(
                 controls=[
                     ft.Row(
@@ -216,13 +211,10 @@ class ControlCenterScreen(ft.Container):
                 spacing=10,
             ),
             padding=AppTheme.PAD_MD,
-            bgcolor=AppTheme.SURFACE,
-            border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
         )
 
         # PIN Management Section
-        pin_section = ft.Container(
+        pin_section = HoverCard(
             content=ft.Column(
                 controls=[
                     ft.Row(
@@ -255,13 +247,10 @@ class ControlCenterScreen(ft.Container):
                 spacing=10,
             ),
             padding=AppTheme.PAD_MD,
-            bgcolor=AppTheme.SURFACE,
-            border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
         )
 
         # Audit Logs Section
-        audit_section = ft.Container(
+        audit_section = HoverCard(
             content=ft.Column(
                 controls=[
                     ft.Row(
@@ -272,16 +261,16 @@ class ControlCenterScreen(ft.Container):
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
                     ft.Container(
-                        content=self.audit_table,
+                        content=ft.Row(
+                            controls=[self.audit_table],
+                            scroll=ft.ScrollMode.AUTO,
+                        ),
                         border_radius=AppTheme.RADIUS_MD,
                     ),
                 ],
                 spacing=12,
             ),
             padding=AppTheme.PAD_MD,
-            bgcolor=AppTheme.SURFACE,
-            border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
         )
 
         self.content = ft.ListView(

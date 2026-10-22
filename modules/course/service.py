@@ -187,6 +187,9 @@ class CourseService(BaseService):
                 context=self.__class__.__name__,
             )
 
+        from core.cache.fees_cache import FeesCacheManager
+        FeesCacheManager.invalidate(f"Course updated #{dto.id}")
+
     def change_institute_fee(self, dto: CourseFeeChangeDTO) -> None:
         """
         Atomically updates the default Institute Course Fee for new admissions.
@@ -256,6 +259,9 @@ class CourseService(BaseService):
                 context=self.__class__.__name__,
             )
 
+        from core.cache.fees_cache import FeesCacheManager
+        FeesCacheManager.invalidate(f"Course fee changed #{dto.course_id}")
+
     def get_fee_history(self, course_id: int, limit: int = 50) -> list[CourseFeeHistoryDTO]:
         """Returns the fee revision audit trail for a course in reverse-chronological order."""
         if not course_id or course_id <= 0:
@@ -294,7 +300,10 @@ class CourseService(BaseService):
                 f"Course #{course_id} status toggled to {new_status.value}.",
                 context=self.__class__.__name__,
             )
-            return new_status
+
+        from core.cache.fees_cache import FeesCacheManager
+        FeesCacheManager.invalidate(f"Course status toggled #{course_id}")
+        return new_status
 
     def delete_course(self, course_id: int) -> None:
         """
@@ -327,6 +336,9 @@ class CourseService(BaseService):
                 f"Course #{course_id} ({existing['code']}) deleted successfully.",
                 context=self.__class__.__name__,
             )
+
+        from core.cache.fees_cache import FeesCacheManager
+        FeesCacheManager.invalidate(f"Course deleted #{course_id}")
 
     def list_courses(
         self,

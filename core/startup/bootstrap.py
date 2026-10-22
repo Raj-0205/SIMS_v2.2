@@ -124,6 +124,10 @@ class ApplicationBootstrapper:
             page.theme_mode = ft.ThemeMode.LIGHT
             page.padding = 0
 
+            # Apply saved user theme
+            from ui.themes.theme_manager import ThemePersistence
+            ThemePersistence.apply_theme(page)
+
             # Single Authoritative Router Instance instantiated safely inside the entry point
             router = AppRouter(page)
 

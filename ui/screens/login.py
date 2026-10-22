@@ -147,22 +147,64 @@ class LoginScreen(ft.Container):
             weight=ft.FontWeight.W_500,
         )
 
+        self.theme_toggle_btn = ft.IconButton(
+            icon=ft.Icons.PALETTE_OUTLINED,
+            icon_color=AppTheme.PRIMARY,
+            tooltip=f"Current: {AppTheme.tokens().name} (Click to preview next theme)",
+            on_click=self._cycle_theme,
+        )
+
+        tokens = AppTheme.tokens()
         self.card_container = ft.Container(
-            width=420,
+            width=430,
             padding=AppTheme.PAD_LG,
             bgcolor=AppTheme.SURFACE,
             border_radius=AppTheme.RADIUS_LG,
-            border=ft.Border.all(1, AppTheme.BORDER),
+            border=AppTheme.get_card_border(is_hovered=False),
+            shadow=AppTheme.get_card_shadows(is_hovered=False),
+            animate=ft.Animation(tokens.animation_duration, tokens.animation_curve),
+            animate_scale=ft.Animation(160, ft.AnimationCurve.EASE_OUT),
         )
 
+        def _on_card_hover(e: ft.ControlEvent) -> None:
+            is_h = (e.data == "true")
+            self.card_container.shadow = AppTheme.get_card_shadows(is_hovered=is_h)
+            self.card_container.border = AppTheme.get_card_border(is_hovered=is_h)
+            self.card_container.scale = 1.01 if is_h else 1.0
+            self._safe_update()
+
+        self.card_container.on_hover = _on_card_hover
+
         self._render_view()
-        self.content = self.card_container
+        self.selection_area = ft.SelectionArea(content=self.card_container)
+        self.content = self.selection_area
 
     def _safe_update(self) -> None:
         try:
             self.update()
         except Exception:
             pass
+
+    def _cycle_theme(self, e: ft.ControlEvent) -> None:
+        from ui.themes.theme import THEMES, ThemeManager
+        from ui.themes.theme_manager import ThemePersistence
+        theme_keys = list(THEMES.keys())
+        curr = ThemeManager().current_theme_id
+        next_idx = (theme_keys.index(curr) + 1) % len(theme_keys) if curr in theme_keys else 0
+        next_id = theme_keys[next_idx]
+        if self._page:
+            ThemePersistence.save_theme(self._page, next_id)
+            ThemePersistence.apply_theme(self._page, next_id)
+        else:
+            ThemeManager().set_theme(next_id)
+        self.bgcolor = AppTheme.BACKGROUND
+        self.card_container.bgcolor = AppTheme.SURFACE
+        self.card_container.border = AppTheme.get_card_border(is_hovered=False)
+        self.card_container.shadow = AppTheme.get_card_shadows(is_hovered=False)
+        self.theme_toggle_btn.tooltip = f"Current: {THEMES[next_id].name} (Click to preview next theme)"
+        self.theme_toggle_btn.icon_color = AppTheme.PRIMARY
+        self._render_view()
+        self._safe_update()
 
     def _on_role_intent_changed(self, e: ft.ControlEvent) -> None:
         selected = next(iter(self.role_selector.selected), "ADMIN")
@@ -192,17 +234,44 @@ class LoginScreen(ft.Container):
         self._safe_update()
 
     def _render_view(self) -> None:
+        top_bar = ft.Row(
+            controls=[
+                ft.Container(
+                    content=ft.Row(
+                        controls=[
+                            ft.Icon(ft.Icons.SCHOOL, size=15, color=AppTheme.PRIMARY),
+                            ft.Text("SIMS v2.2", size=11, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_SECONDARY),
+                        ],
+                        spacing=4,
+                    ),
+                    bgcolor=AppTheme.SURFACE_VARIANT,
+                    padding=ft.Padding(8, 4, 8, 4),
+                    border_radius=AppTheme.RADIUS_PILL,
+                ),
+                self.theme_toggle_btn,
+            ],
+            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        )
+
+        icon_badge = ft.Container(
+            content=ft.Icon(
+                ft.Icons.SECURITY if self.current_step == 1 else ft.Icons.MARK_EMAIL_READ,
+                size=36,
+                color=AppTheme.PRIMARY,
+            ),
+            bgcolor=AppTheme.PRIMARY_LIGHT,
+            padding=ft.Padding(14, 14, 14, 14),
+            border_radius=AppTheme.RADIUS_PILL,
+        )
+
         if self.current_step == 1:
             self.card_container.content = ft.Column(
                 tight=True,
                 spacing=16,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 controls=[
-                    ft.Icon(
-                        ft.Icons.SECURITY,
-                        size=56,
-                        color=AppTheme.PRIMARY,
-                    ),
+                    top_bar,
+                    icon_badge,
                     ft.Column(
                         controls=[
                             ft.Text("Sudharm SIMS", size=22, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
@@ -236,11 +305,8 @@ class LoginScreen(ft.Container):
                 spacing=16,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 controls=[
-                    ft.Icon(
-                        ft.Icons.MARK_EMAIL_READ,
-                        size=56,
-                        color=AppTheme.PRIMARY,
-                    ),
+                    top_bar,
+                    icon_badge,
                     ft.Column(
                         controls=[
                             ft.Text("Two-Step Verification", size=22, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),

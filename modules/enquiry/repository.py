@@ -7,6 +7,7 @@ from modules.enquiry.dto import (
     CreateEnquiryDTO,
     UpdateEnquiryDTO,
     EnquiryFilterDTO,
+    CreateFollowUpDTO,
 )
 
 __all__ = ["EnquiryRepository"]
@@ -29,11 +30,14 @@ class EnquiryRepository(BaseRepository):
                 qualification,
                 gender,
                 status,
+                category,
+                preferred_timing,
                 source,
                 follow_up_date,
                 notes,
-                counselor_name
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                counselor_name,
+                loss_reason
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         params = (
             dto.student_name,
@@ -47,10 +51,13 @@ class EnquiryRepository(BaseRepository):
             dto.qualification,
             dto.gender,
             dto.status,
+            getattr(dto, "category", "WARM") or "WARM",
+            getattr(dto, "preferred_timing", "ANY") or "ANY",
             dto.source,
             dto.follow_up_date,
             dto.notes,
             dto.counselor_name,
+            getattr(dto, "loss_reason", None),
         )
         return self.execute_insert(sql, params)
 
@@ -68,11 +75,14 @@ class EnquiryRepository(BaseRepository):
                 qualification = ?,
                 gender = ?,
                 status = ?,
+                category = ?,
+                preferred_timing = ?,
                 source = ?,
                 follow_up_date = ?,
                 notes = ?,
                 counselor_name = ?,
                 converted_admission_id = ?,
+                loss_reason = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?;
         """
@@ -88,11 +98,14 @@ class EnquiryRepository(BaseRepository):
             dto.qualification,
             dto.gender,
             dto.status,
+            getattr(dto, "category", "WARM") or "WARM",
+            getattr(dto, "preferred_timing", "ANY") or "ANY",
             dto.source,
             dto.follow_up_date,
             dto.notes,
             dto.counselor_name,
             dto.converted_admission_id,
+            getattr(dto, "loss_reason", None),
             dto.id,
         )
         return self.execute(sql, params) > 0
@@ -120,6 +133,19 @@ class EnquiryRepository(BaseRepository):
         if filter_dto.status and filter_dto.status != "ALL":
             conditions.append("e.status = ?")
             params.append(filter_dto.status)
+
+        if filter_dto.category and filter_dto.category != "ALL":
+            conditions.append("e.category = ?")
+            params.append(filter_dto.category)
+
+        if filter_dto.follow_up_filter:
+            f_upper = filter_dto.follow_up_filter.upper()
+            if f_upper == "TODAY":
+                conditions.append("DATE(e.follow_up_date) = DATE('now', 'localtime') AND e.status != 'CONVERTED'")
+            elif f_upper == "OVERDUE":
+                conditions.append("DATE(e.follow_up_date) < DATE('now', 'localtime') AND e.status != 'CONVERTED' AND e.category != 'LOST'")
+            elif f_upper == "UPCOMING":
+                conditions.append("DATE(e.follow_up_date) > DATE('now', 'localtime') AND e.status != 'CONVERTED'")
 
         if filter_dto.course_id:
             conditions.append("e.course_id = ?")
@@ -180,10 +206,97 @@ class EnquiryRepository(BaseRepository):
             "closed": row.get("closed_count") or 0,
         }
 
+    def get_category_summary(self) -> dict[str, int]:
+        """Calculates lead counts across operational categories and follow-up urgencies."""
+        sql = """
+            SELECT
+                COUNT(*) AS total,
+                SUM(CASE WHEN category = 'HOT' AND status != 'CONVERTED' THEN 1 ELSE 0 END) AS hot_count,
+                SUM(CASE WHEN (category = 'WARM' OR category IS NULL OR category = '') AND status != 'CONVERTED' THEN 1 ELSE 0 END) AS warm_count,
+                SUM(CASE WHEN category = 'COLD' AND status != 'CONVERTED' THEN 1 ELSE 0 END) AS cold_count,
+                SUM(CASE WHEN category = 'LOST' OR status = 'CLOSED' THEN 1 ELSE 0 END) AS lost_count,
+                SUM(CASE WHEN category = 'CONVERTED' OR status = 'CONVERTED' THEN 1 ELSE 0 END) AS converted_count,
+                SUM(CASE WHEN DATE(follow_up_date) = DATE('now', 'localtime') AND status != 'CONVERTED' THEN 1 ELSE 0 END) AS today_followup_count,
+                SUM(CASE WHEN DATE(follow_up_date) < DATE('now', 'localtime') AND status != 'CONVERTED' AND category != 'LOST' AND status != 'CLOSED' THEN 1 ELSE 0 END) AS overdue_followup_count
+            FROM enquiries;
+        """
+        row = self.execute_fetchone(sql, ())
+        if not row:
+            return {"total": 0, "hot": 0, "warm": 0, "cold": 0, "lost": 0, "converted": 0, "today_followup": 0, "overdue_followup": 0}
+        return {
+            "total": row.get("total") or 0,
+            "hot": row.get("hot_count") or 0,
+            "warm": row.get("warm_count") or 0,
+            "cold": row.get("cold_count") or 0,
+            "lost": row.get("lost_count") or 0,
+            "converted": row.get("converted_count") or 0,
+            "today_followup": row.get("today_followup_count") or 0,
+            "overdue_followup": row.get("overdue_followup_count") or 0,
+        }
+
+    def create_follow_up(self, dto: CreateFollowUpDTO) -> int:
+        """Inserts a historical call log or counseling remark."""
+        sql = """
+            INSERT INTO enquiry_follow_ups (
+                enquiry_id,
+                follow_up_date,
+                call_type,
+                discussion_notes,
+                category_after_call,
+                next_follow_up_date,
+                counselor_name
+            ) VALUES (?, COALESCE(?, DATE('now', 'localtime')), ?, ?, ?, ?, ?);
+        """
+        params = (
+            dto.enquiry_id,
+            dto.follow_up_date,
+            dto.call_type,
+            dto.discussion_notes,
+            dto.category_after_call,
+            dto.next_follow_up_date,
+            dto.counselor_name,
+        )
+        return self.execute_insert(sql, params)
+
+    def get_follow_ups(self, enquiry_id: int) -> list[dict[str, Any]]:
+        """Retrieves chronological call logs for an enquiry."""
+        sql = """
+            SELECT *
+            FROM enquiry_follow_ups
+            WHERE enquiry_id = ?
+            ORDER BY created_at DESC, id DESC;
+        """
+        return self.execute_fetchall(sql, (enquiry_id,))
+
+    def search_for_admission(self, query: str = "", limit: int = 15) -> list[dict[str, Any]]:
+        """Searches enquiries to allow 1-click candidate selection and auto-fill inside the Admission Form."""
+        conditions = ["e.status != 'CONVERTED'"]
+        params: list[Any] = []
+
+        if query and query.strip():
+            term = f"%{query.strip()}%"
+            conditions.append(
+                "(e.student_name LIKE ? OR e.mobile_number LIKE ? OR e.village LIKE ? OR e.interested_course LIKE ?)"
+            )
+            params.extend([term, term, term, term])
+
+        where_clause = f"WHERE {' AND '.join(conditions)}"
+        sql = f"""
+            SELECT e.*, c.name AS course_name
+            FROM enquiries e
+            LEFT JOIN courses c ON c.id = e.course_id
+            {where_clause}
+            ORDER BY e.created_at DESC
+            LIMIT ?;
+        """
+        params.append(limit)
+        return self.execute_fetchall(sql, tuple(params))
+
     def mark_converted(self, enquiry_id: int, admission_id: int) -> bool:
         sql = """
             UPDATE enquiries
             SET status = 'CONVERTED',
+                category = 'CONVERTED',
                 converted_admission_id = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?;
@@ -191,5 +304,7 @@ class EnquiryRepository(BaseRepository):
         return self.execute(sql, (admission_id, enquiry_id)) > 0
 
     def delete(self, enquiry_id: int) -> bool:
+        self.execute("DELETE FROM enquiry_follow_ups WHERE enquiry_id = ?;", (enquiry_id,))
         sql = "DELETE FROM enquiries WHERE id = ?;"
         return self.execute(sql, (enquiry_id,)) > 0
+

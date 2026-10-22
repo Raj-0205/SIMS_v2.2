@@ -8,6 +8,8 @@ from core.logger.service import LogService
 from core.exceptions import ValidationError
 from modules.settings.controller import SettingsController
 from ui.themes.theme import AppTheme
+from ui.widgets.hover_card import HoverCard
+from ui.widgets.badge import StatusBadge
 
 __all__ = ["SettingsHome"]
 
@@ -44,6 +46,8 @@ class SettingsHome(ft.Container):
                 ft.ElevatedButton("School / College Master", icon=ft.Icons.SCHOOL, on_click=lambda _: self._set_tab(0)),
                 ft.OutlinedButton("Institute Branding & Profile", icon=ft.Icons.BUSINESS, on_click=lambda _: self._set_tab(1)),
                 ft.OutlinedButton("Security & Admin PIN", icon=ft.Icons.SECURITY, on_click=lambda _: self._set_tab(2)),
+                ft.OutlinedButton("Theme & Appearance", icon=ft.Icons.PALETTE, on_click=lambda _: self._set_tab(3)),
+                ft.OutlinedButton("About & Copyright", icon=ft.Icons.INFO_OUTLINE, on_click=lambda _: self._set_tab(4)),
             ],
             spacing=AppTheme.PAD_SM,
         )
@@ -119,6 +123,11 @@ class SettingsHome(ft.Container):
             return self._build_branding_tab()
         elif self.active_tab == 2:
             return self._build_security_tab()
+        elif self.active_tab == 3:
+            from ui.themes.theme_selector import ThemeSelector
+            return ThemeSelector(on_theme_changed=lambda tid: self.show_toast(f"Theme switched to {tid.capitalize()}.", is_success=True))
+        elif self.active_tab == 4:
+            return self._build_about_tab()
         return ft.Text("Tab not found")
 
     # ── TAB 0: SCHOOL / COLLEGE MASTER ──
@@ -230,11 +239,9 @@ class SettingsHome(ft.Container):
                         ft.DataCell(ft.Text(inst.get("institution_type") or "COLLEGE")),
                         ft.DataCell(ft.Text(inst.get("address") or "Chandwad")),
                         ft.DataCell(
-                            ft.Container(
-                                content=ft.Text(status_txt, size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=status_color),
-                                bgcolor=status_bg,
-                                padding=ft.Padding(8, 3, 8, 3),
-                                border_radius=AppTheme.RADIUS_SM,
+                            StatusBadge(
+                                text=status_txt,
+                                variant="success" if is_act else "neutral",
                             )
                         ),
                         ft.DataCell(
@@ -289,7 +296,15 @@ class SettingsHome(ft.Container):
                         ],
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     ),
-                    ft.ListView(controls=[table], expand=True),
+                    ft.ListView(
+                        controls=[
+                            ft.Row(
+                                controls=[table],
+                                scroll=ft.ScrollMode.AUTO,
+                            )
+                        ],
+                        expand=True,
+                    ),
                 ],
                 spacing=AppTheme.PAD_MD,
                 expand=True,
@@ -323,21 +338,33 @@ class SettingsHome(ft.Container):
                 self.show_toast(str(ex), is_error=True)
 
         return ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Text("Official Institute Branding & Receipt Header", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
-                    ft.Row([name_in, person_in], spacing=AppTheme.PAD_MD),
-                    ft.Row([mob_in, alc_in], spacing=AppTheme.PAD_MD),
-                    ft.Row([addr1_in, addr2_in], spacing=AppTheme.PAD_MD),
-                    ft.ElevatedButton(
-                        "Save Profile Changes",
-                        icon=ft.Icons.SAVE,
-                        style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE),
-                        on_click=save_branding,
-                    ),
-                ],
-                spacing=AppTheme.PAD_MD,
-                tight=True,
+            content=HoverCard(
+                content=ft.Column(
+                    controls=[
+                        ft.Row(
+                            controls=[
+                                ft.Icon(ft.Icons.BUSINESS, color=AppTheme.PRIMARY, size=24),
+                                ft.Text("Official Institute Branding & Receipt Header", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                            ],
+                            spacing=8,
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        ),
+                        ft.Text("Configure institute profile, registration ALC codes, and public receipts.", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
+                        ft.Divider(height=1, color=AppTheme.BORDER),
+                        ft.Row([name_in, person_in], spacing=AppTheme.PAD_MD),
+                        ft.Row([mob_in, alc_in], spacing=AppTheme.PAD_MD),
+                        ft.Row([addr1_in, addr2_in], spacing=AppTheme.PAD_MD),
+                        ft.ElevatedButton(
+                            "Save Profile Changes",
+                            icon=ft.Icons.SAVE,
+                            style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE),
+                            on_click=save_branding,
+                        ),
+                    ],
+                    spacing=AppTheme.PAD_MD,
+                    tight=True,
+                ),
+                padding=AppTheme.PAD_LG,
             ),
             padding=AppTheme.PAD_MD,
             expand=True,
@@ -372,23 +399,44 @@ class SettingsHome(ft.Container):
                 self.show_toast(str(ex), is_error=True)
 
         return ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Text("Admin Authorization PIN Configuration", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
-                    ft.Text("Admin PIN is required to authorize discount overrides, confirmation payments, and refunds.", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_SECONDARY),
-                    curr_pin_in,
-                    new_pin_in,
-                    confirm_pin_in,
-                    ft.ElevatedButton(
-                        "Update Admin PIN",
-                        icon=ft.Icons.LOCK_RESET,
-                        style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE),
-                        on_click=change_pin,
-                    ),
-                ],
-                spacing=AppTheme.PAD_MD,
-                tight=True,
+            content=HoverCard(
+                content=ft.Column(
+                    controls=[
+                        ft.Row(
+                            controls=[
+                                ft.Icon(ft.Icons.SHIELD, color=AppTheme.PRIMARY, size=24),
+                                ft.Text("Admin Authorization PIN Configuration", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                            ],
+                            spacing=8,
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        ),
+                        ft.Text("Admin PIN is required to authorize discount overrides, confirmation payments, and refunds.", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_SECONDARY),
+                        ft.Divider(height=1, color=AppTheme.BORDER),
+                        curr_pin_in,
+                        new_pin_in,
+                        confirm_pin_in,
+                        ft.ElevatedButton(
+                            "Update Admin PIN",
+                            icon=ft.Icons.LOCK_RESET,
+                            style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE),
+                            on_click=change_pin,
+                        ),
+                    ],
+                    spacing=AppTheme.PAD_MD,
+                    tight=True,
+                ),
+                padding=AppTheme.PAD_LG,
             ),
             padding=AppTheme.PAD_MD,
             expand=True,
         )
+
+    # ── TAB 4: ABOUT & COPYRIGHT ──
+    def _build_about_tab(self) -> ft.Control:
+        from ui.widgets.about_dialog import build_about_content
+        return ft.Container(
+            content=build_about_content(show_full_page=True),
+            padding=AppTheme.PAD_SM,
+            expand=True,
+        )
+

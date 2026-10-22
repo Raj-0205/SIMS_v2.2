@@ -12,12 +12,14 @@ from modules.student.views.student_home import StudentHome
 from modules.admission.views.admission_home import AdmissionHome
 from modules.course.views.course_home import CourseHome
 from modules.batch.views.batch_home import BatchHome
+from modules.attendance.views.attendance_home import AttendanceHome
 from modules.reports.views.reports_home import ReportsHome
 from modules.settings.views.settings_home import SettingsHome
 from modules.enquiry.views.enquiry_home import EnquiryHome
 from modules.admission.controller import AdmissionController
 from modules.admission.dto import AdmissionSummaryDTO
 from ui.screens.control_center import ControlCenterScreen
+from ui.widgets import HoverCard, StatusBadge
 
 __all__ = ["DashboardScreen", "DashboardHome"]
 
@@ -68,10 +70,14 @@ class DashboardHome(ft.Container):
         )
 
         self.recent_container = ft.Container(
-            content=self.recent_table,
+            content=ft.Row(
+                controls=[self.recent_table],
+                scroll=ft.ScrollMode.AUTO,
+            ),
             bgcolor=AppTheme.SURFACE,
             border_radius=AppTheme.RADIUS_MD,
             padding=AppTheme.PAD_SM,
+            animate_size=ft.Animation(250, ft.AnimationCurve.EASE_OUT),
         )
 
         self._build_ui()
@@ -83,15 +89,21 @@ class DashboardHome(ft.Container):
         icon_color: str,
         main_text: ft.Text,
         sub_text: ft.Text,
-        bg_color: str = AppTheme.SURFACE,
-    ) -> ft.Container:
-        return ft.Container(
+        bg_color: Optional[str] = None,
+    ) -> HoverCard:
+        icon_bubble = ft.Container(
+            content=ft.Icon(icon, color=icon_color, size=20),
+            bgcolor=icon_color + "1A" if len(icon_color) == 7 else icon_color,
+            padding=ft.Padding(7, 7, 7, 7),
+            border_radius=AppTheme.RADIUS_SM,
+        )
+        return HoverCard(
             content=ft.Column(
                 controls=[
                     ft.Row(
                         controls=[
-                            ft.Text(title, size=AppTheme.SIZE_BODY, weight=ft.FontWeight.W_600, color=AppTheme.TEXT_SECONDARY),
-                            ft.Icon(icon, color=icon_color, size=22),
+                            ft.Text(title, size=13, weight=ft.FontWeight.W_600, color=AppTheme.TEXT_SECONDARY),
+                            icon_bubble,
                         ],
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     ),
@@ -103,9 +115,7 @@ class DashboardHome(ft.Container):
                 tight=True,
             ),
             bgcolor=bg_color,
-            padding=ft.Padding(16, 14, 16, 14),
-            border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
+            padding=ft.Padding(18, 14, 18, 14),
             expand=True,
         )
 
@@ -123,6 +133,12 @@ class DashboardHome(ft.Container):
                 ),
                 ft.Row(
                     controls=[
+                        ft.IconButton(
+                            icon=ft.Icons.PALETTE_OUTLINED,
+                            icon_color=AppTheme.PRIMARY,
+                            tooltip="Theme & Appearance",
+                            on_click=lambda _: self.on_navigate("/settings"),
+                        ),
                         ft.OutlinedButton(
                             "Fee Reports",
                             icon=ft.Icons.ASSESSMENT,
@@ -151,20 +167,63 @@ class DashboardHome(ft.Container):
             spacing=AppTheme.PAD_MD,
         )
 
-        # Quick Actions Card
-        actions_card = ft.Container(
+        # Quick Actions with Interactive Micro-Animations
+        def _make_workflow_chip(label: str, icon: str, route: str):
+            tile = ft.Container(
+                content=ft.Row(
+                    controls=[
+                        ft.Container(
+                            content=ft.Icon(icon, size=17, color=AppTheme.PRIMARY),
+                            bgcolor=AppTheme.PRIMARY_LIGHT,
+                            padding=ft.Padding(6, 6, 6, 6),
+                            border_radius=AppTheme.RADIUS_SM,
+                        ),
+                        ft.Text(label, size=AppTheme.SIZE_BODY, weight=ft.FontWeight.W_600, color=AppTheme.TEXT_PRIMARY),
+                    ],
+                    spacing=8,
+                    tight=True,
+                ),
+                padding=ft.Padding(12, 8, 14, 8),
+                border_radius=AppTheme.RADIUS_MD,
+                border=ft.Border.all(1, AppTheme.BORDER),
+                bgcolor=AppTheme.SURFACE,
+                ink=True,
+                tooltip=f"Launch {label}",
+                on_click=lambda _: self.on_navigate(route),
+                animate=ft.Animation(160, ft.AnimationCurve.EASE_OUT),
+                animate_scale=ft.Animation(140, ft.AnimationCurve.EASE_OUT),
+            )
+            def on_chip_hover(e):
+                is_h = (e.data == "true")
+                tile.border = ft.Border.all(1, AppTheme.PRIMARY if is_h else AppTheme.BORDER)
+                tile.scale = 1.03 if is_h else 1.0
+                tile.shadow = [ft.BoxShadow(spread_radius=0, blur_radius=8, color="#00000014", offset=ft.Offset(0, 3))] if is_h else None
+                try:
+                    tile.update()
+                except Exception:
+                    pass
+            tile.on_hover = on_chip_hover
+            return tile
+
+        actions_card = HoverCard(
             content=ft.Column(
                 controls=[
-                    ft.Text("Quick Workflows", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
-                    ft.Divider(height=12),
                     ft.Row(
                         controls=[
-                            ft.OutlinedButton("Walk-ins & Enquiries", icon=ft.Icons.SUPPORT_AGENT, on_click=lambda _: self.on_navigate("/enquiries")),
-                            ft.OutlinedButton("Students Directory", icon=ft.Icons.PEOPLE, on_click=lambda _: self.on_navigate("/students")),
-                            ft.OutlinedButton("Admissions Form", icon=ft.Icons.APP_REGISTRATION, on_click=lambda _: self.on_navigate("/admissions")),
-                            ft.OutlinedButton("Course Catalog", icon=ft.Icons.MENU_BOOK, on_click=lambda _: self.on_navigate("/courses")),
-                            ft.OutlinedButton("Fee Installments", icon=ft.Icons.PAYMENTS, on_click=lambda _: self.on_navigate("/fees")),
-                            ft.OutlinedButton("System Settings", icon=ft.Icons.SETTINGS, on_click=lambda _: self.on_navigate("/settings")),
+                            ft.Icon(ft.Icons.FLASH_ON, color=AppTheme.PRIMARY, size=20),
+                            ft.Text("Quick Workflows", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
+                        ],
+                        spacing=6,
+                    ),
+                    ft.Divider(height=10, color=AppTheme.BORDER),
+                    ft.Row(
+                        controls=[
+                            _make_workflow_chip("Walk-ins & Enquiries", ft.Icons.SUPPORT_AGENT, "/enquiries"),
+                            _make_workflow_chip("Students Directory", ft.Icons.PEOPLE, "/students"),
+                            _make_workflow_chip("Admissions Form", ft.Icons.APP_REGISTRATION, "/admissions"),
+                            _make_workflow_chip("Course Catalog", ft.Icons.MENU_BOOK, "/courses"),
+                            _make_workflow_chip("Fee Installments", ft.Icons.PAYMENTS, "/fees"),
+                            _make_workflow_chip("System Settings", ft.Icons.SETTINGS, "/settings"),
                         ],
                         spacing=AppTheme.PAD_SM,
                         wrap=True,
@@ -173,10 +232,7 @@ class DashboardHome(ft.Container):
                 spacing=AppTheme.PAD_SM,
                 tight=True,
             ),
-            bgcolor=AppTheme.SURFACE,
-            padding=ft.Padding(16, 14, 16, 14),
-            border_radius=AppTheme.RADIUS_MD,
-            border=ft.Border.all(1, AppTheme.BORDER),
+            padding=ft.Padding(18, 16, 18, 16),
         )
 
         # Recent Admissions Stream Header
@@ -228,22 +284,14 @@ class DashboardHome(ft.Container):
             adms, _ = self.adm_controller.filter_admissions({"limit": 5, "sort_keys": [("id", "desc")]})
             rows = []
             for a in adms:
-                status_color = AppTheme.SUCCESS if a.status == "CONFIRMED" else (AppTheme.PRIMARY if a.status == "REGISTERED" else AppTheme.TEXT_SECONDARY)
                 cand_num = f"{a.candidate_year or 2026}-{a.candidate_sequence:03d}" if a.candidate_sequence else f"#{a.id}"
                 rows.append(
                     ft.DataRow(
                         cells=[
                             ft.DataCell(ft.Text(cand_num, weight=ft.FontWeight.W_600)),
-                            ft.DataCell(ft.Text(f"{a.first_name} {a.last_name}")),
+                            ft.DataCell(ft.Text(f"{a.first_name} {a.last_name}", weight=ft.FontWeight.W_500)),
                             ft.DataCell(ft.Text(a.course_name or "—")),
-                            ft.DataCell(
-                                ft.Container(
-                                    content=ft.Text(a.status, size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=status_color),
-                                    padding=ft.Padding(6, 2, 6, 2),
-                                    border_radius=AppTheme.RADIUS_SM,
-                                    bgcolor=AppTheme.SURFACE_VARIANT,
-                                )
-                            ),
+                            ft.DataCell(StatusBadge(label=a.status, variant=a.status)),
                             ft.DataCell(ft.Text(f"₹{a.agreed_fee:,.2f}")),
                             ft.DataCell(ft.Text(f"₹{a.total_paid:,.2f}", weight=ft.FontWeight.W_600, color=AppTheme.SUCCESS)),
                         ]
@@ -255,6 +303,17 @@ class DashboardHome(ft.Container):
                 self.update()
             except Exception:
                 pass
+
+            # Pre-warm Fees Report cache in background thread
+            def _prewarm_fees_cache():
+                try:
+                    from modules.reports.service import ReportsService
+                    ReportsService().get_admission_fees_report_paginated(page=1, page_size=30)
+                except Exception:
+                    pass
+
+            import threading
+            threading.Thread(target=_prewarm_fees_cache, daemon=True).start()
         except Exception:
             pass
 
@@ -373,8 +432,57 @@ class DashboardScreen(ft.Row):
 
         self.content_host = ContentHost()
 
+        self.is_sidebar_visible = True
+
         self.nav_menu = NavigationMenu(
-            on_nav_change=self.on_route_request
+            on_nav_change=self.on_route_request,
+            on_toggle_visibility=self.toggle_sidebar,
+            on_logout_request=self.prompt_logout_confirmation,
+        )
+
+        self.sidebar_container = ft.Container(
+            content=self.nav_menu,
+            visible=True,
+            animate_size=ft.Animation(250, ft.AnimationCurve.EASE_OUT),
+        )
+
+        self.sidebar_divider = ft.VerticalDivider(
+            width=1,
+            color=AppTheme.BORDER,
+            visible=True,
+        )
+
+        self.open_sidebar_btn = ft.Container(
+            content=ft.Row(
+                controls=[
+                    ft.IconButton(
+                        icon=ft.Icons.MENU,
+                        icon_size=20,
+                        icon_color=AppTheme.PRIMARY,
+                        tooltip="Open Modules Sidebar",
+                        on_click=lambda _: self.toggle_sidebar(),
+                    ),
+                    ft.Text(
+                        "Modules Menu",
+                        size=AppTheme.SIZE_BODY,
+                        weight=ft.FontWeight.W_600,
+                        color=AppTheme.TEXT_SECONDARY,
+                    ),
+                ],
+                spacing=4,
+            ),
+            padding=ft.Padding(12, 6, 12, 0),
+            visible=False,
+            animate_opacity=ft.Animation(200, ft.AnimationCurve.EASE_IN_OUT),
+        )
+
+        self.main_content_area = ft.Column(
+            controls=[
+                self.open_sidebar_btn,
+                self.content_host,
+            ],
+            expand=True,
+            spacing=0,
         )
 
         self.placeholder_view = ft.Text(
@@ -384,13 +492,121 @@ class DashboardScreen(ft.Row):
         )
 
         self.controls = [
-            self.nav_menu,
-            ft.VerticalDivider(
-                width=1,
-                color=AppTheme.BORDER,
-            ),
-            self.content_host,
+            self.sidebar_container,
+            self.sidebar_divider,
+            self.main_content_area,
         ]
+
+    def prompt_logout_confirmation(self) -> None:
+        """Displays a confirmation modal before logging out to safeguard active drafts."""
+        def handle_cancel(e=None):
+            confirm_dlg.open = False
+            try:
+                if hasattr(self._page, "pop_dialog"):
+                    self._page.pop_dialog()
+                else:
+                    self._page.update()
+            except Exception:
+                pass
+            if hasattr(self._page, "dialog") and self._page.dialog is confirm_dlg:
+                self._page.dialog = None
+
+        def handle_confirm(e=None):
+            confirm_dlg.open = False
+            try:
+                if hasattr(self._page, "pop_dialog"):
+                    self._page.pop_dialog()
+                else:
+                    self._page.update()
+            except Exception:
+                pass
+            if hasattr(self._page, "dialog") and self._page.dialog is confirm_dlg:
+                self._page.dialog = None
+            self.on_route_request("/logout")
+
+        confirm_dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, color=AppTheme.DANGER, size=28),
+                    ft.Text("Confirm Logout", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD),
+                ],
+                spacing=AppTheme.PAD_SM,
+            ),
+            content=ft.Container(
+                content=ft.Column(
+                    controls=[
+                        ft.Text(
+                            "Are you sure you want to log out of SIMS?",
+                            size=AppTheme.SIZE_BODY,
+                            weight=ft.FontWeight.W_500,
+                        ),
+                        ft.Text(
+                            "If you have unsaved form drafts or active work, you can click Cancel to keep working safely.",
+                            size=AppTheme.SIZE_CAPTION,
+                            color=AppTheme.TEXT_SECONDARY,
+                        ),
+                    ],
+                    spacing=AppTheme.PAD_XS,
+                    tight=True,
+                ),
+                width=420,
+                padding=AppTheme.PAD_SM,
+            ),
+            actions=[
+                ft.OutlinedButton(
+                    content=ft.Text("Cancel / Keep Working"),
+                    on_click=handle_cancel,
+                ),
+                ft.ElevatedButton(
+                    content=ft.Text("Yes, Log Out"),
+                    icon=ft.Icons.LOGOUT,
+                    style=ft.ButtonStyle(bgcolor=AppTheme.DANGER, color=ft.Colors.WHITE),
+                    on_click=handle_confirm,
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+
+        confirm_dlg.handle_cancel = handle_cancel
+        confirm_dlg.handle_submit = handle_confirm
+        confirm_dlg.submit_btn = confirm_dlg.actions[1]
+
+        self._page.dialog = confirm_dlg
+        if hasattr(self._page, "show_dialog"):
+            try:
+                self._page.show_dialog(confirm_dlg)
+            except Exception:
+                confirm_dlg.open = True
+                try:
+                    self._page.update()
+                except Exception:
+                    pass
+        else:
+            confirm_dlg.open = True
+            try:
+                self._page.update()
+            except Exception:
+                pass
+
+    def toggle_sidebar(self, visible: Optional[bool] = None) -> None:
+        """Toggles or sets the visibility of the left sidebar."""
+        if visible is None:
+            self.is_sidebar_visible = not self.is_sidebar_visible
+        else:
+            self.is_sidebar_visible = visible
+
+        self.sidebar_container.visible = self.is_sidebar_visible
+        self.sidebar_divider.visible = self.is_sidebar_visible
+        self.open_sidebar_btn.visible = not self.is_sidebar_visible
+
+        try:
+            if self._page:
+                self._page.update()
+            else:
+                self.update()
+        except Exception:
+            pass
 
     def mount_view(self, route: str):
         self.nav_menu.set_route(route)
@@ -401,6 +617,8 @@ class DashboardScreen(ft.Row):
                 view = EnquiryHome()
             elif route == "/students":
                 view = StudentHome()
+            elif route == "/attendance":
+                view = AttendanceHome()
             elif route == "/admissions":
                 view = AdmissionHome()
             elif route == "/courses":

@@ -239,6 +239,44 @@ class EnquiryFormModal(ft.AlertDialog):
             width=220,
         )
 
+        self.category_dropdown = ft.Dropdown(
+            label="Intent Category *",
+            options=[
+                ft.dropdown.Option("HOT", "🔥 Confirm Laga (High Intent)"),
+                ft.dropdown.Option("WARM", "⚡ Interested (Exploring / Demo)"),
+                ft.dropdown.Option("COLD", "❄️ Doubtful / Low Intent"),
+                ft.dropdown.Option("LOST", "❌ Not Interested / Dropped"),
+                ft.dropdown.Option("CONVERTED", "🎓 Converted (Admitted)"),
+            ],
+            value=enquiry.category if (enquiry and enquiry.category) else "WARM",
+            border_radius=AppTheme.RADIUS_MD,
+            width=250,
+            on_select=self._on_category_changed,
+        )
+
+        self.timing_dropdown = ft.Dropdown(
+            label="Preferred Timing",
+            options=[
+                ft.dropdown.Option("ANY", "Any / Flexible"),
+                ft.dropdown.Option("MORNING", "Morning (8 AM - 12 PM)"),
+                ft.dropdown.Option("AFTERNOON", "Afternoon (12 PM - 4 PM)"),
+                ft.dropdown.Option("EVENING", "Evening (4 PM - 8 PM)"),
+                ft.dropdown.Option("WEEKEND", "Weekend Special"),
+            ],
+            value=enquiry.preferred_timing if (enquiry and enquiry.preferred_timing) else "ANY",
+            border_radius=AppTheme.RADIUS_MD,
+            width=200,
+        )
+
+        self.loss_reason_input = ft.TextField(
+            label="Drop / Loss Reason (Optional)",
+            hint_text="e.g. Fees too high, Joined other institute, College timing clash",
+            value=enquiry.loss_reason if (enquiry and enquiry.loss_reason) else "",
+            border_radius=AppTheme.RADIUS_MD,
+            expand=True,
+            visible=((enquiry.category == "LOST" or enquiry.status == "CLOSED") if enquiry else False),
+        )
+
         self.counselor_input = ft.TextField(
             label="Counselor / Attendant",
             hint_text="Name of staff who counseled",
@@ -252,7 +290,7 @@ class EnquiryFormModal(ft.AlertDialog):
             hint_text="e.g. 2026-10-15",
             value=enquiry.follow_up_date if (enquiry and enquiry.follow_up_date) else "",
             border_radius=AppTheme.RADIUS_MD,
-            width=240,
+            width=220,
         )
 
         self.notes_input = ft.TextField(
@@ -323,8 +361,9 @@ class EnquiryFormModal(ft.AlertDialog):
                         spacing=8,
                     ),
                     ft.Row(controls=[self.course_dropdown, self.qualification_input], spacing=12),
-                    ft.Row(controls=[self.source_dropdown, self.status_dropdown, self.follow_up_input], spacing=12),
-                    ft.Row(controls=[self.counselor_input], spacing=12),
+                    ft.Row(controls=[self.category_dropdown, self.timing_dropdown, self.source_dropdown], spacing=12),
+                    ft.Row(controls=[self.status_dropdown, self.follow_up_input, self.counselor_input], spacing=12),
+                    ft.Row(controls=[self.loss_reason_input], spacing=12),
                     ft.Row(controls=[self.notes_input], spacing=12),
                 ],
                 spacing=12,
@@ -392,6 +431,13 @@ class EnquiryFormModal(ft.AlertDialog):
         if enquiry and enquiry.village:
             self._load_village_peers(enquiry.village)
 
+    @property
+    def safe_page(self) -> Optional[ft.Page]:
+        try:
+            return self.page
+        except Exception:
+            return None
+
     def _show_banner(self, text: str, is_error: bool = True) -> None:
         self.banner_text.value = text
         if is_error:
@@ -407,13 +453,15 @@ class EnquiryFormModal(ft.AlertDialog):
             self.banner_container.bgcolor = "#ECFDF5"
             self.banner_container.border = ft.Border.all(1, "#A7F3D0")
         self.banner_container.visible = True
-        if self.page:
-            self.page.update()
+        p = self.safe_page
+        if p:
+            p.update()
 
     def _hide_banner(self) -> None:
         self.banner_container.visible = False
-        if self.page:
-            self.page.update()
+        p = self.safe_page
+        if p:
+            p.update()
 
     def _on_mobile_change(self, e: ft.ControlEvent) -> None:
         val = self.mobile_input.value or ""
@@ -422,8 +470,9 @@ class EnquiryFormModal(ft.AlertDialog):
             cleaned = cleaned[:10]
         self.mobile_input.value = cleaned
         _clear_error(self.mobile_input)
-        if self.page:
-            self.page.update()
+        p = self.safe_page
+        if p:
+            p.update()
 
     def _on_village_changed(self, e: ft.ControlEvent) -> None:
         village = (self.village_input.value or "").strip()
@@ -432,8 +481,9 @@ class EnquiryFormModal(ft.AlertDialog):
     def _load_village_peers(self, village: str) -> None:
         if not village or len(village) < 2:
             self.village_friends_container.visible = False
-            if self.page:
-                self.page.update()
+            p = self.safe_page
+            if p:
+                p.update()
             return
 
         try:
@@ -462,8 +512,16 @@ class EnquiryFormModal(ft.AlertDialog):
             LogService.warning(f"Failed to fetch village peers: {exc}", context="EnquiryFormModal")
             self.village_friends_container.visible = False
 
-        if self.page:
-            self.page.update()
+        p = self.safe_page
+        if p:
+            p.update()
+
+    def _on_category_changed(self, e: ft.ControlEvent) -> None:
+        is_lost = (self.category_dropdown.value == "LOST")
+        self.loss_reason_input.visible = is_lost
+        p = self.safe_page
+        if p:
+            p.update()
 
     def _validate_form(self) -> tuple[bool, str]:
         errors: list[str] = []
@@ -515,6 +573,9 @@ class EnquiryFormModal(ft.AlertDialog):
                     selected_course_name = c.name
                     break
 
+        category = self.category_dropdown.value or "WARM"
+        preferred_timing = self.timing_dropdown.value or "ANY"
+        loss_reason = (self.loss_reason_input.value or "").strip() or None
         source = self.source_dropdown.value or "WALK_IN"
         status = self.status_dropdown.value or "NEW"
         counselor = (self.counselor_input.value or "").strip() or None
@@ -533,6 +594,9 @@ class EnquiryFormModal(ft.AlertDialog):
             "qualification": qualification,
             "gender": gender,
             "status": status,
+            "category": category,
+            "preferred_timing": preferred_timing,
+            "loss_reason": loss_reason,
             "source": source,
             "follow_up_date": follow_up,
             "notes": notes,
@@ -557,5 +621,11 @@ class EnquiryFormModal(ft.AlertDialog):
 
     def close_modal(self, e: Optional[ft.ControlEvent] = None) -> None:
         self.open = False
-        if self.page:
-            self.page.update()
+        try:
+            p = self.safe_page
+            if p and hasattr(p, "pop_dialog"):
+                p.pop_dialog()
+            elif p:
+                p.update()
+        except Exception:
+            pass

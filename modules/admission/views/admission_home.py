@@ -14,6 +14,7 @@ from modules.admission.views.admission_form_modal import AdmissionFormModal
 from modules.admission.views.admission_workspace_dialog import AdmissionWorkspaceDialog
 from modules.course.controller import CourseController
 from shared.utils.os_helper import open_path_externally
+from ui.widgets.badge import StatusBadge
 
 __all__ = ["AdmissionHome"]
 
@@ -41,6 +42,8 @@ class AdmissionHome(ft.Container):
         self.total_count: int = 0
         self.current_page: int = 0
         self.page_size: int = 25
+        self.show_controls_panel: bool = True
+        self.auto_fit_screen: bool = True
 
         # Filter State
         self.search_query: str = ""
@@ -64,6 +67,26 @@ class AdmissionHome(ft.Container):
             "Manage student admissions, candidate numbering, batch enrollments, and status lifecycle.",
             size=AppTheme.SIZE_BODY,
             color=AppTheme.TEXT_SECONDARY,
+        )
+
+        self.toggle_controls_btn = ft.OutlinedButton(
+            content=ft.Text("Hide Controls", size=AppTheme.SIZE_CAPTION),
+            icon=ft.Icons.FILTER_ALT_OFF,
+            tooltip="Hide search and filter controls",
+            style=ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+            ),
+            on_click=self.handle_toggle_controls,
+        )
+
+        self.toggle_autofit_btn = ft.OutlinedButton(
+            content=ft.Text("Auto-Fit: ON", size=AppTheme.SIZE_CAPTION),
+            icon=ft.Icons.FIT_SCREEN,
+            tooltip="Auto-fit table to available screen width (Click to toggle)",
+            style=ft.ButtonStyle(
+                shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+            ),
+            on_click=self.handle_toggle_autofit,
         )
 
         self.new_adm_btn = ft.ElevatedButton(
@@ -102,6 +125,8 @@ class AdmissionHome(ft.Container):
                 ft.Column(controls=[self.title_text, self.subtitle_text], spacing=2),
                 ft.Row(
                     controls=[
+                        self.toggle_controls_btn,
+                        self.toggle_autofit_btn,
                         self.export_excel_btn,
                         self.refresh_btn,
                         self.new_adm_btn,
@@ -187,28 +212,49 @@ class AdmissionHome(ft.Container):
         )
 
         # ----------------------------------------------------
-        # 4. Data Table
+        # 4. Data Table — Frozen Header & Scrollable Body Architecture
         # ----------------------------------------------------
-        self.table_columns = [
-            ft.DataColumn(label=ft.Text("Candidate No", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_CAPTION)),
-            ft.DataColumn(label=ft.Text("Student Name", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_CAPTION)),
-            ft.DataColumn(label=ft.Text("Mobile Number", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_CAPTION)),
-            ft.DataColumn(label=ft.Text("Course", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_CAPTION)),
-            ft.DataColumn(label=ft.Text("Batch", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_CAPTION)),
-            ft.DataColumn(label=ft.Text("Admission Date", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_CAPTION)),
-            ft.DataColumn(label=ft.Text("Status", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_CAPTION)),
-            ft.DataColumn(label=ft.Text("Fee / Paid / Balance", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_CAPTION)),
-            ft.DataColumn(label=ft.Text("Action", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_CAPTION)),
+        self.col_specs = [
+            ("Candidate No", 110),
+            ("Student Name", 180),
+            ("Mobile Number", 120),
+            ("Course", 140),
+            ("Batch", 120),
+            ("Admission Date", 110),
+            ("Status", 100),
+            ("Fee / Paid / Balance", 160),
+            ("Action", 80),
         ]
 
-        self.data_table = ft.DataTable(
+        self.table_columns = [
+            ft.DataColumn(label=ft.Container(content=ft.Text(label, weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_CAPTION), width=w))
+            for label, w in self.col_specs
+        ]
+
+        self.dummy_columns = [
+            ft.DataColumn(label=ft.Container(width=w))
+            for _, w in self.col_specs
+        ]
+
+        self.header_table = ft.DataTable(
             columns=self.table_columns,
             rows=[],
             heading_row_color=AppTheme.SURFACE_VARIANT,
             heading_row_height=42,
+            border=ft.Border.all(1, AppTheme.BORDER),
+            border_radius=ft.BorderRadius(AppTheme.RADIUS_MD, AppTheme.RADIUS_MD, 0, 0),
+            vertical_lines=ft.BorderSide(0.5, AppTheme.BORDER),
+            horizontal_lines=ft.BorderSide(0.5, AppTheme.BORDER),
+        )
+
+        self.data_table = ft.DataTable(
+            columns=self.dummy_columns,
+            rows=[],
+            heading_row_height=0,
+            divider_thickness=0,
             data_row_min_height=48,
             border=ft.Border.all(1, AppTheme.BORDER),
-            border_radius=AppTheme.RADIUS_MD,
+            border_radius=ft.BorderRadius(0, 0, AppTheme.RADIUS_MD, AppTheme.RADIUS_MD),
             vertical_lines=ft.BorderSide(0.5, AppTheme.BORDER),
             horizontal_lines=ft.BorderSide(0.5, AppTheme.BORDER),
         )
@@ -227,12 +273,36 @@ class AdmissionHome(ft.Container):
             visible=False,
         )
 
+        base_cols_w = sum(w for _, w in self.col_specs) + (len(self.col_specs) - 1) * 18 + 2 * 14
+        self.table_column = ft.Column(
+            controls=[
+                self.header_table,
+                ft.Container(
+                    content=ft.ListView(
+                        controls=[self.data_table],
+                        expand=True,
+                    ),
+                    expand=True,
+                    width=base_cols_w,
+                ),
+            ],
+            spacing=0,
+            width=base_cols_w,
+        )
+
+        self.table_scroll_row = ft.Row(
+            controls=[self.table_column],
+            scroll=ft.ScrollMode.AUTO,
+            expand=True,
+        )
+
         self.table_container = ft.Container(
             content=ft.Column(
-                controls=[self.data_table, self.empty_container],
-                scroll=ft.ScrollMode.AUTO,
+                controls=[self.table_scroll_row, self.empty_container],
+                expand=True,
             ),
             expand=True,
+            animate_size=ft.Animation(250, ft.AnimationCurve.EASE_OUT),
         )
 
         # ----------------------------------------------------
@@ -290,12 +360,22 @@ class AdmissionHome(ft.Container):
         # ----------------------------------------------------
         # Assemble Main Layout
         # ----------------------------------------------------
+        self.controls_panel = ft.Column(
+            controls=[
+                search_container,
+                filter_row,
+            ],
+            spacing=AppTheme.PAD_SM,
+            visible=True,
+            animate_size=ft.Animation(250, ft.AnimationCurve.EASE_OUT),
+            animate_opacity=ft.Animation(200, ft.AnimationCurve.EASE_IN_OUT),
+        )
+
         self.content = ft.Column(
             controls=[
                 header_row,
                 ft.Divider(height=1, color=AppTheme.BORDER),
-                search_container,
-                filter_row,
+                self.controls_panel,
                 self.table_container,
                 ft.Divider(height=1, color=AppTheme.BORDER),
                 pagination_row,
@@ -303,6 +383,54 @@ class AdmissionHome(ft.Container):
             spacing=AppTheme.PAD_MD,
             expand=True,
         )
+
+    def handle_toggle_controls(self, e=None) -> None:
+        self.show_controls_panel = not self.show_controls_panel
+        self.controls_panel.visible = self.show_controls_panel
+        if self.show_controls_panel:
+            self.toggle_controls_btn.content = ft.Text("Hide Controls", size=AppTheme.SIZE_CAPTION)
+            self.toggle_controls_btn.icon = ft.Icons.FILTER_ALT_OFF
+            self.toggle_controls_btn.tooltip = "Hide search and filter controls"
+        else:
+            self.toggle_controls_btn.content = ft.Text("Show Controls", size=AppTheme.SIZE_CAPTION)
+            self.toggle_controls_btn.icon = ft.Icons.FILTER_ALT
+            self.toggle_controls_btn.tooltip = "Show search and filter controls"
+        self._safe_update()
+
+    def handle_toggle_autofit(self, e=None) -> None:
+        self.auto_fit_screen = not self.auto_fit_screen
+        if self.auto_fit_screen:
+            self.toggle_autofit_btn.content = ft.Text("Auto-Fit: ON", size=AppTheme.SIZE_CAPTION)
+            self.toggle_autofit_btn.icon = ft.Icons.FIT_SCREEN
+            self.toggle_autofit_btn.tooltip = "Auto-fit table to available screen width (Click to toggle)"
+        else:
+            self.toggle_autofit_btn.content = ft.Text("Auto-Fit: OFF", size=AppTheme.SIZE_CAPTION)
+            self.toggle_autofit_btn.icon = ft.Icons.FIT_SCREEN_OUTLINED
+            self.toggle_autofit_btn.tooltip = "Table in compact mode (Click to enable auto-fit)"
+        self._render_table()
+        self._safe_update()
+
+    def _render_table_rows(self) -> None:
+        """Backward-compatible alias for _render_table."""
+        self._render_table()
+
+    def _compute_column_spacing(self, num_columns: int = 9, base_content_width: int = 1050) -> tuple[int, int]:
+        if not getattr(self, "auto_fit_screen", True):
+            return 18, 14
+
+        p = self.safe_page
+        screen_w = p.width if (p and p.width and p.width > 300) else 1920
+
+        sidebar_w = 68
+        container_pad = 64
+        avail_w = max(base_content_width + 100, screen_w - sidebar_w - container_pad)
+
+        gaps = max(1, num_columns - 1)
+        extra_w = avail_w - base_content_width - 36
+        if extra_w > 0:
+            spacing = max(18, min(150, int(extra_w / gaps)))
+            return spacing, 18
+        return 18, 14
 
     @property
     def safe_page(self) -> Optional[ft.Page]:
@@ -313,6 +441,15 @@ class AdmissionHome(ft.Container):
 
     def did_mount(self) -> None:
         self.load_data()
+        p = self.safe_page
+        if p:
+            def _on_page_resize(e):
+                if not getattr(self, "page", None) and not getattr(self, "_root_page", None):
+                    return
+                if getattr(self, "auto_fit_screen", True):
+                    self._render_table()
+                    self._safe_update()
+            p.on_resize = _on_page_resize
 
     def _safe_update(self) -> None:
         p = self.safe_page
@@ -372,18 +509,8 @@ class AdmissionHome(ft.Container):
         is_admin = (str(current_role).upper() == Role.ADMINISTRATOR.value)
 
         for adm in self.admissions:
-            status_color = ADMISSION_STATUS_COLORS.get(adm.status, AppTheme.PRIMARY)
-            status_badge = ft.Container(
-                content=ft.Text(
-                    adm.status,
-                    size=AppTheme.SIZE_CAPTION,
-                    weight=ft.FontWeight.W_600,
-                    color=status_color,
-                ),
-                bgcolor=status_color + "1A",
-                padding=ft.Padding(6, 2, 6, 2),
-                border_radius=AppTheme.RADIUS_SM,
-            )
+            variant = "success" if adm.status in ("CONFIRMED", "ENROLLED", "ADMITTED") else ("warning" if adm.status == "PENDING" else ("danger" if adm.status == "CANCELLED" else "primary"))
+            status_badge = StatusBadge(label=adm.status, variant=variant)
 
             cand_badge = ft.Container(
                 content=ft.Text(
@@ -426,21 +553,34 @@ class AdmissionHome(ft.Container):
 
             row = ft.DataRow(
                 cells=[
-                    ft.DataCell(cand_badge),
-                    ft.DataCell(ft.Text(adm.student_name, weight=ft.FontWeight.W_600, size=AppTheme.SIZE_BODY)),
-                    ft.DataCell(ft.Text(adm.mobile_number or "—", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_SECONDARY)),
-                    ft.DataCell(ft.Text(adm.course_name, size=AppTheme.SIZE_BODY)),
-                    ft.DataCell(ft.Text(adm.batch_name or "Unassigned", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY)),
-                    ft.DataCell(ft.Text(adm.created_at[:10] if adm.created_at else "—", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED)),
-                    ft.DataCell(status_badge),
-                    ft.DataCell(fee_info),
-                    ft.DataCell(ft.Row(controls=actions, spacing=2)),
+                    ft.DataCell(ft.Container(content=cand_badge, width=110)),
+                    ft.DataCell(ft.Container(content=ft.Text(adm.student_name, weight=ft.FontWeight.W_600, size=AppTheme.SIZE_BODY, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS), width=180)),
+                    ft.DataCell(ft.Container(content=ft.Text(adm.mobile_number or "—", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_SECONDARY, no_wrap=True), width=120)),
+                    ft.DataCell(ft.Container(content=ft.Text(adm.course_name, size=AppTheme.SIZE_BODY, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS), width=140)),
+                    ft.DataCell(ft.Container(content=ft.Text(adm.batch_name or "Unassigned", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS), width=120)),
+                    ft.DataCell(ft.Container(content=ft.Text(adm.created_at[:10] if adm.created_at else "—", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED, no_wrap=True), width=110)),
+                    ft.DataCell(ft.Container(content=status_badge, width=100)),
+                    ft.DataCell(ft.Container(content=fee_info, width=160)),
+                    ft.DataCell(ft.Container(content=ft.Row(controls=actions, spacing=2), width=80)),
                 ],
                 on_select_change=lambda e, a_id=adm.id: self.open_admission_workspace(a_id),
             )
             rows.append(row)
 
+        col_spacing, horiz_margin = self._compute_column_spacing(num_columns=9, base_content_width=1050)
+        total_cols_w = sum(w for _, w in self.col_specs)
+        total_table_w = total_cols_w + (len(self.col_specs) - 1) * col_spacing + 2 * horiz_margin
+        self.table_column.width = total_table_w
+        if len(self.table_column.controls) > 1 and isinstance(self.table_column.controls[1], ft.Container):
+            self.table_column.controls[1].width = total_table_w
+
+        self.header_table.column_spacing = col_spacing
+        self.header_table.horizontal_margin = horiz_margin
+        self.header_table.visible = (len(rows) > 0)
+        self.data_table.column_spacing = col_spacing
+        self.data_table.horizontal_margin = horiz_margin
         self.data_table.rows = rows
+        self.table_scroll_row.visible = (len(rows) > 0)
         self.empty_container.visible = (len(rows) == 0)
         self.data_table.visible = (len(rows) > 0)
 
@@ -519,15 +659,7 @@ class AdmissionHome(ft.Container):
 
         current_role = SecurityContext.get_current_role()
         if str(current_role).upper() != Role.ADMINISTRATOR.value:
-            p = self.safe_page
-            if p:
-                snack = ft.SnackBar(
-                    content=ft.Text("Access Denied: Only an Administrator can delete admissions."),
-                    bgcolor=AppTheme.DANGER,
-                )
-                p.overlay.append(snack)
-                snack.open = True
-                p.update()
+            self._show_toast("Access Denied: Only an Administrator can delete admissions.", is_error=True)
             return
 
         try:
@@ -560,13 +692,7 @@ class AdmissionHome(ft.Container):
                     pass
 
                 if msg:
-                    snack = ft.SnackBar(
-                        content=ft.Text(msg),
-                        bgcolor=AppTheme.DANGER if err else AppTheme.SUCCESS,
-                    )
-                    p.overlay.append(snack)
-                    snack.open = True
-                    p.update()
+                    self._show_toast(msg, is_error=err, is_success=not err)
                 if not err:
                     self.load_data()
 
@@ -639,11 +765,18 @@ class AdmissionHome(ft.Container):
         p = self.safe_page
         if not p:
             return
+        bg = AppTheme.DANGER if is_error else (AppTheme.SUCCESS if is_success else AppTheme.PRIMARY)
         snack = ft.SnackBar(
             content=ft.Text(message, color=AppTheme.SURFACE),
-            bgcolor=AppTheme.DANGER if is_error else (AppTheme.SUCCESS if is_success else AppTheme.PRIMARY),
+            bgcolor=bg,
         )
-        p.overlay.append(snack)
+        if hasattr(p, "show_dialog"):
+            try:
+                p.show_dialog(snack)
+                return
+            except Exception:
+                pass
+        p.snack_bar = snack
         snack.open = True
         try:
             p.update()

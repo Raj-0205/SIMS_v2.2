@@ -36,6 +36,19 @@ class ReportsController:
             course_id, status, search, sort_by, page, page_size
         )
 
+    def get_admission_fees_report_chunk(
+        self,
+        course_id: Optional[int] = None,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+        sort_by: Optional[str] = None,
+        offset: int = 0,
+        limit: int = 10,
+    ) -> dict[str, Any]:
+        return self.service.get_admission_fees_report_chunk(
+            course_id, status, search, sort_by, offset, limit
+        )
+
     def filter_payments_by_amount(self, target_amount: float, search: Optional[str] = None) -> list[dict[str, Any]]:
         return self.service.filter_payments_by_amount(target_amount, search)
 
@@ -68,3 +81,17 @@ class ReportsController:
         return self.service.export_filtered_fees_report_excel(
             course_id, status, search, sort_by, target_path
         )
+
+    def get_fees_kpi_summary(self, course_id: Optional[int] = None) -> dict[str, Any]:
+        """Calculates and returns pre-aggregated financial KPI metrics from cache/database."""
+        return self.service.get_fees_kpi_summary(course_id=course_id)
+
+    def get_cache_stats(self) -> dict[str, Any]:
+        """Returns live fees caching telemetry and health diagnostics."""
+        from core.cache.fees_cache import FeesCacheManager
+        return FeesCacheManager.get_stats()
+
+    def clear_cache(self, reason: str = "Manual User Reset") -> None:
+        """Forces immediate eviction and invalidation of all fees cache stores."""
+        from core.cache.fees_cache import FeesCacheManager
+        FeesCacheManager.invalidate(reason=reason)

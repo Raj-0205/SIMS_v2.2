@@ -8,6 +8,9 @@ from modules.enquiry.dto import (
     EnquiryDTO,
     EnquiryFilterDTO,
     EnquirySummaryDTO,
+    EnquiryCategorySummaryDTO,
+    CreateFollowUpDTO,
+    FollowUpDTO,
     VillagePeerDTO,
 )
 from modules.enquiry.service import EnquiryService
@@ -25,7 +28,7 @@ class EnquiryController:
         dto = CreateEnquiryDTO(
             student_name=str(raw_data.get("student_name") or "").strip(),
             mobile_number=str(raw_data.get("mobile_number") or "").strip(),
-            alternate_mobile=str(raw_data.get("alternate_mobile") or "").strip() or None,
+            alternate_mobile=str(raw_data.get("alternate_mobile") or raw_data.get("secondary_mobile") or "").strip() or None,
             email=str(raw_data.get("email") or "").strip() or None,
             village=str(raw_data.get("village") or "").strip() or None,
             address=str(raw_data.get("address") or "").strip() or None,
@@ -34,10 +37,13 @@ class EnquiryController:
             qualification=str(raw_data.get("qualification") or "").strip() or None,
             gender=str(raw_data.get("gender") or "MALE").strip().upper(),
             status=str(raw_data.get("status") or "NEW").strip().upper(),
+            category=str(raw_data.get("category") or "WARM").strip().upper(),
+            preferred_timing=str(raw_data.get("preferred_timing") or "ANY").strip().upper(),
             source=str(raw_data.get("source") or "WALK_IN").strip().upper(),
             follow_up_date=str(raw_data.get("follow_up_date") or "").strip() or None,
             notes=str(raw_data.get("notes") or "").strip() or None,
             counselor_name=str(raw_data.get("counselor_name") or "").strip() or None,
+            loss_reason=str(raw_data.get("loss_reason") or "").strip() or None,
         )
         return self.service.create_enquiry(dto)
 
@@ -46,7 +52,7 @@ class EnquiryController:
             id=int(raw_data["id"]),
             student_name=str(raw_data.get("student_name") or "").strip(),
             mobile_number=str(raw_data.get("mobile_number") or "").strip(),
-            alternate_mobile=str(raw_data.get("alternate_mobile") or "").strip() or None,
+            alternate_mobile=str(raw_data.get("alternate_mobile") or raw_data.get("secondary_mobile") or "").strip() or None,
             email=str(raw_data.get("email") or "").strip() or None,
             village=str(raw_data.get("village") or "").strip() or None,
             address=str(raw_data.get("address") or "").strip() or None,
@@ -55,11 +61,14 @@ class EnquiryController:
             qualification=str(raw_data.get("qualification") or "").strip() or None,
             gender=str(raw_data.get("gender") or "MALE").strip().upper(),
             status=str(raw_data.get("status") or "NEW").strip().upper(),
+            category=str(raw_data.get("category") or "WARM").strip().upper(),
+            preferred_timing=str(raw_data.get("preferred_timing") or "ANY").strip().upper(),
             source=str(raw_data.get("source") or "WALK_IN").strip().upper(),
             follow_up_date=str(raw_data.get("follow_up_date") or "").strip() or None,
             notes=str(raw_data.get("notes") or "").strip() or None,
             counselor_name=str(raw_data.get("counselor_name") or "").strip() or None,
             converted_admission_id=int(raw_data["converted_admission_id"]) if raw_data.get("converted_admission_id") else None,
+            loss_reason=str(raw_data.get("loss_reason") or "").strip() or None,
         )
         return self.service.update_enquiry(dto)
 
@@ -70,6 +79,8 @@ class EnquiryController:
         self,
         query: Optional[str] = None,
         status: Optional[str] = None,
+        category: Optional[str] = None,
+        follow_up_filter: Optional[str] = None,
         course_id: Optional[int] = None,
         village: Optional[str] = None,
         limit: int = 50,
@@ -77,7 +88,9 @@ class EnquiryController:
     ) -> tuple[list[EnquiryDTO], int]:
         filters = EnquiryFilterDTO(
             query=query,
-            status=status,
+            status=status if status and status != "ALL" else None,
+            category=category if category and category != "ALL" else None,
+            follow_up_filter=follow_up_filter if follow_up_filter and follow_up_filter != "ALL" else None,
             course_id=course_id,
             village=village,
             limit=limit,
@@ -87,6 +100,28 @@ class EnquiryController:
 
     def get_summary(self) -> EnquirySummaryDTO:
         return self.service.get_summary()
+
+    def get_category_summary(self) -> EnquiryCategorySummaryDTO:
+        return self.service.get_category_summary()
+
+    def record_follow_up(self, raw_data: Mapping[str, Any]) -> int:
+        dto = CreateFollowUpDTO(
+            enquiry_id=int(raw_data["enquiry_id"]),
+            discussion_notes=str(raw_data.get("discussion_notes") or "").strip(),
+            category_after_call=str(raw_data.get("category_after_call") or "WARM").strip().upper(),
+            call_type=str(raw_data.get("call_type") or "PHONE").strip().upper(),
+            follow_up_date=str(raw_data.get("follow_up_date") or "").strip() or None,
+            next_follow_up_date=str(raw_data.get("next_follow_up_date") or "").strip() or None,
+            counselor_name=str(raw_data.get("counselor_name") or "").strip() or None,
+            loss_reason=str(raw_data.get("loss_reason") or "").strip() or None,
+        )
+        return self.service.record_follow_up(dto)
+
+    def get_follow_ups(self, enquiry_id: int) -> list[FollowUpDTO]:
+        return self.service.get_follow_ups(enquiry_id)
+
+    def search_for_admission(self, query: str = "", limit: int = 15) -> list[EnquiryDTO]:
+        return self.service.search_for_admission(query, limit)
 
     def delete_enquiry(self, enquiry_id: int) -> bool:
         return self.service.delete_enquiry(enquiry_id)
@@ -101,6 +136,8 @@ class EnquiryController:
         self,
         query: Optional[str] = None,
         status: Optional[str] = None,
+        category: Optional[str] = None,
+        follow_up_filter: Optional[str] = None,
         course_id: Optional[int] = None,
         village: Optional[str] = None,
         target_path: Optional[str] = None,
@@ -108,6 +145,8 @@ class EnquiryController:
         dto = EnquiryFilterDTO(
             query=query,
             status=status if status and status != "ALL" else None,
+            category=category if category and category != "ALL" else None,
+            follow_up_filter=follow_up_filter if follow_up_filter and follow_up_filter != "ALL" else None,
             course_id=course_id,
             village=village,
             limit=100000,
@@ -119,6 +158,8 @@ class EnquiryController:
         self,
         query: Optional[str] = None,
         status: Optional[str] = None,
+        category: Optional[str] = None,
+        follow_up_filter: Optional[str] = None,
         course_id: Optional[int] = None,
         village: Optional[str] = None,
         target_path: Optional[str] = None,
@@ -126,6 +167,8 @@ class EnquiryController:
         dto = EnquiryFilterDTO(
             query=query,
             status=status if status and status != "ALL" else None,
+            category=category if category and category != "ALL" else None,
+            follow_up_filter=follow_up_filter if follow_up_filter and follow_up_filter != "ALL" else None,
             course_id=course_id,
             village=village,
             limit=100000,
