@@ -32,7 +32,7 @@ class NavigationMenu(ft.NavigationRail):
                 color=AppTheme.DANGER,
             ),
             on_click=lambda _: self.on_logout_request() if self.on_logout_request else on_nav_change("/logout"),
-            width=180,
+            width=178,
         )
 
         self.logout_icon_btn = ft.IconButton(
@@ -44,8 +44,8 @@ class NavigationMenu(ft.NavigationRail):
 
         self.trailing_container = ft.Container(
             content=self.logout_full_btn,
-            padding=ft.Padding(12, 10, 12, 16),
-            alignment=ft.Alignment.CENTER,
+            padding=ft.Padding(16, 8, 16, 16),
+            alignment=ft.Alignment.BOTTOM_LEFT,
         )
 
 
@@ -96,7 +96,7 @@ class NavigationMenu(ft.NavigationRail):
             content=ft.Row(
                 controls=[
                     self.brand_row,
-                    ft.Row([self.about_btn, self.collapse_btn, self.close_btn], spacing=0),
+                    ft.Row([self.collapse_btn, self.close_btn], spacing=2),
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -120,12 +120,12 @@ class NavigationMenu(ft.NavigationRail):
         self.routes = [
             "/dashboard",
             "/enquiries",
-            "/students",
-            "/attendance",
             "/admissions",
+            "/students",
             "/courses",
-            "/fees",
             "/batch",
+            "/attendance",
+            "/fees",
             "/settings",
         ]
 
@@ -139,28 +139,28 @@ class NavigationMenu(ft.NavigationRail):
                 label="Enquiries",
             ),
             ft.NavigationRailDestination(
-                icon=ft.Icons.PEOPLE,
-                label="Students",
-            ),
-            ft.NavigationRailDestination(
-                icon=ft.Icons.CO_PRESENT,
-                label="Attendance",
-            ),
-            ft.NavigationRailDestination(
                 icon=ft.Icons.APP_REGISTRATION,
                 label="Admissions",
+            ),
+            ft.NavigationRailDestination(
+                icon=ft.Icons.PEOPLE,
+                label="Students",
             ),
             ft.NavigationRailDestination(
                 icon=ft.Icons.MENU_BOOK,
                 label="Courses",
             ),
             ft.NavigationRailDestination(
-                icon=ft.Icons.MONETIZATION_ON,
-                label="Fees",
-            ),
-            ft.NavigationRailDestination(
                 icon=ft.Icons.GROUP_WORK,
                 label="Batch",
+            ),
+            ft.NavigationRailDestination(
+                icon=ft.Icons.CO_PRESENT,
+                label="Attendance",
+            ),
+            ft.NavigationRailDestination(
+                icon=ft.Icons.MONETIZATION_ON,
+                label="Fees",
             ),
             ft.NavigationRailDestination(
                 icon=ft.Icons.SETTINGS,
@@ -207,13 +207,14 @@ class NavigationMenu(ft.NavigationRail):
             self.header_container.content = ft.Row(
                 controls=[
                     self.brand_row,
-                    ft.Row([self.about_btn, self.collapse_btn, self.close_btn], spacing=0),
+                    ft.Row([self.collapse_btn, self.close_btn], spacing=2),
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             )
             self.trailing_container.content = self.logout_full_btn
-            self.trailing_container.alignment = ft.Alignment.CENTER
+            self.trailing_container.alignment = ft.Alignment.BOTTOM_LEFT
+            self.trailing_container.padding = ft.Padding(16, 8, 16, 16)
         else:
             self.collapse_btn.icon = ft.Icons.MENU
             self.collapse_btn.tooltip = "Expand Sidebar"
@@ -221,14 +222,14 @@ class NavigationMenu(ft.NavigationRail):
             self.header_container.content = ft.Column(
                 controls=[
                     self.collapse_btn,
-                    self.about_btn,
                     self.compact_close_btn,
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                spacing=2,
+                spacing=4,
             )
             self.trailing_container.content = self.logout_icon_btn
-            self.trailing_container.alignment = ft.Alignment.CENTER
+            self.trailing_container.alignment = ft.Alignment.BOTTOM_CENTER
+            self.trailing_container.padding = ft.Padding(8, 8, 8, 16)
 
         try:
             if self.page:

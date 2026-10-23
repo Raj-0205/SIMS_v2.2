@@ -292,7 +292,20 @@ class ThemeManager:
         if callback in self._listeners:
             self._listeners.remove(callback)
 
-    def set_theme(self, theme_id: str) -> None:
+    def load_saved_theme(self) -> str:
+        """Loads and applies the saved theme from persistent storage."""
+        try:
+            from ui.themes.theme_manager import ThemePersistence
+            saved_id = ThemePersistence.load_theme()
+            if saved_id in THEMES:
+                self.set_theme(saved_id, persist=False)
+                return saved_id
+        except Exception:
+            pass
+        self.set_theme("minimalism", persist=False)
+        return "minimalism"
+
+    def set_theme(self, theme_id: str, persist: bool = True) -> None:
         if theme_id not in THEMES:
             theme_id = "minimalism"
 
@@ -303,6 +316,13 @@ class ThemeManager:
             val = getattr(active, field_name)
             attr_name = field_name.upper() if field_name.islower() and not field_name.startswith("RADIUS") else field_name
             setattr(AppTheme, attr_name, val)
+
+        if persist:
+            try:
+                from ui.themes.theme_manager import ThemePersistence
+                ThemePersistence.save_theme(None, theme_id)
+            except Exception:
+                pass
 
         for listener in list(self._listeners):
             try:
@@ -393,4 +413,4 @@ class AppTheme:
         return (t.PRIMARY, t.PRIMARY_LIGHT)
 
 
-ThemeManager().set_theme("minimalism")
+ThemeManager().load_saved_theme()

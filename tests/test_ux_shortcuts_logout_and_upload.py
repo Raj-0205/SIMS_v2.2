@@ -318,21 +318,24 @@ class TestUXShortcutsLogoutAndUpload(unittest.TestCase):
         dashboard = DashboardScreen(self.page, on_route_request=self.page.navigate)
         nav = dashboard.nav_menu
 
-        # 1. Extended mode: Trailing has full button with text
+        # 1. Extended mode: Trailing has full button with text positioned bottom-left
         self.assertTrue(nav.extended)
         self.assertIs(nav.trailing_container.content, nav.logout_full_btn)
         self.assertEqual(nav.logout_full_btn.content, "Log Out")
+        self.assertEqual(nav.trailing_container.alignment, ft.Alignment.BOTTOM_LEFT)
 
-        # 2. Toggle to compact mode: Trailing swaps to icon button
+        # 2. Toggle to compact mode: Trailing swaps to icon button centered at bottom
         nav.handle_toggle_extended()
         self.assertFalse(nav.extended)
         self.assertIs(nav.trailing_container.content, nav.logout_icon_btn)
         self.assertEqual(nav.logout_icon_btn.icon, ft.Icons.LOGOUT)
+        self.assertEqual(nav.trailing_container.alignment, ft.Alignment.BOTTOM_CENTER)
 
         # 3. Toggle back to extended mode
         nav.handle_toggle_extended()
         self.assertTrue(nav.extended)
         self.assertIs(nav.trailing_container.content, nav.logout_full_btn)
+        self.assertEqual(nav.trailing_container.alignment, ft.Alignment.BOTTOM_LEFT)
 
         # 4. Clicking logout in navigation triggers confirmation dialog
         nav.logout_full_btn.on_click(None)

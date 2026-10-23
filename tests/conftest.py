@@ -98,3 +98,42 @@ def isolated_test_database():
                     f.unlink()
                 except Exception:
                     pass
+
+        # Clean up any session-level test theme preferences
+        theme_test_file = project_root / "config" / "theme_preference_test.json"
+        if theme_test_file.exists():
+            try:
+                theme_test_file.unlink()
+            except Exception:
+                pass
+
+
+@pytest.fixture(autouse=True)
+def isolated_theme_state():
+    """
+    Ensures every test runs against a clean 'minimalism' theme baseline.
+    Removes temporary theme persistence files and database records before and after each test.
+    """
+    from ui.themes.theme import ThemeManager
+    from ui.themes.theme_manager import ThemePersistence
+    from core.database.engine import DatabaseEngine
+
+    def _reset():
+        storage_path = ThemePersistence._get_storage_path()
+        if storage_path.exists():
+            try:
+                storage_path.unlink()
+            except Exception:
+                pass
+        if DatabaseEngine.is_initialized():
+            try:
+                with DatabaseEngine.connection() as conn:
+                    conn.execute("DELETE FROM institute_settings WHERE key = 'active_theme'")
+            except Exception:
+                pass
+        ThemeManager().set_theme("minimalism", persist=False)
+
+    _reset()
+    yield
+    _reset()
+

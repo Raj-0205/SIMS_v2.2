@@ -9,8 +9,18 @@ from ui.themes.theme import AppTheme
 from ui.widgets.hover_card import HoverCard
 from ui.widgets.badge import StatusBadge
 
-__all__ = ["AboutSIMSDialog", "open_about_dialog", "build_about_content", "ARP_GROUP_NAME", "ARP_GROUP_URL", "COPYRIGHT_NOTICE"]
+__all__ = [
+    "AboutSIMSDialog",
+    "AboutScreenView",
+    "open_about_dialog",
+    "build_about_content",
+    "APP_FULL_NAME",
+    "ARP_GROUP_NAME",
+    "ARP_GROUP_URL",
+    "COPYRIGHT_NOTICE",
+]
 
+APP_FULL_NAME = "Sudharm Infotech Management System"
 ARP_GROUP_NAME = "The ARP Group"
 ARP_GROUP_URL = "https://arpgroup.ai.studio"
 COPYRIGHT_NOTICE = "© 2026 The ARP Group. All Rights Reserved."
@@ -60,7 +70,7 @@ def build_about_content(show_full_page: bool = False) -> ft.Control:
                             vertical_alignment=ft.CrossAxisAlignment.CENTER,
                         ),
                         ft.Text(
-                            "Student Information Management System",
+                            APP_FULL_NAME,
                             size=AppTheme.SIZE_BODY,
                             color=AppTheme.TEXT_SECONDARY,
                             weight=ft.FontWeight.W_500,
@@ -331,3 +341,20 @@ def open_about_dialog(page: ft.Page) -> AboutSIMSDialog:
         except Exception:
             pass
     return dlg
+
+
+class AboutScreenView(ft.Container):
+    """
+    Full-page enterprise About & Copyright view mounted inside ContentHost for /about route.
+    """
+
+    def __init__(self):
+        super().__init__(
+            content=build_about_content(show_full_page=True),
+            padding=AppTheme.PAD_SM,
+            expand=True,
+        )
+
+    def load_data(self) -> None:
+        pass
+

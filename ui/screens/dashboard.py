@@ -631,6 +631,9 @@ class DashboardScreen(ft.Row):
                 view = BatchHome()
             elif route == "/control-center":
                 view = ControlCenterScreen(self._page, on_navigate=self.on_route_request)
+            elif route == "/about":
+                from ui.widgets.about_dialog import AboutScreenView
+                view = AboutScreenView()
             else:
                 view = DashboardHome(on_navigate=self.on_route_request)
 

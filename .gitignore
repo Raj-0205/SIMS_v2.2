@@ -39,3 +39,7 @@ database/*.db
 database/*.db-shm
 database/*.db-wal
 database/*.db.*
+
+# User runtime preferences
+config/theme_preference*.json
+

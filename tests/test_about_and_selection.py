@@ -23,6 +23,7 @@ from ui.widgets.about_dialog import (
     open_about_dialog,
     build_about_content,
     open_arp_website,
+    APP_FULL_NAME,
     ARP_GROUP_NAME,
     ARP_GROUP_URL,
     COPYRIGHT_NOTICE,
@@ -183,6 +184,9 @@ class TestAboutAndUniversalTextSelection(unittest.TestCase):
         self.assertIn(ARP_GROUP_URL, combined_text)
         self.assertIn("SIMS", combined_text)
         self.assertIn("v2.2 Enterprise", combined_text)
+        self.assertIn(APP_FULL_NAME, combined_text)
+        self.assertIn("Sudharm Infotech Management System", combined_text)
+        self.assertNotIn("Student Information Management System", combined_text)
         self.assertIn(COPYRIGHT_NOTICE, combined_text)
         self.assertIn("Proprietary Enterprise License", combined_text)
 
@@ -207,21 +211,39 @@ class TestAboutAndUniversalTextSelection(unittest.TestCase):
         self.assertTrue(opened_dlg.open)
 
     def test_05_navigation_menu_about_triggers(self):
-        """Verifies NavigationMenu brand header and info button trigger open_about_dialog."""
+        """Verifies NavigationMenu brand header triggers open_about_dialog and header is clean without extra info icon."""
         nav = NavigationMenu(on_nav_change=lambda r: None)
         self.page.controls.append(nav)
         nav._page = self.page
 
+        # Attribute retained for backward compatibility
         self.assertTrue(hasattr(nav, "about_btn"))
         self.assertEqual(nav.about_btn.icon, ft.Icons.INFO_OUTLINE)
+
+        # But header controls row does NOT contain about_btn (clean header)
+        header_row = nav.header_container.content
+        self.assertNotIn(nav.about_btn, header_row.controls)
+        right_header_buttons = header_row.controls[1]
+        self.assertNotIn(nav.about_btn, right_header_buttons.controls)
+
         self.assertTrue(hasattr(nav, "brand_row"))
 
-        # Trigger about dialog from about_btn
+        # Trigger about dialog from brand row / handle_open_about
         nav.handle_open_about()
         self.assertIsNotNone(self.page.dialog)
         self.assertIsInstance(self.page.dialog, AboutSIMSDialog)
         self.assertTrue(self.page.dialog.open)
 
+    def test_06_about_screen_view_full_page(self):
+        """Verifies AboutScreenView renders full-page view inside ContentHost for /about."""
+        from ui.widgets.about_dialog import AboutScreenView
+        view = AboutScreenView()
+        self.assertIsInstance(view, ft.Container)
+        self.assertTrue(view.expand)
+        self.assertIsNotNone(view.content)
+        self.assertIsInstance(view.content, ft.SelectionArea)
+
 
 if __name__ == "__main__":
     unittest.main()
+

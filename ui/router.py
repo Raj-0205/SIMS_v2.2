@@ -29,6 +29,7 @@ class AppRouter:
         "/batch",
         "/settings",
         "/control-center",
+        "/about",
     }
 
     def __init__(self, page: ft.Page) -> None:
