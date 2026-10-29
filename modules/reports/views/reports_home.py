@@ -11,6 +11,7 @@ from core.security.context import SecurityContext
 from modules.reports.controller import ReportsController
 from modules.course.controller import CourseController
 from shared.utils.os_helper import open_path_externally
+from shared.utils.export_helper import export_and_prompt_save
 from ui.themes.theme import AppTheme
 
 __all__ = ["ReportsHome"]
@@ -23,12 +24,15 @@ class ReportsHome(ft.Container):
     Tab 2: Payment Amount Search / Filter (Exact amount matches, e.g. ₹500, ₹1000)
     """
 
-    def __init__(self) -> None:
+    def __init__(self, page: Optional[ft.Page] = None) -> None:
         super().__init__(
             expand=True,
             padding=0,
             animate_size=ft.Animation(250, ft.AnimationCurve.EASE_OUT),
         )
+
+        self._page = page
+        self._root_page = page
 
         self.controller = ReportsController()
         self.course_controller = CourseController()
@@ -44,9 +48,9 @@ class ReportsHome(ft.Container):
         self.sort_by: Optional[str] = None
         self.filter_amount: float = 500.0
 
-        # Pagination states for Tab 1 (Block size: 30 records)
+        # Pagination states for Tab 1 (Default page size: 50 records)
         self.current_page: int = 1
-        self.page_size: int = 30
+        self.page_size: int = 50
         self.total_count: int = 0
         self.total_pages: int = 1
         self._courses_cache: Optional[list[Any]] = None
@@ -214,6 +218,25 @@ class ReportsHome(ft.Container):
             on_click=self.handle_toggle_controls,
         )
 
+        self.collect_payment_btn = ft.FilledButton(
+            "Collect Payment",
+            icon=ft.Icons.POINT_OF_SALE,
+            style=ft.ButtonStyle(
+                bgcolor=AppTheme.SUCCESS,
+                color=AppTheme.SURFACE,
+                shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+            ),
+            tooltip="Open payment gateway to collect fees or settle balances",
+            on_click=lambda _: self.handle_collect_payment(),
+        )
+
+        self.refresh_btn = ft.IconButton(
+            icon=ft.Icons.REFRESH,
+            icon_size=20,
+            tooltip="Refresh Fees & Invalidate Cache",
+            on_click=self.handle_sync_cache,
+        )
+
         header = ft.Row(
             controls=[
                 ft.Column(
@@ -238,6 +261,7 @@ class ReportsHome(ft.Container):
                     controls=[
                         self.cache_pill,
                         self.toggle_controls_btn,
+                        self.collect_payment_btn,
                         ft.FilledButton(
                             "Export Excel (.xlsx)",
                             icon=ft.Icons.TABLE_VIEW,
@@ -248,6 +272,7 @@ class ReportsHome(ft.Container):
                             ),
                             on_click=self.handle_export_excel,
                         ),
+                        self.refresh_btn,
                     ],
                     spacing=AppTheme.PAD_SM,
                 ),
@@ -304,8 +329,8 @@ class ReportsHome(ft.Container):
             visible=False,
         )
 
-        # Body Container
-        self.body_container = ft.Container(content=self._build_skeleton(), expand=True)
+        # Body Container initialized directly with the active fees report tab
+        self.body_container = ft.Container(content=self._build_fees_report_tab(), expand=True)
 
         self.content = ft.Column(
             controls=[
@@ -353,20 +378,74 @@ class ReportsHome(ft.Container):
             self.body_container.content = self._build_amount_filter_tab()
             self._safe_update()
 
-    def _safe_update(self) -> None:
+    def did_mount(self) -> None:
+        """
+        Lifecycle hook invoked automatically by Flet when the control
+        is mounted into the live page tree and self.page is accessible.
+        Ensures immediate rendering of the fees report without requiring user interaction.
+        """
         p = self.safe_page
         if p:
+            self._page = p
+            self._root_page = p
+
+        from core.cache.fees_cache import FeesCacheManager
+        if not self.report_data or not self._active_data_table:
+            if FeesCacheManager.is_loaded():
+                self._perform_query_and_render()
+            else:
+                self.load_data(sync=True)
+
+        self._safe_update()
+        p = self.safe_page
+        if p and hasattr(p, "update"):
             try:
-                self.update()
-            except RuntimeError:
+                p.update()
+            except Exception:
+                pass
+
+    def _safe_update(self) -> None:
+        """
+        Safely dispatches UI updates to the active Flet page session.
+        Explicitly updates mutated sub-controls (table_area, pagination controls, KPI container, etc.)
+        as well as the parent container, ensuring Flet's sparse change tracking captures
+        all modifications and renders immediately without requiring secondary user interaction.
+        """
+        for ctrl in [
+            getattr(self, "table_area", None),
+            getattr(self, "pagination_card", None),
+            getattr(self, "pagination_info", None),
+            getattr(self, "prev_page_btn", None),
+            getattr(self, "next_page_btn", None),
+            getattr(self, "kpi_cards_container", None),
+            getattr(self, "body_container", None),
+            getattr(self, "cache_status_text", None),
+            getattr(self, "cache_pill", None),
+        ]:
+            if ctrl is not None:
+                try:
+                    ctrl.update()
+                except Exception:
+                    pass
+
+        try:
+            self.update()
+        except Exception:
+            pass
+
+        p = getattr(self, "safe_page", None)
+        if p and hasattr(p, "update"):
+            try:
+                p.update()
+            except Exception:
                 pass
 
     @property
     def safe_page(self) -> Optional[ft.Page]:
         try:
-            return self.page
+            return getattr(self, "_root_page", None) or self.page or getattr(self, "_page", None)
         except (RuntimeError, AttributeError):
-            return getattr(self, "_page", None)
+            return getattr(self, "_root_page", None) or getattr(self, "_page", None)
 
     def show_toast(self, message: str, is_error: bool = False, is_success: bool = False) -> None:
         self.toast_text.value = message
@@ -385,51 +464,70 @@ class ReportsHome(ft.Container):
         or synchronous fetch when running in unit tests / headless.
         """
         if self.active_tab == 0:
-            self.body_container.content = self._build_fees_report_tab()
+            if not hasattr(self, "table_area") or self.table_area is None:
+                self.body_container.content = self._build_fees_report_tab()
+            from core.cache.fees_cache import FeesCacheManager
+            if FeesCacheManager.is_loaded() or sync:
+                self._perform_query_and_render()
+            else:
+                self._trigger_load_data(sync=False)
             self._safe_update()
-            self._trigger_load_data(sync=sync)
+            p = self.safe_page
+            if p and hasattr(p, "update"):
+                try:
+                    p.update()
+                except Exception:
+                    pass
         else:
             self.body_container.content = self._build_amount_filter_tab()
             self._safe_update()
 
     def _trigger_load_data(self, sync: bool = False) -> None:
-        """Sets loading animation, updates UI immediately, and executes progressive chunked worker."""
+        """Sets loading animation, updates UI immediately, and executes single-shot page loader."""
         self._load_generation += 1
         current_gen = self._load_generation
 
-        # If headless/unit-test (no page attached) or explicitly requested sync:
-        if sync or self.safe_page is None:
+        # If headless/unit-test (no page attached, or mock page without real session), sync requested,
+        # or bulk in-memory cache is already loaded: render synchronously without delay or worker thread!
+        is_mock_or_headless = self.safe_page is None or not hasattr(self.safe_page, "session")
+        from core.cache.fees_cache import FeesCacheManager
+        if sync or is_mock_or_headless or FeesCacheManager.is_loaded():
             self._perform_query_and_render()
             return
 
         # ── CACHE-FIRST CHECK: Instant zero-flicker render on cache hit ──
         status_param = None if self.selected_status == "ALL" else self.selected_status
-        status_clean = (status_param or "ALL").strip().upper()
-        search_clean = (self.search_text or "").strip()
-        sort_clean = (self.sort_by or "NONE").strip().upper()
-        base_offset = (self.current_page - 1) * self.page_size
-        chunk_size = 10
-        first_limit = min(chunk_size, self.page_size)
-        chunk_key = (self.selected_course_id, status_clean, search_clean, sort_clean, base_offset, first_limit)
-        count_key = (self.selected_course_id, status_clean, search_clean)
-
         from core.cache.fees_cache import FeesCacheManager
-        cached_chunk = FeesCacheManager.get_block(chunk_key)
+        page_key = FeesCacheManager.make_page_key(
+            self.selected_course_id,
+            status_param,
+            self.search_text,
+            self.sort_by,
+            self.page_size,
+            self.current_page,
+        )
+        count_key = FeesCacheManager.make_count_key(
+            self.selected_course_id,
+            status_param,
+            self.search_text,
+        )
+
+        cached_block = FeesCacheManager.get_block(page_key)
         cached_count = FeesCacheManager.get_total_count(count_key)
 
-        if cached_chunk is not None and cached_count is not None:
+        if cached_block is not None and cached_count is not None:
             self.total_count = cached_count
             self.total_pages = max(1, (self.total_count + self.page_size - 1) // self.page_size)
-            self.report_data = list(cached_chunk)
+            self.report_data = list(cached_block)
             if hasattr(self, "table_area") and self.table_area:
                 self.table_area.content = self._build_table_view() if self.report_data else self._build_empty_view()
 
-            target_page_rows = min(self.page_size, max(0, self.total_count - base_offset))
-            start_item = base_offset + 1 if self.total_count > 0 else 0
-            end_item = min(self.total_count, base_offset + len(self.report_data))
+            start_item = (self.current_page - 1) * self.page_size + 1 if self.total_count > 0 else 0
+            end_item = min(self.total_count, (self.current_page - 1) * self.page_size + len(self.report_data))
             if hasattr(self, "pagination_info") and self.pagination_info:
                 self.pagination_info.value = (
-                    f"Showing {start_item} - {end_item} of {self.total_count} admissions (Page {self.current_page} of {self.total_pages})"
+                    f"Showing {start_item} - {end_item} of {self.total_count} admissions "
+                    f"(Page {self.current_page} of {self.total_pages})"
                     if self.total_count > 0 else "Showing 0 of 0 admissions"
                 )
             if hasattr(self, "prev_page_btn") and self.prev_page_btn:
@@ -439,12 +537,19 @@ class ReportsHome(ft.Container):
             if hasattr(self, "streaming_badge") and self.streaming_badge:
                 self.streaming_badge.visible = False
 
+            self._rendered_cache_version = FeesCacheManager.get_version()
+            self._rendered_filter_state = (
+                self.selected_course_id,
+                self.selected_status,
+                self.search_text,
+                self.sort_by,
+                self.current_page,
+                self.page_size,
+            )
             self._update_cache_badge()
             self._update_kpi_cards()
             self._safe_update()
-
-            if len(self.report_data) >= target_page_rows:
-                return
+            return
 
         # Live UI: Immediately show animated loading indicator in the table area
         if hasattr(self, "table_area") and self.table_area:
@@ -467,7 +572,7 @@ class ReportsHome(ft.Container):
                 SecurityContext.set_current_user(user_id=user_id, username=username, role=role)
                 if current_gen != self._load_generation:
                     return
-                self._stream_chunks_and_render(current_gen)
+                self._load_page_data(current_gen)
             except Exception as ex:
                 LogService.error(f"Error loading fees report: {ex}", context="ReportsHome")
                 if current_gen == self._load_generation:
@@ -476,38 +581,29 @@ class ReportsHome(ft.Container):
         worker_thread = threading.Thread(target=_worker, daemon=True)
         worker_thread.start()
 
-    def _stream_chunks_and_render(self, current_gen: int) -> None:
+    def _load_page_data(self, current_gen: int) -> None:
         """
-        Progressively streams micro-chunks (10 records each).
-        Immediately dismisses central loading animation upon arrival of Chunk 1,
-        and smoothly appends subsequent chunks in the background.
+        Loads the active page in a single shot (default 50 rows)
+        and renders the dual-table view without micro-chunk redraws.
         """
         status_param = None if self.selected_status == "ALL" else self.selected_status
-        base_offset = (self.current_page - 1) * self.page_size
-        chunk_size = 10
-        first_limit = min(chunk_size, self.page_size)
-
-        # ── CHUNK 1 (Immediate First 10 Records) ──
-        res1 = self.controller.get_admission_fees_report_chunk(
+        result = self.controller.get_admission_fees_report_paginated(
             course_id=self.selected_course_id,
             status=status_param,
             search=self.search_text,
             sort_by=self.sort_by,
-            offset=base_offset,
-            limit=first_limit,
+            page=self.current_page,
+            page_size=self.page_size,
         )
 
         if current_gen != self._load_generation:
             return
 
-        self.total_count = res1["total_count"]
-        self.total_pages = max(1, (self.total_count + self.page_size - 1) // self.page_size)
-        self.report_data = list(res1["rows"])
+        self.report_data = list(result["rows"])
+        self.total_count = result["total_count"]
+        self.total_pages = max(1, result["total_pages"])
+        self.current_page = result["page"]
 
-        # Determine target records for current page
-        target_page_rows = min(self.page_size, max(0, self.total_count - base_offset))
-
-        # Handle empty dataset
         if self.total_count == 0 or not self.report_data:
             self.report_data = []
             if hasattr(self, "table_area") and self.table_area:
@@ -520,151 +616,61 @@ class ReportsHome(ft.Container):
                 self.next_page_btn.disabled = True
             if hasattr(self, "streaming_badge") and self.streaming_badge:
                 self.streaming_badge.visible = False
+            self._update_cache_badge()
+            self._update_kpi_cards()
             self._safe_update()
             return
 
-        # RENDER CHUNK 1: Instantly dismisses central loading spinner!
         if hasattr(self, "table_area") and self.table_area:
             self.table_area.content = self._build_table_view()
 
-        # Update pagination numbers and navigation buttons
-        start_item = base_offset + 1
+        start_item = (self.current_page - 1) * self.page_size + 1 if self.total_count > 0 else 0
+        end_item = min(self.total_count, (self.current_page - 1) * self.page_size + len(self.report_data))
         if hasattr(self, "pagination_info") and self.pagination_info:
             self.pagination_info.value = (
-                f"Showing {start_item} - {min(self.total_count, base_offset + target_page_rows)} of {self.total_count} admissions "
+                f"Showing {start_item} - {end_item} of {self.total_count} admissions "
                 f"(Page {self.current_page} of {self.total_pages})"
             )
         if hasattr(self, "prev_page_btn") and self.prev_page_btn:
             self.prev_page_btn.disabled = self.current_page <= 1
         if hasattr(self, "next_page_btn") and self.next_page_btn:
             self.next_page_btn.disabled = self.current_page >= self.total_pages
-
-        # Check if more chunks needed for this page
-        if len(self.report_data) < target_page_rows:
-            if hasattr(self, "streaming_badge") and self.streaming_badge:
-                self.streaming_text.value = f"Streaming: {len(self.report_data)} of {target_page_rows} loaded..."
-                self.streaming_badge.visible = True
-        else:
-            if hasattr(self, "streaming_badge") and self.streaming_badge:
-                self.streaming_badge.visible = False
-
-        self._safe_update()
-
-        # ── SUBSEQUENT CHUNKS (Streaming in batches of 10) ──
-        while len(self.report_data) < target_page_rows:
-            if current_gen != self._load_generation:
-                return
-
-            next_offset = base_offset + len(self.report_data)
-            next_limit = min(chunk_size, target_page_rows - len(self.report_data))
-
-            res_next = self.controller.get_admission_fees_report_chunk(
-                course_id=self.selected_course_id,
-                status=status_param,
-                search=self.search_text,
-                sort_by=self.sort_by,
-                offset=next_offset,
-                limit=next_limit,
-            )
-
-            if current_gen != self._load_generation:
-                return
-
-            next_rows = res_next["rows"]
-            if not next_rows:
-                break
-
-            self.report_data.extend(next_rows)
-            new_data_rows = [self._create_table_row(r) for r in next_rows]
-            if self._active_data_table:
-                self._active_data_table.rows.extend(new_data_rows)
-
-            if len(self.report_data) >= target_page_rows:
-                if hasattr(self, "streaming_badge") and self.streaming_badge:
-                    self.streaming_badge.visible = False
-            else:
-                if hasattr(self, "streaming_badge") and self.streaming_badge:
-                    self.streaming_text.value = f"Streaming: {len(self.report_data)} of {target_page_rows} loaded..."
-
-            self._safe_update()
-
-        from core.cache.fees_cache import FeesCacheManager
-        self._rendered_cache_version = FeesCacheManager.get_version()
-        self._rendered_filter_state = (
-            self.selected_course_id,
-            self.selected_status,
-            self.search_text,
-            self.sort_by,
-            self.current_page,
-            self.page_size,
-        )
-        self._update_cache_badge()
-        self._update_kpi_cards()
-        self._safe_update()
-
-    def _perform_query_and_render(self) -> None:
-        """Executes database query and updates table & pagination controls."""
-        status_param = None if self.selected_status == "ALL" else self.selected_status
-        result = self.controller.get_admission_fees_report_paginated(
-            course_id=self.selected_course_id,
-            status=status_param,
-            search=self.search_text,
-            sort_by=self.sort_by,
-            page=self.current_page,
-            page_size=self.page_size,
-        )
-
-        self.report_data = result["rows"]
-        self.total_count = result["total_count"]
-        self.total_pages = max(1, result["total_pages"])
-        self.current_page = result["page"]
-
-        from core.cache.fees_cache import FeesCacheManager
-        self._rendered_cache_version = FeesCacheManager.get_version()
-        self._rendered_filter_state = (
-            self.selected_course_id,
-            self.selected_status,
-            self.search_text,
-            self.sort_by,
-            self.current_page,
-            self.page_size,
-        )
-
         if hasattr(self, "streaming_badge") and self.streaming_badge:
             self.streaming_badge.visible = False
 
-        # Render table in table area
-        if hasattr(self, "table_area") and self.table_area:
-            self.table_area.content = self._build_table_view()
-
-        # Update Pagination Bar
-        start_item = (self.current_page - 1) * self.page_size + 1 if self.total_count > 0 else 0
-        end_item = min(self.total_count, self.current_page * self.page_size)
-
-        if hasattr(self, "pagination_info") and self.pagination_info:
-            self.pagination_info.value = (
-                f"Showing {start_item} - {end_item} of {self.total_count} admissions (Page {self.current_page} of {self.total_pages})"
-                if self.total_count > 0 else "Showing 0 of 0 admissions"
-            )
-        if hasattr(self, "prev_page_btn") and self.prev_page_btn:
-            self.prev_page_btn.disabled = self.current_page <= 1
-        if hasattr(self, "next_page_btn") and self.next_page_btn:
-            self.next_page_btn.disabled = self.current_page >= self.total_pages
+        from core.cache.fees_cache import FeesCacheManager
+        self._rendered_cache_version = FeesCacheManager.get_version()
+        self._rendered_filter_state = (
+            self.selected_course_id,
+            self.selected_status,
+            self.search_text,
+            self.sort_by,
+            self.current_page,
+            self.page_size,
+        )
         self._update_cache_badge()
         self._update_kpi_cards()
         self._safe_update()
 
+    def _stream_chunks_and_render(self, current_gen: int) -> None:
+        """Backward compatibility alias delegating to single-shot page loader."""
+        self._load_page_data(current_gen)
+
+    def _perform_query_and_render(self) -> None:
+        """Executes single-shot query and updates table & pagination controls (used for sync / headless)."""
+        self._load_page_data(self._load_generation)
+
     def _get_cached_courses(self) -> list[Any]:
         if self._courses_cache is None:
-            courses, _ = self.course_controller.list_courses(limit=100)
-            self._courses_cache = courses
+            try:
+                courses, _ = self.course_controller.list_courses(limit=100)
+                self._courses_cache = courses
+            except Exception:
+                self._courses_cache = []
         return self._courses_cache
 
-    def handle_export_csv(self, e: ft.ControlEvent) -> None:
-        """Delegates export to professional Excel (.xlsx) format per template specifications."""
-        self.handle_export_excel(e)
-
-    def handle_export_excel(self, e: ft.ControlEvent) -> None:
+    def handle_export_excel(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Exports filtered fees report to Excel (.xlsx) with custom save prompt."""
         try:
             status_param = None if self.selected_status == "ALL" else self.selected_status
             path = self.controller.export_filtered_fees_report_excel(
@@ -673,10 +679,79 @@ class ReportsHome(ft.Container):
                 search=self.search_text,
                 sort_by=self.sort_by,
             )
-            self.show_toast(f"Excel Report (.xlsx) exported successfully: {path.name}", is_success=True)
-            open_path_externally(path.parent)
+            export_and_prompt_save(
+                source_file_path=path,
+                dialog_title="Save Fee Report As",
+                allowed_extensions=[".xlsx"],
+                show_toast=self.show_toast,
+            )
         except Exception as ex:
             self.show_toast(f"Excel export error: {ex}", is_error=True)
+
+    def handle_export_csv(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Exports filtered fees report to CSV format with custom save prompt."""
+        try:
+            status_param = None if self.selected_status == "ALL" else self.selected_status
+            path = self.controller.export_filtered_fees_report_csv(
+                course_id=self.selected_course_id,
+                status=status_param,
+                search=self.search_text,
+                sort_by=self.sort_by,
+            )
+            export_and_prompt_save(
+                source_file_path=path,
+                dialog_title="Save Fee Report CSV As",
+                allowed_extensions=[".csv"],
+                show_toast=self.show_toast,
+            )
+        except Exception as ex:
+            self.show_toast(f"CSV export error: {ex}", is_error=True)
+
+    def handle_collect_payment(self, admission_id: Optional[int] = None) -> None:
+        """Opens smooth Payment Gateway modal from Fees Module."""
+        p = self.safe_page
+        if not p:
+            return
+        from modules.admission.views.payment_dialog import PaymentDialog
+        dlg = PaymentDialog(
+            admission_id=admission_id,
+            page=p,
+            on_payment_completed=lambda pid: self.handle_sync_cache(None),
+        )
+        p.show_dialog(dlg)
+
+    def handle_collect_payment_for_row(self, r: dict[str, Any]) -> None:
+        """Opens pre-filled Payment Gateway modal for a specific student with outstanding balance."""
+        p = self.safe_page
+        if not p:
+            return
+        from modules.admission.views.payment_dialog import PaymentDialog
+        adm_id_raw = r.get("admission_id_raw")
+        dlg = PaymentDialog(
+            admission_id=int(adm_id_raw) if adm_id_raw else None,
+            student_name=r.get("name", ""),
+            course_name=r.get("course_name", ""),
+            candidate_number=r.get("admission_id", ""),
+            total_fee=float(r.get("total_fees", 0.0)),
+            already_paid=float(r.get("total_paid", 0.0)),
+            page=p,
+            on_payment_completed=lambda pid: self.handle_sync_cache(None),
+        )
+        p.show_dialog(dlg)
+
+    def handle_view_receipt(self, payment_id: int) -> None:
+        """Opens Receipt Dialog for a recorded payment."""
+        p = self.safe_page
+        if not p:
+            return
+        from modules.receipts.controller import ReceiptController
+        from modules.admission.views.receipt_dialog import ReceiptDialog
+        r_dto = ReceiptController().get_receipt_by_payment(payment_id)
+        if r_dto:
+            dlg = ReceiptDialog(receipt=r_dto)
+            p.show_dialog(dlg)
+        else:
+            self.show_toast(f"No receipt found for Payment #{payment_id}", is_error=True)
 
     # ── TAB 1: ADMISSION FEES REPORT (SHELL & 17 COLUMNS) ──
     def _build_fees_report_tab(self) -> ft.Container:
@@ -831,11 +906,10 @@ class ReportsHome(ft.Container):
             content_padding=ft.Padding(8, 6, 8, 6),
             border_radius=AppTheme.RADIUS_MD,
             options=[
-                ft.DropdownOption(key="30", text="30 / page"),
-                ft.DropdownOption(key="60", text="60 / page"),
-                ft.DropdownOption(key="90", text="90 / page"),
                 ft.DropdownOption(key="10", text="10 / page"),
+                ft.DropdownOption(key="30", text="30 / page"),
                 ft.DropdownOption(key="50", text="50 / page"),
+                ft.DropdownOption(key="100", text="100 / page"),
             ],
             on_select=self._handle_page_size_change,
         )
@@ -853,7 +927,7 @@ class ReportsHome(ft.Container):
             on_click=self._handle_next_page,
         )
 
-        pagination_card = ft.Container(
+        self.pagination_card = ft.Container(
             content=ft.Row(
                 controls=[
                     ft.Row(
@@ -891,7 +965,7 @@ class ReportsHome(ft.Container):
                     self.kpi_cards_container,
                     self.filter_card,
                     self.table_area,
-                    pagination_card,
+                    self.pagination_card,
                 ],
                 spacing=AppTheme.PAD_SM,
                 expand=True,
@@ -964,6 +1038,19 @@ class ReportsHome(ft.Container):
         st_color = AppTheme.SUCCESS if st in ("CONFIRMED", "REGISTERED") else (AppTheme.DANGER if st == "CANCELLED" else AppTheme.PRIMARY)
         st_bg = AppTheme.SUCCESS_LIGHT if st in ("CONFIRMED", "REGISTERED") else (AppTheme.DANGER_LIGHT if st == "CANCELLED" else AppTheme.PRIMARY_LIGHT)
 
+        pending = float(r.get("pending_fees", 0.0))
+        action_btn = (
+            ft.IconButton(
+                icon=ft.Icons.PAYMENTS,
+                icon_color=AppTheme.SUCCESS,
+                icon_size=20,
+                tooltip=f"Collect Payment (Pending: ₹{pending:,.2f})",
+                on_click=lambda _, row_data=r: self.handle_collect_payment_for_row(row_data),
+            )
+            if pending > 0
+            else ft.Icon(ft.Icons.CHECK_CIRCLE, color=AppTheme.SUCCESS, size=20)
+        )
+
         return ft.DataRow(
             cells=[
                 ft.DataCell(ft.Text(str(r["sr_no"]), size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY, width=55)),
@@ -991,6 +1078,7 @@ class ReportsHome(ft.Container):
                 ft.DataCell(ft.Text(r["address"] or "—", size=AppTheme.SIZE_BODY, no_wrap=True, max_lines=1, overflow=ft.TextOverflow.ELLIPSIS, width=150)),
                 ft.DataCell(ft.Text(r["friend_name"] or "—", size=AppTheme.SIZE_BODY, no_wrap=True, width=120)),
                 ft.DataCell(ft.Text(r["friend_mobile"] or "—", size=AppTheme.SIZE_BODY, no_wrap=True, width=110)),
+                ft.DataCell(ft.Container(content=action_btn, width=70, alignment=ft.Alignment(0, 0))),
             ]
         )
 
@@ -1020,6 +1108,7 @@ class ReportsHome(ft.Container):
             ("ADDRESS / RESIDENCE", 150, False),
             ("FRIEND NAME", 120, False),
             ("FRIEND CONTACT", 110, False),
+            ("ACTION", 70, False),
         ]
 
         header_cols = [
@@ -1144,9 +1233,22 @@ class ReportsHome(ft.Container):
 
     def _handle_page_size_change(self, e: ft.ControlEvent) -> None:
         try:
-            self.page_size = int(self.page_size_dropdown.value)
+            val = getattr(e, "data", None) or (self.page_size_dropdown.value if hasattr(self, "page_size_dropdown") and self.page_size_dropdown else None)
+            if val:
+                self.page_size = int(val)
+                if hasattr(self, "page_size_dropdown") and self.page_size_dropdown:
+                    self.page_size_dropdown.value = str(val)
+            else:
+                self.page_size = int(self.page_size_dropdown.value)
             self.current_page = 1
-            self._trigger_load_data()
+            self._trigger_load_data(sync=True)
+            self._safe_update()
+            p = self.safe_page
+            if p and hasattr(p, "update"):
+                try:
+                    p.update()
+                except Exception:
+                    pass
         except (ValueError, TypeError):
             pass
 
@@ -1225,6 +1327,14 @@ class ReportsHome(ft.Container):
                         ),
                         ft.DataCell(ft.Text(p["payment_date"], size=AppTheme.SIZE_BODY)),
                         ft.DataCell(ft.Text(p["collector_name"], size=AppTheme.SIZE_BODY)),
+                        ft.DataCell(
+                            ft.IconButton(
+                                icon=ft.Icons.RECEIPT_LONG,
+                                icon_color=AppTheme.PRIMARY,
+                                tooltip=f"View Receipt #{p['payment_id']}",
+                                on_click=lambda _, pid=p["payment_id"]: self.handle_view_receipt(pid),
+                            )
+                        ),
                     ]
                 )
             )
@@ -1241,6 +1351,7 @@ class ReportsHome(ft.Container):
                 ft.DataColumn(ft.Text("Mode", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_CAPTION)),
                 ft.DataColumn(ft.Text("Payment Date", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_CAPTION)),
                 ft.DataColumn(ft.Text("Collected By", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_CAPTION)),
+                ft.DataColumn(ft.Text("Receipt", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_CAPTION)),
             ],
             rows=rows,
             heading_row_color=AppTheme.SURFACE_VARIANT,

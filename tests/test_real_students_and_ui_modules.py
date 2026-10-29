@@ -340,7 +340,10 @@ class TestRealStudentsAndUIModules(unittest.TestCase):
         pay_dlg.pin_input.value = "1234"
         pay_dlg.mode_dropdown.value = "CASH"
         pay_dlg.handle_confirm_payment(None)
-        # Should pop dialog after completion
+        # Should pop payment dialog and display receipt dialog
+        self.assertIsNotNone(self.page.dialog)
+        self.assertIsInstance(self.page.dialog, ReceiptDialog)
+        self.page.dialog.close_modal()
         self.assertIsNone(self.page.dialog)
 
         # Verify updated admission balance

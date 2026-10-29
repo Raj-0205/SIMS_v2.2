@@ -1,6 +1,6 @@
 # modules/attendance/views/offline_upload_modal.py
 
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 import flet as ft
@@ -26,12 +26,13 @@ class OfflineUploadModal(ft.AlertDialog):
         batch_name: str,
         session_date: Optional[str] = None,
         on_saved: Optional[Callable[[], None]] = None,
+        on_success: Optional[Callable[[], None]] = None,
         controller: Optional[AttendanceController] = None,
     ):
         self.batch_id = batch_id
         self.batch_name = batch_name
         self.session_date = session_date or datetime.now().strftime("%Y-%m-%d")
-        self.on_saved = on_saved
+        self.on_saved = on_saved or on_success
         self.controller = controller or AttendanceController()
 
         self.selected_file_path: Optional[str] = None
@@ -122,45 +123,49 @@ class OfflineUploadModal(ft.AlertDialog):
         self.cancel_btn = ft.TextButton("Cancel", on_click=lambda _: self._close())
 
         content = ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Text(
-                        f"Batch: {self.batch_name}  •  Upload marked physical attendance sheet",
-                        size=AppTheme.SIZE_BODY,
-                        color=AppTheme.TEXT_SECONDARY,
-                    ),
-                    ft.Row(
-                        controls=[
-                            self.date_field,
-                            self.browse_btn,
-                            self.scan_btn,
-                        ],
-                        spacing=10,
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                    ),
-                    self.file_path_text,
-                    ft.Row(
-                        controls=[self.progress_ring, self.status_msg],
-                        spacing=10,
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                    ),
-                    ft.Divider(height=1, color=AppTheme.BORDER),
-                    self.reconciliation_container,
-                ],
-                spacing=10,
-                tight=True,
+            content=ft.SelectionArea(
+                content=ft.Column(
+                    controls=[
+                        ft.Text(
+                            f"Batch: {self.batch_name}  •  Upload marked physical attendance sheet",
+                            size=AppTheme.SIZE_BODY,
+                            color=AppTheme.TEXT_SECONDARY,
+                        ),
+                        ft.Row(
+                            controls=[
+                                self.date_field,
+                                self.browse_btn,
+                                self.scan_btn,
+                            ],
+                            spacing=10,
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        ),
+                        self.file_path_text,
+                        ft.Row(
+                            controls=[self.progress_ring, self.status_msg],
+                            spacing=10,
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        ),
+                        ft.Divider(height=1, color=AppTheme.BORDER),
+                        self.reconciliation_container,
+                    ],
+                    spacing=10,
+                    tight=True,
+                )
             ),
             width=620,
             padding=ft.Padding(4, 4, 4, 4),
         )
 
         super().__init__(
-            title=ft.Row(
-                controls=[
-                    ft.Icon(ft.Icons.DOCUMENT_SCANNER, color=AppTheme.PRIMARY),
-                    ft.Text("Upload Offline Presenty & OCR Scanner", weight=ft.FontWeight.BOLD),
-                ],
-                spacing=8,
+            title=ft.SelectionArea(
+                content=ft.Row(
+                    controls=[
+                        ft.Icon(ft.Icons.DOCUMENT_SCANNER, color=AppTheme.PRIMARY),
+                        ft.Text("Upload Offline Presenty & OCR Scanner", weight=ft.FontWeight.BOLD),
+                    ],
+                    spacing=8,
+                )
             ),
             content=content,
             actions=[self.cancel_btn, self.commit_btn],
@@ -187,9 +192,9 @@ class OfflineUploadModal(ft.AlertDialog):
         """Opens asynchronous, non-blocking file chooser."""
         p = getattr(self, "_root_page", None) or self.page or getattr(self, "_page", None)
 
-        def on_file_picked(path: Optional[str]):
+        def on_file_picked(path: Optional[Any]):
             if path and Path(path).is_file():
-                self.selected_file_path = path
+                self.selected_file_path = str(path)
                 file_name = Path(path).name
                 size_mb = round(Path(path).stat().st_size / (1024 * 1024), 2)
                 self.file_path_text.value = f"Selected: {file_name} ({size_mb} MB)"
@@ -327,6 +332,22 @@ class OfflineUploadModal(ft.AlertDialog):
         if not self.scan_result:
             return
 
+        try:
+            d = datetime.strptime(self.session_date, "%Y-%m-%d").date()
+            if d > date.today():
+                p = getattr(self, "_root_page", None) or self.page or getattr(self, "_page", None)
+                if p:
+                    snack = ft.SnackBar(
+                        content=ft.Text("Cannot mark attendance for future dates. Attendance cannot be recorded in advance.", color=AppTheme.SURFACE),
+                        bgcolor=AppTheme.DANGER,
+                    )
+                    p.overlay.append(snack)
+                    snack.open = True
+                    p.update()
+                return
+        except Exception:
+            pass
+
         student_marks = []
         for item in self.scan_result.items:
             sw = self.student_toggle_map.get(item.student_id)
@@ -345,7 +366,7 @@ class OfflineUploadModal(ft.AlertDialog):
                 batch_id=self.batch_id,
                 session_date=self.session_date,
                 student_marks=student_marks,
-                scanned_image_path=self.selected_file_path,
+                scanned_image_path=str(self.selected_file_path) if self.selected_file_path else None,
                 remarks="Imported from scanned physical sheet",
             )
 

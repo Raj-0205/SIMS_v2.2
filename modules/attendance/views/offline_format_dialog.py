@@ -9,6 +9,7 @@ from core.logger.service import LogService
 from modules.attendance.controller import AttendanceController
 from modules.attendance.dto import OfflineFormatConfigDTO
 from shared.utils.os_helper import open_path_externally
+from shared.utils.export_helper import export_and_prompt_save
 from ui.themes.theme import AppTheme
 
 
@@ -82,64 +83,68 @@ class OfflineFormatDialog(ft.AlertDialog):
         )
 
         content = ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Text(
-                        f"Customize physical attendance sheet for: {self.batch_name} ({self.course_name})",
-                        size=AppTheme.SIZE_BODY,
-                        color=AppTheme.TEXT_SECONDARY,
-                    ),
-                    ft.Divider(height=1, color=AppTheme.BORDER),
-                    ft.Text(
-                        "Administrator Column Customizer (Enable / Disable Columns):",
-                        size=AppTheme.SIZE_BODY,
-                        weight=ft.FontWeight.BOLD,
-                        color=AppTheme.TEXT_PRIMARY,
-                    ),
-                    ft.Container(
-                        content=ft.Column(
-                            controls=[
-                                self.chk_name,
-                                self.chk_mobile,
-                                self.chk_adm_date,
-                                self.chk_pending_fees,
-                                self.chk_course,
-                            ],
-                            spacing=4,
+            content=ft.SelectionArea(
+                content=ft.Column(
+                    controls=[
+                        ft.Text(
+                            f"Customize physical attendance sheet for: {self.batch_name} ({self.course_name})",
+                            size=AppTheme.SIZE_BODY,
+                            color=AppTheme.TEXT_SECONDARY,
                         ),
-                        bgcolor=AppTheme.SURFACE_VARIANT,
-                        padding=ft.Padding(12, 10, 12, 10),
-                        border_radius=AppTheme.RADIUS_MD,
-                    ),
-                    ft.Divider(height=1, color=AppTheme.BORDER),
-                    ft.Row(
-                        controls=[
-                            self.columns_count_dropdown,
-                            self.date_field,
-                        ],
-                        spacing=12,
-                    ),
-                    ft.Text(
-                        "Note: Generated Excel sheet contains designated OCR check boxes [ ✓ ] aligned for automated scanner ingestion.",
-                        size=AppTheme.SIZE_CAPTION,
-                        color=AppTheme.TEXT_MUTED,
-                        italic=True,
-                    ),
-                ],
-                spacing=12,
-                tight=True,
+                        ft.Divider(height=1, color=AppTheme.BORDER),
+                        ft.Text(
+                            "Administrator Column Customizer (Enable / Disable Columns):",
+                            size=AppTheme.SIZE_BODY,
+                            weight=ft.FontWeight.BOLD,
+                            color=AppTheme.TEXT_PRIMARY,
+                        ),
+                        ft.Container(
+                            content=ft.Column(
+                                controls=[
+                                    self.chk_name,
+                                    self.chk_mobile,
+                                    self.chk_adm_date,
+                                    self.chk_pending_fees,
+                                    self.chk_course,
+                                ],
+                                spacing=4,
+                            ),
+                            bgcolor=AppTheme.SURFACE_VARIANT,
+                            padding=ft.Padding(12, 10, 12, 10),
+                            border_radius=AppTheme.RADIUS_MD,
+                        ),
+                        ft.Divider(height=1, color=AppTheme.BORDER),
+                        ft.Row(
+                            controls=[
+                                self.columns_count_dropdown,
+                                self.date_field,
+                            ],
+                            spacing=12,
+                        ),
+                        ft.Text(
+                            "Note: Generated Excel sheet contains designated OCR check boxes [ ✓ ] aligned for automated scanner ingestion.",
+                            size=AppTheme.SIZE_CAPTION,
+                            color=AppTheme.TEXT_MUTED,
+                            italic=True,
+                        ),
+                    ],
+                    spacing=12,
+                    tight=True,
+                )
             ),
             width=500,
             padding=ft.Padding(6, 4, 6, 4),
         )
 
         super().__init__(
-            title=ft.Row(
-                controls=[
-                    ft.Icon(ft.Icons.TABLE_VIEW, color=AppTheme.PRIMARY),
-                    ft.Text("Print Offline Attendance Format", weight=ft.FontWeight.BOLD),
-                ],
-                spacing=8,
+            title=ft.SelectionArea(
+                content=ft.Row(
+                    controls=[
+                        ft.Icon(ft.Icons.TABLE_VIEW, color=AppTheme.PRIMARY),
+                        ft.Text("Print Offline Attendance Format", weight=ft.FontWeight.BOLD),
+                    ],
+                    spacing=8,
+                )
             ),
             content=content,
             actions=[self.cancel_btn, self.generate_btn],
@@ -177,7 +182,27 @@ class OfflineFormatDialog(ft.AlertDialog):
             )
 
             path_str = self.controller.generate_offline_format(config)
-            open_path_externally(Path(path_str))
+
+            def _notify(msg: str, is_error: bool = False, is_success: bool = False):
+                p = getattr(self, "_root_page", None) or self.page or getattr(self, "_page", None)
+                if p:
+                    snack = ft.SnackBar(
+                        content=ft.Text(msg, color=AppTheme.SURFACE),
+                        bgcolor=AppTheme.DANGER if is_error else (AppTheme.SUCCESS if is_success else AppTheme.PRIMARY),
+                    )
+                    p.overlay.append(snack)
+                    snack.open = True
+                    try:
+                        p.update()
+                    except Exception:
+                        pass
+
+            export_and_prompt_save(
+                source_file_path=path_str,
+                dialog_title="Save Attendance Sheet Format As",
+                allowed_extensions=[".xlsx"],
+                show_toast=_notify,
+            )
 
             if self.on_generated:
                 self.on_generated(path_str)

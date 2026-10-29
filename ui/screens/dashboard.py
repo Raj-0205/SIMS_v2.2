@@ -409,7 +409,7 @@ class ErrorRecoveryView(ft.Container):
             ),
         )
 
-        self.content = card
+        self.content = ft.SelectionArea(content=card)
 
 
 class DashboardScreen(ft.Row):
@@ -429,6 +429,7 @@ class DashboardScreen(ft.Row):
         self._page = page
         self.on_route_request = on_route_request
         self.on_back_request = on_back_request
+        self._nav_sequence: int = 0
 
         self.content_host = ContentHost()
 
@@ -441,7 +442,7 @@ class DashboardScreen(ft.Row):
         )
 
         self.sidebar_container = ft.Container(
-            content=self.nav_menu,
+            content=ft.SelectionArea(content=self.nav_menu),
             visible=True,
             animate_size=ft.Animation(250, ft.AnimationCurve.EASE_OUT),
         )
@@ -453,23 +454,25 @@ class DashboardScreen(ft.Row):
         )
 
         self.open_sidebar_btn = ft.Container(
-            content=ft.Row(
-                controls=[
-                    ft.IconButton(
-                        icon=ft.Icons.MENU,
-                        icon_size=20,
-                        icon_color=AppTheme.PRIMARY,
-                        tooltip="Open Modules Sidebar",
-                        on_click=lambda _: self.toggle_sidebar(),
-                    ),
-                    ft.Text(
-                        "Modules Menu",
-                        size=AppTheme.SIZE_BODY,
-                        weight=ft.FontWeight.W_600,
-                        color=AppTheme.TEXT_SECONDARY,
-                    ),
-                ],
-                spacing=4,
+            content=ft.SelectionArea(
+                content=ft.Row(
+                    controls=[
+                        ft.IconButton(
+                            icon=ft.Icons.MENU,
+                            icon_size=20,
+                            icon_color=AppTheme.PRIMARY,
+                            tooltip="Open Modules Sidebar",
+                            on_click=lambda _: self.toggle_sidebar(),
+                        ),
+                        ft.Text(
+                            "Modules Menu",
+                            size=AppTheme.SIZE_BODY,
+                            weight=ft.FontWeight.W_600,
+                            color=AppTheme.TEXT_SECONDARY,
+                        ),
+                    ],
+                    spacing=4,
+                ),
             ),
             padding=ft.Padding(12, 6, 12, 0),
             visible=False,
@@ -489,6 +492,7 @@ class DashboardScreen(ft.Row):
             "Module Under Construction",
             size=24,
             color=AppTheme.TEXT_MUTED,
+            selectable=True,
         )
 
         self.controls = [
@@ -529,26 +533,28 @@ class DashboardScreen(ft.Row):
             title=ft.Row(
                 controls=[
                     ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, color=AppTheme.DANGER, size=28),
-                    ft.Text("Confirm Logout", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD),
+                    ft.Text("Confirm Logout", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, selectable=True),
                 ],
                 spacing=AppTheme.PAD_SM,
             ),
             content=ft.Container(
-                content=ft.Column(
-                    controls=[
-                        ft.Text(
-                            "Are you sure you want to log out of SIMS?",
-                            size=AppTheme.SIZE_BODY,
-                            weight=ft.FontWeight.W_500,
-                        ),
-                        ft.Text(
-                            "If you have unsaved form drafts or active work, you can click Cancel to keep working safely.",
-                            size=AppTheme.SIZE_CAPTION,
-                            color=AppTheme.TEXT_SECONDARY,
-                        ),
-                    ],
-                    spacing=AppTheme.PAD_XS,
-                    tight=True,
+                content=ft.SelectionArea(
+                    content=ft.Column(
+                        controls=[
+                            ft.Text(
+                                "Are you sure you want to log out of SIMS?",
+                                size=AppTheme.SIZE_BODY,
+                                weight=ft.FontWeight.W_500,
+                            ),
+                            ft.Text(
+                                "If you have unsaved form drafts or active work, you can click Cancel to keep working safely.",
+                                size=AppTheme.SIZE_CAPTION,
+                                color=AppTheme.TEXT_SECONDARY,
+                            ),
+                        ],
+                        spacing=AppTheme.PAD_XS,
+                        tight=True,
+                    ),
                 ),
                 width=420,
                 padding=AppTheme.PAD_SM,
@@ -608,52 +614,101 @@ class DashboardScreen(ft.Row):
         except Exception:
             pass
 
-    def mount_view(self, route: str):
-        self.nav_menu.set_route(route)
+    def _safe_page_update(self) -> None:
         try:
-            if route == "/dashboard":
-                view = DashboardHome(on_navigate=self.on_route_request)
-            elif route == "/enquiries":
-                view = EnquiryHome()
-            elif route == "/students":
-                view = StudentHome()
-            elif route == "/attendance":
-                view = AttendanceHome()
-            elif route == "/admissions":
-                view = AdmissionHome()
-            elif route == "/courses":
-                view = CourseHome()
-            elif route == "/fees":
-                view = ReportsHome()
-            elif route == "/settings":
-                view = SettingsHome()
-            elif route == "/batch":
-                view = BatchHome()
-            elif route == "/control-center":
-                view = ControlCenterScreen(self._page, on_navigate=self.on_route_request)
-            elif route == "/about":
-                from ui.widgets.about_dialog import AboutScreenView
-                view = AboutScreenView()
+            if self._page:
+                self._page.update()
             else:
-                view = DashboardHome(on_navigate=self.on_route_request)
+                self.update()
+        except Exception:
+            pass
 
-            self.content_host.mount(view)
-            if hasattr(view, "load_data"):
-                view.load_data()
-        except Exception as ex:
-            import logging, traceback
-            from datetime import datetime
-            from core.security.context import SecurityContext
-            current_user = SecurityContext.get_current_user_id() or "anonymous"
-            logging.getLogger("sims.ui").error(
-                f"[UI Forensic Error] User: {current_user} | Route: {route} | Time: {datetime.now().isoformat()} | Error: {str(ex)}\n{traceback.format_exc()}"
-            )
-            recovery_view = ErrorRecoveryView(
-                route=route,
-                error_message=str(ex),
-                on_retry=lambda: self.mount_view(route),
-                on_back=self.on_back_request or (lambda: self.on_route_request("/dashboard")),
-                on_dashboard=lambda: self.on_route_request("/dashboard"),
-            )
-            self.content_host.mount(recovery_view)
+    def _create_view_instance(self, route: str) -> ft.Control:
+        if route == "/dashboard":
+            return DashboardHome(on_navigate=self.on_route_request)
+        elif route == "/enquiries":
+            return EnquiryHome()
+        elif route == "/students":
+            return StudentHome()
+        elif route == "/attendance":
+            return AttendanceHome()
+        elif route == "/admissions":
+            return AdmissionHome()
+        elif route == "/courses":
+            return CourseHome()
+        elif route == "/fees":
+            return ReportsHome(self._page)
+        elif route == "/settings":
+            return SettingsHome()
+        elif route == "/batch":
+            return BatchHome()
+        elif route == "/control-center":
+            return ControlCenterScreen(self._page, on_navigate=self.on_route_request)
+        elif route == "/about":
+            from ui.widgets.about_dialog import AboutScreenView
+            return AboutScreenView()
+        else:
+            return DashboardHome(on_navigate=self.on_route_request)
+
+    def _handle_mount_error(self, route: str, ex: Exception) -> None:
+        import logging, traceback
+        from datetime import datetime
+        from core.security.context import SecurityContext
+        current_user = SecurityContext.get_current_user_id() or "anonymous"
+        logging.getLogger("sims.ui").error(
+            f"[UI Forensic Error] User: {current_user} | Route: {route} | Time: {datetime.now().isoformat()} | Error: {str(ex)}\n{traceback.format_exc()}"
+        )
+        recovery_view = ErrorRecoveryView(
+            route=route,
+            error_message=str(ex),
+            on_retry=lambda: self.mount_view(route),
+            on_back=self.on_back_request or (lambda: self.on_route_request("/dashboard")),
+            on_dashboard=lambda: self.on_route_request("/dashboard"),
+        )
+        self.content_host.mount(recovery_view)
+        self._safe_page_update()
+
+    def mount_view(self, route: str) -> None:
+        self.nav_menu.set_route(route)
+        self._nav_sequence += 1
+        current_seq = self._nav_sequence
+
+        is_live = bool(getattr(self._page, "session_id", None))
+
+        if not is_live:
+            # Synchronous mount for headless test runner environments
+            try:
+                view = self._create_view_instance(route)
+                self.content_host.mount(view)
+                if hasattr(view, "load_data"):
+                    view.load_data()
+                setattr(view, "_data_loaded", True)
+                self._safe_page_update()
+            except Exception as ex:
+                self._handle_mount_error(route, ex)
+            return
+
+        # Live runtime mode: Adaptive loading screen displays while database loads
+        self.content_host.show_loader(route)
+        self._safe_page_update()
+
+        import threading
+
+        def _adaptive_load_worker(seq: int):
+            try:
+                view = self._create_view_instance(route)
+                if hasattr(view, "load_data"):
+                    view.load_data()
+                setattr(view, "_data_loaded", True)
+
+                # Guard against race conditions from rapid navigation clicks
+                if self._nav_sequence == seq:
+                    self.content_host.mount(view)
+                    self._safe_page_update()
+            except Exception as ex:
+                if self._nav_sequence == seq:
+                    self._handle_mount_error(route, ex)
+
+        threading.Thread(target=_adaptive_load_worker, args=(current_seq,), daemon=True).start()
+
 

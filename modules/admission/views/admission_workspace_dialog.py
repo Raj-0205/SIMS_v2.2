@@ -44,22 +44,24 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
         self.candidate_badge = ft.Container()
         self.status_badge = ft.Container()
 
-        self.title = ft.Row(
-            controls=[
-                ft.Row(
-                    controls=[self.title_text, self.candidate_badge, self.status_badge],
-                    spacing=AppTheme.PAD_SM,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                ),
-                ft.IconButton(
-                    icon=ft.Icons.CLOSE,
-                    icon_size=18,
-                    icon_color=AppTheme.TEXT_SECONDARY,
-                    tooltip="Close Workspace",
-                    on_click=self.close_dialog,
-                ),
-            ],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        self.title = ft.SelectionArea(
+            content=ft.Row(
+                controls=[
+                    ft.Row(
+                        controls=[self.title_text, self.candidate_badge, self.status_badge],
+                        spacing=AppTheme.PAD_SM,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    ft.IconButton(
+                        icon=ft.Icons.CLOSE,
+                        icon_size=18,
+                        icon_color=AppTheme.TEXT_SECONDARY,
+                        tooltip="Close Workspace",
+                        on_click=self.close_dialog,
+                    ),
+                ],
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            ),
         )
 
         # Tab Bar & Content Area
@@ -105,14 +107,16 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
         self.content = ft.Container(
             width=840,
             height=560,
-            content=ft.Column(
-                controls=[
-                    self.tab_buttons_row,
-                    ft.Divider(height=1, color=AppTheme.BORDER),
-                    self.tab_content_area,
-                ],
-                spacing=0,
-                expand=True,
+            content=ft.SelectionArea(
+                content=ft.Column(
+                    controls=[
+                        self.tab_buttons_row,
+                        ft.Divider(height=1, color=AppTheme.BORDER),
+                        self.tab_content_area,
+                    ],
+                    spacing=0,
+                    expand=True,
+                ),
             ),
         )
 
@@ -172,7 +176,10 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
             self.active_tab_index = idx
             self.tab_buttons_row = self._build_tab_bar()
             self.tab_content_area.content = self._build_active_tab_content()
-            self.content.content.controls[0] = self.tab_buttons_row
+            if hasattr(self.content.content, "controls"):
+                self.content.content.controls[0] = self.tab_buttons_row
+            elif hasattr(getattr(self.content.content, "content", None), "controls"):
+                self.content.content.content.controls[0] = self.tab_buttons_row
             self._safe_update()
         except Exception as ex:
             LogService.error(f"Error switching to tab {idx}: {ex}", context=self.__class__.__name__)
@@ -533,6 +540,7 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
                 total_fee=adm.final_fee,
                 already_paid=adm.total_paid,
                 default_amount=min(500.0, adm.pending_amount) if adm.pending_amount > 0 else 500.0,
+                mobile_number=adm.mobile_number,
                 on_payment_completed=self._on_payment_collected,
             )
             p.show_dialog(dlg)
@@ -579,22 +587,26 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
 
         cancel_dlg = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Cancel Admission", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.DANGER),
+            title=ft.SelectionArea(
+                content=ft.Text("Cancel Admission", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.DANGER),
+            ),
             content=ft.Container(
                 width=450,
-                content=ft.Column(
-                    controls=[
-                        ft.Text(
-                            f"Are you sure you want to cancel admission {adm.admission_number} ({adm.course_name}) for {adm.student_name}?\n\n"
-                            "All recorded payments and receipts will be permanently preserved in the financial audit log.",
-                            size=AppTheme.SIZE_BODY,
-                            color=AppTheme.TEXT_SECONDARY,
-                        ),
-                        reason_field,
-                        error_msg,
-                    ],
-                    spacing=AppTheme.PAD_SM,
-                    tight=True,
+                content=ft.SelectionArea(
+                    content=ft.Column(
+                        controls=[
+                            ft.Text(
+                                f"Are you sure you want to cancel admission {adm.admission_number} ({adm.course_name}) for {adm.student_name}?\n\n"
+                                "All recorded payments and receipts will be permanently preserved in the financial audit log.",
+                                size=AppTheme.SIZE_BODY,
+                                color=AppTheme.TEXT_SECONDARY,
+                            ),
+                            reason_field,
+                            error_msg,
+                        ],
+                        spacing=AppTheme.PAD_SM,
+                        tight=True,
+                    ),
                 ),
             ),
             actions=[
@@ -657,51 +669,55 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
 
         del_dlg = ft.AlertDialog(
             modal=True,
-            title=ft.Row(
-                controls=[
-                    ft.Icon(ft.Icons.WARNING_AMBER, color=AppTheme.DANGER, size=24),
-                    ft.Text("Permanent Admission Deletion", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H2),
-                ],
-                spacing=8,
+            title=ft.SelectionArea(
+                content=ft.Row(
+                    controls=[
+                        ft.Icon(ft.Icons.WARNING_AMBER, color=AppTheme.DANGER, size=24),
+                        ft.Text("Permanent Admission Deletion", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H2),
+                    ],
+                    spacing=8,
+                ),
             ),
             content=ft.Container(
                 width=480,
-                content=ft.Column(
-                    controls=[
-                        ft.Text(
-                            f"Are you sure you want to permanently delete admission {adm.admission_number} ({adm.course_name}) for {adm.student_name}?",
-                            weight=ft.FontWeight.W_600,
-                            size=AppTheme.SIZE_BODY,
-                        ),
-                        ft.Text(
-                            "This is a permanent destructive operation. The following related records will be permanently removed:",
-                            size=AppTheme.SIZE_CAPTION,
-                            color=AppTheme.TEXT_SECONDARY,
-                        ),
-                        ft.Container(
-                            content=ft.Column(
-                                controls=[
-                                    ft.Text(f"• Payments: {impact.get('payments', 0)} (Total: ₹{impact.get('payments_total', 0.0):,.2f})", size=AppTheme.SIZE_CAPTION),
-                                    ft.Text(f"• Receipts: {impact.get('receipts', 0)}", size=AppTheme.SIZE_CAPTION),
-                                    ft.Text(f"• Course Enrolments: {impact.get('courses', 0)}", size=AppTheme.SIZE_CAPTION),
-                                    ft.Text("• Student Profile: Preserved (Only this admission record is removed)", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD),
-                                ],
-                                spacing=4,
+                content=ft.SelectionArea(
+                    content=ft.Column(
+                        controls=[
+                            ft.Text(
+                                f"Are you sure you want to permanently delete admission {adm.admission_number} ({adm.course_name}) for {adm.student_name}?",
+                                weight=ft.FontWeight.W_600,
+                                size=AppTheme.SIZE_BODY,
                             ),
-                            bgcolor=AppTheme.SURFACE_VARIANT,
-                            padding=AppTheme.PAD_SM,
-                            border_radius=AppTheme.RADIUS_SM,
-                        ),
-                        ft.Container(height=4),
-                        ft.Text(
-                            "CAUTION: This operation cannot be undone. An audit event will be recorded.",
-                            size=AppTheme.SIZE_CAPTION,
-                            color=AppTheme.DANGER,
-                            weight=ft.FontWeight.BOLD,
-                        ),
-                    ],
-                    spacing=AppTheme.PAD_SM,
-                    tight=True,
+                            ft.Text(
+                                "This is a permanent destructive operation. The following related records will be permanently removed:",
+                                size=AppTheme.SIZE_CAPTION,
+                                color=AppTheme.TEXT_SECONDARY,
+                            ),
+                            ft.Container(
+                                content=ft.Column(
+                                    controls=[
+                                        ft.Text(f"• Payments: {impact.get('payments', 0)} (Total: ₹{impact.get('payments_total', 0.0):,.2f})", size=AppTheme.SIZE_CAPTION),
+                                        ft.Text(f"• Receipts: {impact.get('receipts', 0)}", size=AppTheme.SIZE_CAPTION),
+                                        ft.Text(f"• Course Enrolments: {impact.get('courses', 0)}", size=AppTheme.SIZE_CAPTION),
+                                        ft.Text("• Student Profile: Preserved (Only this admission record is removed)", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD),
+                                    ],
+                                    spacing=4,
+                                ),
+                                bgcolor=AppTheme.SURFACE_VARIANT,
+                                padding=AppTheme.PAD_SM,
+                                border_radius=AppTheme.RADIUS_SM,
+                            ),
+                            ft.Container(height=4),
+                            ft.Text(
+                                "CAUTION: This operation cannot be undone. An audit event will be recorded.",
+                                size=AppTheme.SIZE_CAPTION,
+                                color=AppTheme.DANGER,
+                                weight=ft.FontWeight.BOLD,
+                            ),
+                        ],
+                        spacing=AppTheme.PAD_SM,
+                        tight=True,
+                    ),
                 ),
             ),
             actions=[

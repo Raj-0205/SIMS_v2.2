@@ -21,17 +21,19 @@ class StudentDetailDialog(ft.AlertDialog):
         self.student = student
         self.modal = True
 
-        self.title = ft.Row(
-            controls=[
-                ft.Icon(ft.Icons.BADGE, color=AppTheme.PRIMARY, size=24),
-                ft.Text(
-                    "Student Profile Details",
-                    size=AppTheme.SIZE_H2,
-                    weight=ft.FontWeight.BOLD,
-                    color=AppTheme.TEXT_PRIMARY,
-                ),
-            ],
-            spacing=AppTheme.PAD_SM,
+        self.title = ft.SelectionArea(
+            content=ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.BADGE, color=AppTheme.PRIMARY, size=24),
+                    ft.Text(
+                        "Student Profile Details",
+                        size=AppTheme.SIZE_H2,
+                        weight=ft.FontWeight.BOLD,
+                        color=AppTheme.TEXT_PRIMARY,
+                    ),
+                ],
+                spacing=AppTheme.PAD_SM,
+            ),
         )
 
         def make_field(label: str, value: str, icon: str) -> ft.Container:
@@ -54,20 +56,22 @@ class StudentDetailDialog(ft.AlertDialog):
 
         self.content = ft.Container(
             width=420,
-            content=ft.Column(
-                controls=[
-                    make_field("Student Name", student.display_name, ft.Icons.PERSON),
-                    ft.Divider(height=1, color=AppTheme.BORDER),
-                    make_field("Student ID", str(student.id), ft.Icons.NUMBERS),
-                    ft.Divider(height=1, color=AppTheme.BORDER),
-                    make_field("Mobile Number", student.mobile_number, ft.Icons.PHONE),
-                    ft.Divider(height=1, color=AppTheme.BORDER),
-                    make_field("Email Address", student.email or "Not Provided", ft.Icons.EMAIL),
-                    ft.Divider(height=1, color=AppTheme.BORDER),
-                    make_field("Registration Date", student.created_at or "N/A", ft.Icons.CALENDAR_TODAY),
-                ],
-                spacing=0,
-                tight=True,
+            content=ft.SelectionArea(
+                content=ft.Column(
+                    controls=[
+                        make_field("Student Name", student.display_name, ft.Icons.PERSON),
+                        ft.Divider(height=1, color=AppTheme.BORDER),
+                        make_field("Student ID", str(student.id), ft.Icons.NUMBERS),
+                        ft.Divider(height=1, color=AppTheme.BORDER),
+                        make_field("Mobile Number", student.mobile_number, ft.Icons.PHONE),
+                        ft.Divider(height=1, color=AppTheme.BORDER),
+                        make_field("Email Address", student.email or "Not Provided", ft.Icons.EMAIL),
+                        ft.Divider(height=1, color=AppTheme.BORDER),
+                        make_field("Registration Date", student.created_at or "N/A", ft.Icons.CALENDAR_TODAY),
+                    ],
+                    spacing=0,
+                    tight=True,
+                ),
             ),
         )
 

@@ -307,8 +307,11 @@ class ExcelExporter:
         # 6. Freeze Panes below header
         ws.freeze_panes = ws.cell(row=header_row_idx + 1, column=1)
 
-        wb.save(path)
-        return path
+        try:
+            wb.save(path)
+            return path
+        finally:
+            wb.close()
 
     @staticmethod
     def _parse_numeric(val: Any) -> Optional[float]:

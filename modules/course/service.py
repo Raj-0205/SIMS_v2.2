@@ -188,7 +188,10 @@ class CourseService(BaseService):
             )
 
         from core.cache.fees_cache import FeesCacheManager
-        FeesCacheManager.invalidate(f"Course updated #{dto.id}")
+        if FeesCacheManager.is_loaded():
+            FeesCacheManager.targeted_course_update(dto.id, clean_name)
+        else:
+            FeesCacheManager.bump_version()
 
     def change_institute_fee(self, dto: CourseFeeChangeDTO) -> None:
         """

@@ -44,7 +44,7 @@ def print_status(label: str, status: str = "OK", detail: str = "") -> None:
     print(line)
 
 
-def run_database_verification(verbose: bool = True) -> tuple[bool, list[str]]:
+def run_database_verification(verbose: bool = True, shutdown_engine: bool = False) -> tuple[bool, list[str]]:
     """
     Executes observational read-only forensic verification against the active SIMS database.
     Returns a tuple of (passed: bool, errors: list[str]).
@@ -374,7 +374,7 @@ def run_database_verification(verbose: bool = True) -> tuple[bool, list[str]]:
             except Exception:
                 pass
 
-        if DatabaseEngine.is_initialized():
+        if shutdown_engine and DatabaseEngine.is_initialized():
             try:
                 DatabaseEngine.shutdown()
             except Exception:
@@ -396,7 +396,7 @@ def run_database_verification(verbose: bool = True) -> tuple[bool, list[str]]:
 
 
 def main() -> None:
-    passed, _ = run_database_verification(verbose=True)
+    passed, _ = run_database_verification(verbose=True, shutdown_engine=True)
     sys.exit(0 if passed else 1)
 
 

@@ -79,24 +79,26 @@ class AdmissionFormModal(ft.AlertDialog):
 
         # Title Header
         title_str = "Edit Admission Record" if self.is_edit_mode else "New Student Admission Workspace"
-        self.title = ft.Row(
-            controls=[
-                ft.Row(
-                    controls=[
-                        ft.Icon(ft.Icons.APP_REGISTRATION, color=AppTheme.PRIMARY, size=24),
-                        ft.Text(title_str, size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
-                    ],
-                    spacing=AppTheme.PAD_SM,
-                ),
-                ft.IconButton(
-                    icon=ft.Icons.CLOSE,
-                    icon_size=18,
-                    icon_color=AppTheme.TEXT_SECONDARY,
-                    tooltip="Cancel & Close",
-                    on_click=self.close_modal,
-                ),
-            ],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        self.title = ft.SelectionArea(
+            content=ft.Row(
+                controls=[
+                    ft.Row(
+                        controls=[
+                            ft.Icon(ft.Icons.APP_REGISTRATION, color=AppTheme.PRIMARY, size=24),
+                            ft.Text(title_str, size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
+                        ],
+                        spacing=AppTheme.PAD_SM,
+                    ),
+                    ft.IconButton(
+                        icon=ft.Icons.CLOSE,
+                        icon_size=18,
+                        icon_color=AppTheme.TEXT_SECONDARY,
+                        tooltip="Cancel & Close",
+                        on_click=self.close_modal,
+                    ),
+                ],
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            ),
         )
 
         # ── Top Notification Toast Banner ──
@@ -512,25 +514,27 @@ class AdmissionFormModal(ft.AlertDialog):
         self.content = ft.Container(
             width=1180,
             height=680,
-            content=ft.Column(
-                controls=[
-                    self.banner_container,
-                    self.duplicate_alert_container,
-                    ft.Row(
-                        controls=[
-                            self.mode_segmented_btn,
-                            self.import_enquiry_btn,
-                            self.student_search_input,
-                        ],
-                        spacing=AppTheme.PAD_SM,
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                    ),
-                    self.student_search_results,
-                    ft.Divider(height=1, color=AppTheme.BORDER),
-                    ft.Row(controls=[left_col, ft.VerticalDivider(width=1, color=AppTheme.BORDER), right_col], expand=True, spacing=AppTheme.PAD_MD),
-                ],
-                spacing=AppTheme.PAD_SM,
-                expand=True,
+            content=ft.SelectionArea(
+                content=ft.Column(
+                    controls=[
+                        self.banner_container,
+                        self.duplicate_alert_container,
+                        ft.Row(
+                            controls=[
+                                self.mode_segmented_btn,
+                                self.import_enquiry_btn,
+                                self.student_search_input,
+                            ],
+                            spacing=AppTheme.PAD_SM,
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        ),
+                        self.student_search_results,
+                        ft.Divider(height=1, color=AppTheme.BORDER),
+                        ft.Row(controls=[left_col, ft.VerticalDivider(width=1, color=AppTheme.BORDER), right_col], expand=True, spacing=AppTheme.PAD_MD),
+                    ],
+                    spacing=AppTheme.PAD_SM,
+                    expand=True,
+                ),
             ),
         )
 
@@ -979,23 +983,27 @@ class AdmissionFormModal(ft.AlertDialog):
         search_field.on_change = lambda ev: do_search(ev.control.value or "")
 
         dialog = ft.AlertDialog(
-            title=ft.Row(
-                controls=[
-                    ft.Icon(ft.Icons.PERSON_PIN_CIRCLE, color=AppTheme.PRIMARY),
-                    ft.Text("Select Enquiry Profile for Admission", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3),
-                ],
-                spacing=AppTheme.PAD_SM,
+            title=ft.SelectionArea(
+                content=ft.Row(
+                    controls=[
+                        ft.Icon(ft.Icons.PERSON_PIN_CIRCLE, color=AppTheme.PRIMARY),
+                        ft.Text("Select Enquiry Profile for Admission", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3),
+                    ],
+                    spacing=AppTheme.PAD_SM,
+                ),
             ),
             content=ft.Container(
                 width=650,
                 height=450,
-                content=ft.Column(
-                    controls=[
-                        search_field,
-                        ft.Text("Active leads (pick a profile to auto-fill registration details):", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
-                        results_col,
-                    ],
-                    spacing=AppTheme.PAD_SM,
+                content=ft.SelectionArea(
+                    content=ft.Column(
+                        controls=[
+                            search_field,
+                            ft.Text("Active leads (pick a profile to auto-fill registration details):", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
+                            results_col,
+                        ],
+                        spacing=AppTheme.PAD_SM,
+                    ),
                 ),
             ),
             actions=[
@@ -1377,6 +1385,7 @@ class AdmissionFormModal(ft.AlertDialog):
                     default_amount=500.0,
                     page=root_page,
                     current_status=adm.status,
+                    mobile_number=adm.mobile_number,
                     on_payment_completed=lambda pid: self._open_receipt_dialog_with_page(root_page, adm_id),
                 )
                 root_page.show_dialog(pay_dialog)
@@ -1389,6 +1398,8 @@ class AdmissionFormModal(ft.AlertDialog):
 
     def _open_receipt_dialog_with_page(self, page: Optional[ft.Page], admission_id: int) -> None:
         try:
+            if page and isinstance(getattr(page, "dialog", None), ReceiptDialog):
+                return
             receipts = self.receipt_controller.get_receipts_for_admission(admission_id)
             if receipts and page:
                 adm = self.controller.get_admission(admission_id)

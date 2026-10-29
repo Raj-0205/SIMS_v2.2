@@ -617,29 +617,33 @@ class BatchHome(ft.Container):
 
         dlg = ft.AlertDialog(
             modal=True,
-            title=ft.Row(
-                controls=[
-                    ft.Icon(ft.Icons.WARNING_AMBER, color=AppTheme.DANGER, size=24),
-                    ft.Text("Confirm Batch Deletion", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H2),
-                ],
-                spacing=8,
+            title=ft.SelectionArea(
+                content=ft.Row(
+                    controls=[
+                        ft.Icon(ft.Icons.WARNING_AMBER, color=AppTheme.DANGER, size=24),
+                        ft.Text("Confirm Batch Deletion", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H2),
+                    ],
+                    spacing=8,
+                )
             ),
             content=ft.Container(
                 width=450,
-                content=ft.Column(
-                    controls=[
-                        ft.Text(
-                            f"Are you sure you want to delete batch '{batch.batch_name}' ({batch.timing})?",
-                            size=AppTheme.SIZE_BODY,
-                        ),
-                        ft.Text(
-                            "Batches linked to active or historical student admissions cannot be deleted under ERP audit policies.",
-                            size=AppTheme.SIZE_CAPTION,
-                            color=AppTheme.TEXT_SECONDARY,
-                        ),
-                    ],
-                    spacing=AppTheme.PAD_SM,
-                    tight=True,
+                content=ft.SelectionArea(
+                    content=ft.Column(
+                        controls=[
+                            ft.Text(
+                                f"Are you sure you want to delete batch '{batch.batch_name}' ({batch.timing})?",
+                                size=AppTheme.SIZE_BODY,
+                            ),
+                            ft.Text(
+                                "Batches linked to active or historical student admissions cannot be deleted under ERP audit policies.",
+                                size=AppTheme.SIZE_CAPTION,
+                                color=AppTheme.TEXT_SECONDARY,
+                            ),
+                        ],
+                        spacing=AppTheme.PAD_SM,
+                        tight=True,
+                    )
                 ),
             ),
             actions=[

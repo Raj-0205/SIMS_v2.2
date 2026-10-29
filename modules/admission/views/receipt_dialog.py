@@ -10,6 +10,7 @@ import flet as ft
 
 from core.logger.service import LogService
 from shared.utils.os_helper import open_path_externally
+from shared.utils.export_helper import export_and_prompt_save
 from ui.themes.theme import AppTheme
 from modules.receipts.controller import ReceiptController
 from modules.receipts.dto import ReceiptDTO
@@ -39,17 +40,47 @@ class ReceiptDialog(ft.AlertDialog):
         self.candidate_number = candidate_number
         self.course_name = course_name
         self.mobile_number = mobile_number
+        self.transaction_ref = getattr(self.receipt, "transaction_ref", None)
+
+        # Auto-enrich metadata from admission if incomplete
+        if (self.student_name in ("Student", "") or not self.mobile_number or not self.course_name) and getattr(self.receipt, "admission_id", None):
+            try:
+                from modules.admission.controller import AdmissionController
+                adm = AdmissionController().get_admission(self.receipt.admission_id)
+                if adm:
+                    if (self.student_name in ("Student", "")) and adm.student_name:
+                        self.student_name = adm.student_name
+                    if not self.candidate_number and adm.admission_number:
+                        self.candidate_number = adm.admission_number
+                    if not self.course_name and adm.course_name:
+                        self.course_name = adm.course_name
+                    if not self.mobile_number and adm.mobile_number:
+                        self.mobile_number = adm.mobile_number
+            except Exception as ex:
+                LogService.debug(f"Could not enrich receipt dialog metadata: {ex}", context="ReceiptDialog")
+
+        # Auto-enrich transaction_ref from payments if missing
+        if not self.transaction_ref and getattr(self.receipt, "payment_id", None):
+            try:
+                from modules.payments.repository import PaymentRepository
+                p_row = PaymentRepository().get_by_id(self.receipt.payment_id)
+                if p_row and p_row.get("transaction_ref"):
+                    self.transaction_ref = str(p_row["transaction_ref"]).strip()
+            except Exception as ex:
+                LogService.debug(f"Could not enrich receipt transaction_ref: {ex}", context="ReceiptDialog")
 
         self.settings_service = SettingsService()
         profile = self.settings_service.get_institute_profile()
 
         # Dialog Title
-        self.title = ft.Row(
-            controls=[
-                ft.Icon(ft.Icons.RECEIPT_LONG, color=AppTheme.PRIMARY, size=24),
-                ft.Text("Official Fee Receipt", size=AppTheme.SIZE_H2, weight=ft.FontWeight.W_600),
-            ],
-            spacing=AppTheme.PAD_SM,
+        self.title = ft.SelectionArea(
+            content=ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.RECEIPT_LONG, color=AppTheme.PRIMARY, size=24),
+                    ft.Text("Official Fee Receipt", size=AppTheme.SIZE_H2, weight=ft.FontWeight.W_600),
+                ],
+                spacing=AppTheme.PAD_SM,
+            ),
         )
 
         # Receipt Paper Preview Card
@@ -59,7 +90,8 @@ class ReceiptDialog(ft.AlertDialog):
             padding=AppTheme.PAD_MD,
             border_radius=AppTheme.RADIUS_MD,
             border=ft.Border.all(1, AppTheme.BORDER),
-            content=ft.Column(
+            content=ft.SelectionArea(
+                content=ft.Column(
                 controls=[
                     # 1. Branding Header
                     ft.Column(
@@ -111,6 +143,14 @@ class ReceiptDialog(ft.AlertDialog):
                                 ),
                                 ft.Divider(height=6),
                                 ft.Row([ft.Text("Payment Mode:", size=AppTheme.SIZE_CAPTION), ft.Text(self.receipt.payment_mode, size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                                *(
+                                    [
+                                        ft.Row([
+                                            ft.Text("Bank UTR / Ref No:", size=AppTheme.SIZE_CAPTION),
+                                            ft.Text(self.transaction_ref, size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                                        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                                    ] if self.transaction_ref else []
+                                ),
                                 ft.Row([ft.Text("Total Course Fee:", size=AppTheme.SIZE_CAPTION), ft.Text(f"₹{self.receipt.total_course_fee:,.2f}", size=AppTheme.SIZE_CAPTION)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                                 ft.Row([ft.Text("Total Paid Till Date:", size=AppTheme.SIZE_CAPTION), ft.Text(f"₹{self.receipt.total_paid_till_now:,.2f}", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                                 ft.Row([ft.Text("Remaining Balance:", size=AppTheme.SIZE_CAPTION), ft.Text(f"₹{self.receipt.pending_amount:,.2f}", size=AppTheme.SIZE_CAPTION, color=AppTheme.DANGER, weight=ft.FontWeight.BOLD)], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
@@ -133,25 +173,29 @@ class ReceiptDialog(ft.AlertDialog):
                 spacing=AppTheme.PAD_SM,
                 tight=True,
             ),
-        )
+        ),
+    )
 
         # Action Buttons
         self.print_btn = ft.OutlinedButton(
             content=ft.Text("Print", size=AppTheme.SIZE_CAPTION),
             icon=ft.Icons.PRINT,
+            tooltip="Open receipt for system printing",
             on_click=self.handle_print,
         )
 
         self.pdf_btn = ft.OutlinedButton(
-            content=ft.Text("Export PDF", size=AppTheme.SIZE_CAPTION),
+            content=ft.Text("Export PDF", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.W_600),
             icon=ft.Icons.PICTURE_AS_PDF,
+            tooltip="Export and save official receipt PDF to your computer",
             on_click=self.handle_export_pdf,
         )
 
         self.whatsapp_btn = ft.ElevatedButton(
-            content=ft.Text("WhatsApp", size=AppTheme.SIZE_CAPTION, color=AppTheme.SURFACE),
+            content=ft.Text("WhatsApp", size=AppTheme.SIZE_CAPTION, color=AppTheme.SURFACE, weight=ft.FontWeight.W_600),
             icon=ft.Icons.SEND,
             style=ft.ButtonStyle(bgcolor="#25D366"),
+            tooltip="Share official receipt details to student via WhatsApp",
             on_click=self.handle_whatsapp,
         )
 
@@ -191,15 +235,38 @@ class ReceiptDialog(ft.AlertDialog):
             except RuntimeError:
                 pass
 
+    def _notify(self, msg: str, is_error: bool = False, is_success: bool = False) -> None:
+        p = self.safe_page
+        if p:
+            snack = ft.SnackBar(
+                content=ft.Text(msg, color=AppTheme.SURFACE),
+                bgcolor=AppTheme.DANGER if is_error else (AppTheme.SUCCESS if is_success else AppTheme.PRIMARY),
+            )
+            p.overlay.append(snack)
+            snack.open = True
+            try:
+                p.update()
+            except Exception:
+                pass
+
     def handle_print(self, e: ft.ControlEvent) -> None:
         """Opens receipt PDF with system print / viewer."""
         if self.receipt.pdf_path and os.path.exists(self.receipt.pdf_path):
             open_path_externally(self.receipt.pdf_path)
 
-    def handle_export_pdf(self, e: ft.ControlEvent) -> None:
-        """Opens the exported PDF file location."""
+    def handle_export_pdf(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Prompts user with system file picker to save receipt PDF to custom location while preserving internal SIMS copy."""
         if self.receipt.pdf_path and os.path.exists(self.receipt.pdf_path):
-            open_path_externally(self.receipt.pdf_path)
+            r_num = (self.receipt.receipt_number or "receipt").lower().replace("-", "_")
+            export_and_prompt_save(
+                source_file_path=self.receipt.pdf_path,
+                dialog_title="Save Official Receipt PDF As",
+                default_filename=f"{r_num}.pdf",
+                allowed_extensions=[".pdf"],
+                show_toast=self._notify,
+            )
+        else:
+            self._notify("Receipt PDF file not found on disk.", is_error=True)
 
     def handle_whatsapp(self, e: ft.ControlEvent) -> None:
         """Opens WhatsApp Web / Desktop with pre-filled message and receipt details."""
@@ -207,10 +274,12 @@ class ReceiptDialog(ft.AlertDialog):
         if len(clean_mob) == 10:
             clean_mob = f"91{clean_mob}"
 
+        ref_text = f"Bank UTR / Ref: {self.transaction_ref}\n" if self.transaction_ref else ""
         msg = (
             f"Dear {self.student_name},\n"
             f"Thank you for your fee payment of Rs. {self.receipt.amount_paid:,.2f} for {self.course_name}.\n"
             f"Receipt No: {self.receipt.receipt_number}\n"
+            f"{ref_text}"
             f"Pending Balance: Rs. {self.receipt.pending_amount:,.2f}\n"
             f"- Sudharm Infotech, Chandwad"
         )

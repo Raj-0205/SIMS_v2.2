@@ -36,6 +36,13 @@ class PaymentRepository(BaseRepository):
         sql = "SELECT * FROM payments WHERE id = ? LIMIT 1;"
         return self.execute_fetchone(sql, (payment_id,))
 
+    def get_by_transaction_ref(self, transaction_ref: str) -> Optional[dict[str, Any]]:
+        """Look up payment by transaction reference (case-insensitive) to prevent duplicate replay."""
+        if not transaction_ref or not transaction_ref.strip():
+            return None
+        sql = "SELECT * FROM payments WHERE LOWER(TRIM(transaction_ref)) = LOWER(TRIM(?)) LIMIT 1;"
+        return self.execute_fetchone(sql, (transaction_ref.strip(),))
+
     def get_by_admission_id(self, admission_id: int) -> list[dict[str, Any]]:
         sql = "SELECT * FROM payments WHERE admission_id = ? ORDER BY installment_number ASC;"
         return self.execute_fetchall(sql, (admission_id,))

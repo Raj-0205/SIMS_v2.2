@@ -244,7 +244,16 @@ class StudentService(BaseService):
             )
 
         from core.cache.fees_cache import FeesCacheManager
-        FeesCacheManager.invalidate(f"Student updated #{dto.id}")
+        if FeesCacheManager.is_loaded():
+            FeesCacheManager.targeted_student_update(
+                student_id=dto.id,
+                first_name=first_name,
+                last_name=last_name,
+                mobile_number=mobile_number,
+                address=format_title_case(dto.address) if dto.address else None,
+            )
+        else:
+            FeesCacheManager.bump_version()
 
     def add_student_note(self, student_id: int, note_text: str, actor_name: str = "ADMIN") -> None:
         """Adds an internal note for a student enclosed in unit_of_work."""
@@ -283,9 +292,26 @@ class StudentService(BaseService):
                 actor_name="ADMIN",
                 details=f"Added friend student ID #{friend_student_id}.",
             )
+            s_row = self.repository.get_by_id(student_id)
+            f_row = self.repository.get_by_id(friend_student_id)
 
         from core.cache.fees_cache import FeesCacheManager
-        FeesCacheManager.invalidate(f"Student friendship added {student_id} <-> {friend_student_id}")
+        if FeesCacheManager.is_loaded():
+            if s_row and f_row:
+                s_name = f"{s_row.get('first_name', '')} {s_row.get('last_name', '')}".strip()
+                s_mob = s_row.get("mobile_number") or "—"
+                f_name = f"{f_row.get('first_name', '')} {f_row.get('last_name', '')}".strip()
+                f_mob = f_row.get("mobile_number") or "—"
+                FeesCacheManager.targeted_friendship_update(
+                    student_id=student_id,
+                    friend_student_id=friend_student_id,
+                    friend_name=f_name,
+                    friend_mobile=f_mob,
+                    student_name=s_name,
+                    student_mobile=s_mob,
+                )
+        else:
+            FeesCacheManager.bump_version()
 
     def remove_student_friend(self, student_id: int, friend_student_id: int) -> None:
         """Removes a friend connection within unit_of_work."""
@@ -300,7 +326,10 @@ class StudentService(BaseService):
             )
 
         from core.cache.fees_cache import FeesCacheManager
-        FeesCacheManager.invalidate(f"Student friendship removed {student_id} <-> {friend_student_id}")
+        if FeesCacheManager.is_loaded():
+            FeesCacheManager.targeted_friendship_removed(student_id, friend_student_id)
+        else:
+            FeesCacheManager.bump_version()
 
     def upload_student_document(
         self,
@@ -420,7 +449,10 @@ class StudentService(BaseService):
             )
 
         from core.cache.fees_cache import FeesCacheManager
-        FeesCacheManager.invalidate(f"Student deleted #{student_id}")
+        if FeesCacheManager.is_loaded():
+            FeesCacheManager.targeted_student_deleted(student_id)
+        else:
+            FeesCacheManager.bump_version()
 
     def get_student(self, student_id: int) -> StudentDTO:
         if not student_id or student_id <= 0:

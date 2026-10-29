@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MKCL Career Courses Showcase | Interactive Student & Parent Presentation</title>
+  
+  <!-- Google Fonts: Outfit & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- CSS Stylesheets -->
+  <link rel="stylesheet" href="css/animations.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- Ambient Slow Floating Glowing Orbs -->
+  <div class="ambient-orb ambient-orb-1"></div>
+  <div class="ambient-orb ambient-orb-2"></div>
+  <div class="ambient-orb ambient-orb-3"></div>
+
+  <div class="app-container">
+    
+    <!-- Top Glass Header -->
+    <header class="header-glass">
+      <div class="header-inner">
+        <!-- Brand Block -->
+        <div class="brand-block">
+          <div class="brand-logo-badge pulse-badge">
+            <span>🎓</span> Sudharm Infotech
+          </div>
+          <div class="brand-text-block">
+            <h1>Sudharm Infotech</h1>
+            <p><strong>MKCL Authorised Learning Centre</strong> • Teacher: <strong>Proff. Hemant Mahale</strong> • 📞 <strong>9271226772</strong></p>
+          </div>
+        </div>
+
+        <!-- Action CTAs -->
+        <div class="header-actions">
+          <button class="btn-header" id="launchQuizBtn" title="Help choose the right course">
+            <span>🎯</span> Course Finder Quiz
+          </button>
+          <button class="btn-header primary-action" id="launchSlideshowBtn" title="Open Fullscreen Slideshow for Screen / Projector Presentation">
+            <span>📺</span> Presentation Mode
+          </button>
+          <button class="btn-header" id="compareFloatingBtn" style="display: none; background: #EEF2FF; border-color: #C7D2FE; color: #4338CA;">
+            <span>⚖️</span> Compare (<span id="compareCountBadge">0</span>)
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Hero Presentation Section -->
+    <section class="hero-section">
+      <div class="hero-inner">
+        <!-- Trust Badges -->
+        <div class="hero-trust-badges anim-fade-in-up">
+          <span class="trust-badge trust-badge-accent">
+            <span>⭐</span> MKCL Authorised Learning Centre
+          </span>
+          <span class="trust-badge pulse-green">
+            <span>🏛️</span> MSBTE & Maharashtra Govt. Recognized
+          </span>
+          <span class="trust-badge">
+            <span>💻</span> 100% Practical Hands-on Labs
+          </span>
+          <span class="trust-badge">
+            <span>🤖</span> 21st-Century Industry Software & AI Tools
+          </span>
+        </div>
+
+        <!-- Animated Heading -->
+        <h2 class="hero-title shimmer-text anim-fade-in-scale">
+          Professional Career Computer Education & MKCL Programs
+        </h2>
+        <p class="hero-subtitle anim-fade-in-up">
+          Official MKCL certified programs under the mentorship of <strong>Proff. Hemant Mahale</strong> at <strong>Sudharm Infotech</strong>. Prepare for competitive exams, corporate careers, freelancing, and college academic excellence.
+        </p>
+
+        <!-- Live Search Bar -->
+        <div class="search-filter-box anim-fade-in-up">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="courseSearchInput" class="search-input" placeholder="Search by course name, software (Tally, Python, Photoshop, AutoCAD), or career role...">
+          <button class="search-clear-btn" id="searchClearBtn" title="Clear search">✕</button>
+        </div>
+
+        <!-- Category / Track Tabs -->
+        <div class="track-filters-container anim-fade-in-up">
+          <button class="track-filter-pill active" data-track="all">
+            <span>🌟 All Programs</span>
+            <span class="track-count">27</span>
+          </button>
+          <button class="track-filter-pill" data-track="flagship">
+            <span>👑 Flagship (MS-CIT)</span>
+            <span class="track-count">1</span>
+          </button>
+          <button class="track-filter-pill" data-track="accounting">
+            <span>📊 Accounting & Excel</span>
+            <span class="track-count">3</span>
+          </button>
+          <button class="track-filter-pill" data-track="design">
+            <span>🎨 Graphic & 3D Design</span>
+            <span class="track-count">7</span>
+          </button>
+          <button class="track-filter-pill" data-track="software">
+            <span>💻 Coding & Python</span>
+            <span class="track-count">5</span>
+          </button>
+          <button class="track-filter-pill" data-track="emerging">
+            <span>🤖 AI & Freelancing</span>
+            <span class="track-count">3</span>
+          </button>
+          <button class="track-filter-pill" data-track="hardware">
+            <span>🛡️ Hardware & Cyber</span>
+            <span class="track-count">4</span>
+          </button>
+          <button class="track-filter-pill" data-track="office">
+            <span>📁 Back Office & Cloud</span>
+            <span class="track-count">3</span>
+          </button>
+          <button class="track-filter-pill" data-track="frontoffice">
+            <span>🗣️ English & Soft Skills</span>
+            <span class="track-count">3</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 1: ALL CERTIFIED CAREER PROGRAMS CATALOG & RESULTS -->
+    <main class="courses-showcase-section" id="catalogSection">
+      <div class="recommended-header">
+        <span class="section-kicker kicker-blue">🌟 Comprehensive Catalog</span>
+        <h2 class="recommended-title">All Certified Career Programs</h2>
+        <p class="recommended-subtitle">
+          Browse all career tracks or use the search box above to find specific software courses.
+        </p>
+      </div>
+
+      <div class="section-status-bar">
+        <div class="results-count-text" id="resultsCount">Showing All Career Courses</div>
+        <div style="font-size: 0.85rem; color: #64748B;">
+          Sudharm Infotech • MKCL Authorized Center
+        </div>
+      </div>
+
+      <!-- Course Cards Grid -->
+      <div class="courses-grid" id="coursesGrid">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+    </main>
+
+    <!-- SECTION 2: RECOMMENDED CAREER COURSES (Placed below catalog/results) -->
+    <section class="recommended-courses-section anim-fade-in-up" id="recommendedSection">
+      <div class="recommended-header">
+        <span class="section-kicker kicker-gold">⭐ High Demand Career Pathways</span>
+        <h2 class="recommended-title">Recommended Career Courses</h2>
+        <p class="recommended-subtitle">
+          Essential programs curated by Proff. Hemant Mahale for college students, job seekers, and career growth. Includes MS-CIT, Tally Prime with GST, Python, C/C++, Graphic Designing, and AutoCAD.
+        </p>
+      </div>
+      <div class="recommended-grid" id="recommendedGrid">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+    </section>
+
+    <!-- Full-Window Dedicated Course Details View -->
+    <div class="modal-overlay modal-full-window" id="introModal" role="dialog" aria-modal="true">
+      <div class="full-window-container anim-fade-in-scale">
+        <!-- Dedicated Top Sticky Bar -->
+        <div class="fullscreen-topbar">
+          <button class="btn-topbar-back" data-action="close-modal" title="Return to Course Catalog">
+            <span style="font-size: 1.1rem;">←</span>
+            <span>Back to All Courses</span>
+          </button>
+          <div class="topbar-center-branding">
+            <strong>Sudharm Infotech</strong> • MKCL Authorised Centre • Teacher: <strong>Proff. Hemant Mahale</strong> (📞 9271226772)
+          </div>
+          <div class="topbar-actions-right">
+            <a href="https://wa.me/919271226772" target="_blank" class="topbar-whatsapp-btn" title="Contact Teacher on WhatsApp">
+              <span>💬 WhatsApp Inquiries</span>
+            </a>
+            <button class="topbar-close-btn" data-action="close-modal" title="Close Details">✕</button>
+          </div>
+        </div>
+
+        <div id="introModalBody" class="fullscreen-scroll-content">
+          <!-- Filled dynamically by app.js -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Course Comparison Tool Modal -->
+    <div class="modal-overlay" id="compareModal" role="dialog" aria-modal="true">
+      <div class="compare-modal-content anim-fade-in-scale">
+        <button class="modal-close-btn" data-action="close-modal" title="Close comparison">✕</button>
+        <div id="compareModalBody">
+          <!-- Filled dynamically by app.js -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Smart Course Finder / Career Counselor Quiz Modal -->
+    <div class="modal-overlay" id="quizModal" role="dialog" aria-modal="true">
+      <div class="modal-content-lg anim-fade-in-scale" style="max-width: 720px; padding: 36px;">
+        <button class="modal-close-btn" data-action="close-modal" title="Close quiz">✕</button>
+        <div id="quizModalBody">
+          <!-- Filled dynamically by app.js -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Student Admission Proposal / Fee Quote Generator Modal -->
+    <div class="modal-overlay" id="proposalModal" role="dialog" aria-modal="true">
+      <div class="modal-content-lg anim-fade-in-scale" style="max-width: 860px; padding: 32px;">
+        <button class="modal-close-btn no-print" data-action="close-modal" title="Close proposal">✕</button>
+        <div id="proposalModalBody">
+          <!-- Filled dynamically by app.js -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Cinema-Grade Fullscreen Presentation / Slideshow Deck -->
+    <div class="slideshow-overlay" id="slideshowOverlay">
+      <!-- Top Deck Bar -->
+      <div class="slideshow-header">
+        <div class="slideshow-logo">
+          <span>🎓</span>
+          <span>MKCL Career Course Showcase Presentation</span>
+        </div>
+        <div class="slideshow-counter">
+          Slide <span id="slideCurrentNum">1</span> of <span id="slideTotalNum">27</span>
+        </div>
+        <div class="slideshow-controls-top">
+          <button class="btn-slide-nav" id="slidePrevBtn" title="Previous Slide (or Left Arrow)">◀ Previous</button>
+          <button class="btn-slide-nav" id="slideNextBtn" title="Next Slide (or Right Arrow / Space)">Next ▶</button>
+          <button class="btn-slide-nav" id="slideshowCloseBtn" style="background: rgba(239, 68, 68, 0.2); color: #F87171;" title="Exit Slideshow (or Esc)">✕ Close</button>
+        </div>
+      </div>
+
+      <!-- Main Stage -->
+      <div class="slideshow-stage" id="slideshowStage">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+
+      <!-- Slideshow Footer -->
+      <div class="slideshow-footer">
+        <div style="font-size: 0.85rem; color: #94A3B8;">
+          💡 <strong>Presenter Tip:</strong> Use <kbd>◀</kbd> and <kbd>▶</kbd> keyboard arrows to navigate smoothly during student & parent counseling.
+        </div>
+        <div style="font-size: 0.85rem; color: #E2E8F0;">
+          MKCL Authorized Learning Center Presentation Deck
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer & Compliance Notice -->
+    <footer class="footer-showcase">
+      <div class="footer-inner">
+        <div class="footer-grid">
+          <div class="footer-brand">
+            <h3>Sudharm Infotech</h3>
+            <p style="margin-bottom: 6px; font-size: 0.95rem; font-weight: 700; color: #F8FAFC;">
+              Teacher & Owner: Proff. Hemant Mahale &nbsp;|&nbsp; Contact: 9271226772
+            </p>
+            <p style="margin-bottom: 16px; font-size: 0.88rem; line-height: 1.6;">
+              Dedicated to delivering world-class, work-centric computer education to school and college students, job seekers, and working professionals. Certified lab infrastructure with personalized mentor guidance under Proff. Hemant Mahale.
+            </p>
+            <div class="footer-legal-notice">
+              <strong>⚠️ Trademark & Authorization Notice:</strong><br>
+              MKCL, MS-CIT, KLiC, and MSBTE logos, trademarks, and curricula are registered intellectual property of <strong>Maharashtra Knowledge Corporation Limited (MKCL)</strong> and MSBTE. This interactive application is prepared for academic counseling, student orientation, and educational guidance at <strong>Sudharm Infotech</strong>.
+            </div>
+          </div>
+
+          <div>
+            <h4 style="color: #FFFFFF; font-size: 0.95rem; margin-bottom: 12px;">Top Career Tracks</h4>
+            <ul style="list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 0.84rem;">
+              <li>• Flagship MS-CIT & AI Literacy</li>
+              <li>• Tally Prime with GST & Advanced Excel</li>
+              <li>• Graphic Designing & Video Editing</li>
+              <li>• Python, Web Design & C/C++ Coding</li>
+              <li>• Hardware, Networking & Cyber Defense</li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 style="color: #FFFFFF; font-size: 0.95rem; margin-bottom: 12px;">Contact & Guidance</h4>
+            <div style="font-size: 0.85rem; color: #CBD5E1; line-height: 1.8;">
+              <div>📍 <strong>Sudharm Infotech</strong></div>
+              <div>👨‍🏫 Teacher: <strong>Proff. Hemant Mahale</strong></div>
+              <div>📞 Direct Call: <a href="tel:9271226772" style="color: #38BDF8; font-weight: 700;">9271226772</a></div>
+              <div>💬 WhatsApp: <a href="https://wa.me/919271226772" target="_blank" style="color: #4ADE80; font-weight: 700;">+91 9271226772</a></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer-bottom-bar">
+          <div>© 2026 <strong>Sudharm Infotech</strong>. All rights reserved. Directed by <strong>Proff. Hemant Mahale</strong>.</div>
+          <div style="font-weight: 700; color: #F1F5F9; letter-spacing: 0.5px;">
+            ⚡ Powered by <span style="color: #F43F5E;">Arp Group Of Technology, Research & Developement</span>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- JavaScript Data Store & Application Controller -->
+  <script src="js/courses_data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

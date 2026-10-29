@@ -80,92 +80,179 @@ class ThemeSelector(ft.Container):
         is_active = (self.tm.current_theme_id == theme_id)
 
         # Miniature realistic UI preview
-        preview_box = ft.Container(
-            height=95,
-            border_radius=tokens.RADIUS_MD,
-            bgcolor=tokens.BACKGROUND,
-            border=ft.Border.all(tokens.border_width, tokens.BORDER),
-            padding=ft.Padding(10, 10, 10, 10),
-            content=ft.Column(
+        if theme_id == "arp_studio":
+            preview_box = ft.Container(
+                height=95,
+                border_radius=tokens.RADIUS_MD,
+                bgcolor="#16192E",
+                border=ft.Border.all(tokens.border_width, "#2A2E4D"),
+                clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+                content=ft.Column(
+                    controls=[
+                        # Dark Midnight Header with glowing cyan bar & mini notch
+                        ft.Container(
+                            padding=ft.Padding(8, 6, 8, 4),
+                            content=ft.Row(
+                                controls=[
+                                    ft.Row([
+                                        ft.Container(width=10, height=10, border_radius=5, bgcolor="#38BDF8"),
+                                        ft.Container(width=28, height=4, border_radius=2, bgcolor="#4361EE"),
+                                    ], spacing=3),
+                                    # Glowing liquid progress bar
+                                    ft.Container(
+                                        width=50,
+                                        height=3,
+                                        border_radius=2,
+                                        bgcolor="#38BDF8",
+                                        shadow=[ft.BoxShadow(spread_radius=0, blur_radius=6, color="#38BDF8AA")],
+                                    ),
+                                ],
+                                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                            ),
+                        ),
+                        # Soft Frosted Pearl Lower Half with squircle icon chips and floating sync button
+                        ft.Container(
+                            expand=True,
+                            bgcolor="#EDF0F8",
+                            border_radius=ft.BorderRadius(14, 14, tokens.RADIUS_MD, tokens.RADIUS_MD),
+                            padding=ft.Padding(8, 6, 8, 6),
+                            content=ft.Row(
+                                controls=[
+                                    # Squircle 1: Amber folder
+                                    ft.Container(
+                                        width=20, height=20, border_radius=6, bgcolor="#FFFFFF",
+                                        shadow=[ft.BoxShadow(blur_radius=4, color="#00000010", offset=ft.Offset(0, 2))],
+                                        content=ft.Icon(ft.Icons.FOLDER, size=12, color="#F59E0B"),
+                                        alignment=ft.Alignment(0, 0),
+                                    ),
+                                    # Squircle 2: Cyan media
+                                    ft.Container(
+                                        width=20, height=20, border_radius=6, bgcolor="#FFFFFF",
+                                        shadow=[ft.BoxShadow(blur_radius=4, color="#00000010", offset=ft.Offset(0, 2))],
+                                        content=ft.Icon(ft.Icons.IMAGE, size=12, color="#0EA5E9"),
+                                        alignment=ft.Alignment(0, 0),
+                                    ),
+                                    # Squircle 3: Magenta audio
+                                    ft.Container(
+                                        width=20, height=20, border_radius=6, bgcolor="#FFFFFF",
+                                        shadow=[ft.BoxShadow(blur_radius=4, color="#00000010", offset=ft.Offset(0, 2))],
+                                        content=ft.Icon(ft.Icons.GRAPHIC_EQ, size=12, color="#EC4899"),
+                                        alignment=ft.Alignment(0, 0),
+                                    ),
+                                    # Floating circular sync button
+                                    ft.Container(
+                                        width=22, height=22, border_radius=11, bgcolor="#FFFFFF",
+                                        border=ft.Border.all(1, "#D5DCF0"),
+                                        shadow=[ft.BoxShadow(blur_radius=6, color="#4361EE22", offset=ft.Offset(0, 2))],
+                                        content=ft.Icon(ft.Icons.SYNC, size=13, color="#4361EE"),
+                                        alignment=ft.Alignment(0, 0),
+                                    ),
+                                ],
+                                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                        ),
+                    ],
+                    spacing=0,
+                ),
+            )
+            swatches = ft.Row(
                 controls=[
-                    # Simulated Topbar
-                    ft.Row(
-                        controls=[
-                            ft.Row(
-                                controls=[
-                                    ft.Container(width=14, height=14, border_radius=tokens.RADIUS_SM, bgcolor=tokens.PRIMARY),
-                                    ft.Container(width=32, height=6, border_radius=2, bgcolor=tokens.TEXT_SECONDARY),
-                                ],
-                                spacing=4,
-                            ),
-                            ft.Row(
-                                controls=[
-                                    ft.Container(width=40, height=14, border_radius=tokens.RADIUS_PILL, bgcolor=tokens.PRIMARY_LIGHT),
-                                    ft.Container(width=12, height=12, border_radius=tokens.RADIUS_PILL, bgcolor=tokens.SECONDARY),
-                                ],
-                                spacing=4,
-                            ),
-                        ],
-                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                    ),
-                    # Simulated Content Area with Card
-                    ft.Row(
-                        controls=[
-                            # Mini Sidebar
-                            ft.Column(
-                                controls=[
-                                    ft.Container(width=12, height=4, border_radius=1, bgcolor=tokens.PRIMARY),
-                                    ft.Container(width=10, height=4, border_radius=1, bgcolor=tokens.TEXT_MUTED),
-                                    ft.Container(width=10, height=4, border_radius=1, bgcolor=tokens.TEXT_MUTED),
-                                ],
-                                spacing=3,
-                            ),
-                            # Mini Metric Card
-                            ft.Container(
-                                expand=True,
-                                height=46,
-                                bgcolor=tokens.SURFACE,
-                                border_radius=tokens.RADIUS_SM,
-                                border=ft.Border.all(tokens.border_width, tokens.BORDER),
-                                shadow=tokens.shadows,
-                                padding=ft.Padding(6, 6, 6, 6),
-                                content=ft.Row(
-                                    controls=[
-                                        ft.Container(width=4, height=22, border_radius=2, bgcolor=tokens.PRIMARY),
-                                        ft.Column(
-                                            controls=[
-                                                ft.Container(width=44, height=6, border_radius=2, bgcolor=tokens.TEXT_PRIMARY),
-                                                ft.Container(width=28, height=4, border_radius=2, bgcolor=tokens.TEXT_MUTED),
-                                            ],
-                                            spacing=2,
-                                            alignment=ft.MainAxisAlignment.CENTER,
-                                        ),
-                                    ],
-                                    spacing=6,
-                                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                                ),
-                            ),
-                        ],
-                        spacing=8,
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                        expand=True,
-                    ),
+                    ft.Container(width=18, height=18, border_radius=tokens.RADIUS_PILL, bgcolor="#4361EE", tooltip="Liquid Cobalt Primary"),
+                    ft.Container(width=18, height=18, border_radius=tokens.RADIUS_PILL, bgcolor="#38BDF8", tooltip="Neon Cyan Glow"),
+                    ft.Container(width=18, height=18, border_radius=tokens.RADIUS_PILL, bgcolor="#EC4899", tooltip="Liquid Sunset Coral"),
+                    ft.Container(width=18, height=18, border_radius=tokens.RADIUS_PILL, bgcolor="#16192E", border=ft.Border.all(1, "#333A5C"), tooltip="Midnight Indigo"),
+                    ft.Container(width=18, height=18, border_radius=tokens.RADIUS_PILL, bgcolor="#EDF0F8", border=ft.Border.all(1, tokens.BORDER), tooltip="Frosted Pearl Base"),
                 ],
-                spacing=6,
-            ),
-        )
+                spacing=5,
+            )
+        else:
+            preview_box = ft.Container(
+                height=95,
+                border_radius=tokens.RADIUS_MD,
+                bgcolor=tokens.BACKGROUND,
+                border=ft.Border.all(tokens.border_width, tokens.BORDER),
+                padding=ft.Padding(10, 10, 10, 10),
+                content=ft.Column(
+                    controls=[
+                        # Simulated Topbar
+                        ft.Row(
+                            controls=[
+                                ft.Row(
+                                    controls=[
+                                        ft.Container(width=14, height=14, border_radius=tokens.RADIUS_SM, bgcolor=tokens.PRIMARY),
+                                        ft.Container(width=32, height=6, border_radius=2, bgcolor=tokens.TEXT_SECONDARY),
+                                    ],
+                                    spacing=4,
+                                ),
+                                ft.Row(
+                                    controls=[
+                                        ft.Container(width=40, height=14, border_radius=tokens.RADIUS_PILL, bgcolor=tokens.PRIMARY_LIGHT),
+                                        ft.Container(width=12, height=12, border_radius=tokens.RADIUS_PILL, bgcolor=tokens.SECONDARY),
+                                    ],
+                                    spacing=4,
+                                ),
+                            ],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        ),
+                        # Simulated Content Area with Card
+                        ft.Row(
+                            controls=[
+                                # Mini Sidebar
+                                ft.Column(
+                                    controls=[
+                                        ft.Container(width=12, height=4, border_radius=1, bgcolor=tokens.PRIMARY),
+                                        ft.Container(width=10, height=4, border_radius=1, bgcolor=tokens.TEXT_MUTED),
+                                        ft.Container(width=10, height=4, border_radius=1, bgcolor=tokens.TEXT_MUTED),
+                                    ],
+                                    spacing=3,
+                                ),
+                                # Mini Metric Card
+                                ft.Container(
+                                    expand=True,
+                                    height=46,
+                                    bgcolor=tokens.SURFACE,
+                                    border_radius=tokens.RADIUS_SM,
+                                    border=ft.Border.all(tokens.border_width, tokens.BORDER),
+                                    shadow=tokens.shadows,
+                                    padding=ft.Padding(6, 6, 6, 6),
+                                    content=ft.Row(
+                                        controls=[
+                                            ft.Container(width=4, height=22, border_radius=2, bgcolor=tokens.PRIMARY),
+                                            ft.Column(
+                                                controls=[
+                                                    ft.Container(width=44, height=6, border_radius=2, bgcolor=tokens.TEXT_PRIMARY),
+                                                    ft.Container(width=28, height=4, border_radius=2, bgcolor=tokens.TEXT_MUTED),
+                                                ],
+                                                spacing=2,
+                                                alignment=ft.MainAxisAlignment.CENTER,
+                                            ),
+                                        ],
+                                        spacing=6,
+                                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                    ),
+                                ),
+                            ],
+                            spacing=8,
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            expand=True,
+                        ),
+                    ],
+                    spacing=6,
+                ),
+            )
 
-        # Palette color swatch chips
-        swatches = ft.Row(
-            controls=[
-                ft.Container(width=18, height=18, border_radius=tokens.RADIUS_PILL, bgcolor=tokens.PRIMARY, tooltip="Primary Accent"),
-                ft.Container(width=18, height=18, border_radius=tokens.RADIUS_PILL, bgcolor=tokens.PRIMARY_HOVER, tooltip="Primary Hover"),
-                ft.Container(width=18, height=18, border_radius=tokens.RADIUS_PILL, bgcolor=tokens.SECONDARY, tooltip="Secondary"),
-                ft.Container(width=18, height=18, border_radius=tokens.RADIUS_PILL, bgcolor=tokens.SURFACE, border=ft.Border.all(1, tokens.BORDER), tooltip="Surface"),
-                ft.Container(width=18, height=18, border_radius=tokens.RADIUS_PILL, bgcolor=tokens.BACKGROUND, border=ft.Border.all(1, tokens.BORDER), tooltip="Background"),
-            ],
-            spacing=5,
-        )
+            # Palette color swatch chips
+            swatches = ft.Row(
+                controls=[
+                    ft.Container(width=18, height=18, border_radius=tokens.RADIUS_PILL, bgcolor=tokens.PRIMARY, tooltip="Primary Accent"),
+                    ft.Container(width=18, height=18, border_radius=tokens.RADIUS_PILL, bgcolor=tokens.PRIMARY_HOVER, tooltip="Primary Hover"),
+                    ft.Container(width=18, height=18, border_radius=tokens.RADIUS_PILL, bgcolor=tokens.SECONDARY, tooltip="Secondary"),
+                    ft.Container(width=18, height=18, border_radius=tokens.RADIUS_PILL, bgcolor=tokens.SURFACE, border=ft.Border.all(1, tokens.BORDER), tooltip="Surface"),
+                    ft.Container(width=18, height=18, border_radius=tokens.RADIUS_PILL, bgcolor=tokens.BACKGROUND, border=ft.Border.all(1, tokens.BORDER), tooltip="Background"),
+                ],
+                spacing=5,
+            )
 
         # Active status badge
         badge = ft.Container(

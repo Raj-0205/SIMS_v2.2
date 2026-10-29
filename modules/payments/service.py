@@ -61,7 +61,46 @@ class PaymentService(BaseService):
         if mode_str not in ("CASH", "UPI", "CARD", "NET_BANKING", "CHEQUE"):
             raise ValidationError(f"Invalid payment mode '{mode_str}'.")
 
+        # Transaction Reference Format & Anti-Fraud Validation
+        clean_tx_ref = dto.transaction_ref.strip() if dto.transaction_ref else None
+        if mode_str in ("UPI", "NET_BANKING"):
+            if mode_str == "UPI" and not clean_tx_ref:
+                raise ValidationError("Bank UTR / Transaction Reference Number is mandatory for UPI payments.")
+            if clean_tx_ref:
+                if len(clean_tx_ref) != 12 or not clean_tx_ref.isdigit():
+                    raise ValidationError(
+                        f"Invalid Transaction Reference '{clean_tx_ref}'. Bank UTR / UPI Reference Number must be exactly 12 numeric digits."
+                    )
+                dummy_refs = {
+                    "000000000000", "111111111111", "222222222222", "333333333333",
+                    "444444444444", "555555555555", "666666666666", "777777777777",
+                    "888888888888", "999999999999", "123456789012"
+                }
+                if clean_tx_ref in dummy_refs:
+                    raise ValidationError(
+                        f"Invalid Transaction Reference '{clean_tx_ref}'. Dummy reference numbers are not permitted."
+                    )
+        elif clean_tx_ref:
+            dummy_refs = {
+                "123", "1234", "12345", "123456", "0000", "000000", "000000000000",
+                "test", "testing", "dummy", "sample", "na", "n/a", "cash", "upi", "none", "null", "nil"
+            }
+            if clean_tx_ref.lower() in dummy_refs or len(clean_tx_ref) < 4:
+                raise ValidationError(
+                    f"Invalid Transaction Reference '{clean_tx_ref}'. Please enter a valid transaction reference."
+                )
+
         with self.unit_of_work():
+            # Duplicate Transaction Replay Prevention
+            if clean_tx_ref:
+                existing_tx = self.repository.get_by_transaction_ref(clean_tx_ref)
+                if existing_tx:
+                    dup_adm = existing_tx.get("admission_id")
+                    dup_date = existing_tx.get("payment_date") or "earlier date"
+                    raise ValidationError(
+                        f"Security Alert: Transaction Reference / UTR '{clean_tx_ref}' has already been recorded for Admission #{dup_adm} on {dup_date}. Duplicate payment reference cannot be reused."
+                    )
+
             # 1. Fetch & Validate Admission
             adm = self.admission_repo.get_by_id(dto.admission_id)
             if not adm:
@@ -154,12 +193,14 @@ class PaymentService(BaseService):
                 payment_mode=mode_str,
                 collector_name=dto.collector_name.strip(),
                 generated_by=dto.created_by,
+                transaction_ref=clean_tx_ref,
             )
 
             context_data = {
                 "student_name": student_name,
                 "candidate_number": cand_num,
                 "course_name": course_name,
+                "transaction_ref": clean_tx_ref,
             }
 
             self.receipt_service.create_receipt(receipt_dto, context_data=context_data)
@@ -188,9 +229,14 @@ class PaymentService(BaseService):
                 context=self.__class__.__name__,
             )
 
-        # Invalidate fees cache upon successful transaction commit
+        # Targeted in-memory cache update upon successful transaction commit (R3, R4, R11, R12, R14)
         from core.cache.fees_cache import FeesCacheManager
-        FeesCacheManager.invalidate(f"Payment recorded #{payment_id}")
+        FeesCacheManager.targeted_payment_update(
+            admission_id=dto.admission_id,
+            installment_number=next_inst,
+            amount=float(dto.amount),
+            new_status=new_status,
+        )
 
         return payment_id
 

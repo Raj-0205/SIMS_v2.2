@@ -13,6 +13,97 @@ from modules.course.views.course_fee_dialog import CourseFeeDialog
 
 __all__ = ["CourseFormModal"]
 
+PRESETS = {
+    "PYTHON_AI": {
+        "code": "KLIC-PYTHON-AI",
+        "name": "Python with Generative AI & Automation",
+        "category": "Programming",
+        "duration": "2 Months (120 Hours)",
+        "fee": "6500.0",
+        "desc": "Hands-on Python programming, Object-Oriented Design, Generative AI APIs, automation scripts, and full project portfolio.",
+        "tools": "Python 3.12, VS Code, Git, Google Gemini API, Streamlit",
+        "roles": "Python Developer, AI Automation Specialist, Data Associate",
+        "salary": "₹25,000 - ₹45,000 / month",
+    },
+    "FULLSTACK_WEB": {
+        "code": "KLIC-FULLSTACK",
+        "name": "Full Stack Web & Frontend Development",
+        "category": "Development",
+        "duration": "3 Months (150 Hours)",
+        "fee": "7500.0",
+        "desc": "HTML5, CSS3, JavaScript modern ES6+, React fundamentals, responsive UI design, and backend REST API integration.",
+        "tools": "HTML5, CSS3, JavaScript, React, Bootstrap 5, Git, VS Code",
+        "roles": "Frontend Developer, Web Designer, Junior Full Stack Engineer",
+        "salary": "₹22,000 - ₹40,000 / month",
+    },
+    "TALLY_GST": {
+        "code": "KLIC-TALLY-PRO",
+        "name": "Tally Prime with Corporate GST & TDS",
+        "category": "Accounting",
+        "duration": "2 Months (100 Hours)",
+        "fee": "5500.0",
+        "desc": "Practical computerized financial accounting in TallyPrime, GST returns, e-Way bills, payroll, and TDS compliance.",
+        "tools": "TallyPrime 4.0, GST Portal Simulator, E-Way Bill System, MS Excel",
+        "roles": "Senior Accounts Executive, GST Practitioner, Taxation Assistant",
+        "salary": "₹20,000 - ₹35,000 / month",
+    },
+    "ADV_EXCEL": {
+        "code": "KLIC-EXCEL-BI",
+        "name": "Advanced Excel & MIS Business Analytics",
+        "category": "Office",
+        "duration": "1 Month (60 Hours)",
+        "fee": "4500.0",
+        "desc": "Master dynamic formulas (XLOOKUP), Power Query, interactive dashboards, Pivot Tables, and automated MIS reporting.",
+        "tools": "Microsoft Excel 2021, Power Query, Pivot Tables, Google Sheets",
+        "roles": "MIS Executive, Business Data Analyst, Operations Specialist",
+        "salary": "₹18,000 - ₹32,000 / month",
+    },
+    "GRAPHIC_UI": {
+        "code": "KLIC-CREATIVE",
+        "name": "Graphic Designing, Branding & UI/UX",
+        "category": "Design",
+        "duration": "2 Months (120 Hours)",
+        "fee": "6000.0",
+        "desc": "Creative vector illustration, photo manipulation, social media branding, typography, and modern Figma UI prototypes.",
+        "tools": "Adobe Photoshop, Illustrator, CorelDRAW, Figma, Canva Pro",
+        "roles": "Graphic Designer, Creative Content Artist, UI/UX Designer",
+        "salary": "₹20,000 - ₹38,000 / month",
+    },
+    "CYBER_NET": {
+        "code": "KLIC-CYBERSEC",
+        "name": "Cyber Security & Ethical Network Defense",
+        "category": "General",
+        "duration": "2 Months (120 Hours)",
+        "fee": "7000.0",
+        "desc": "Network defense fundamentals, vulnerability scanning, system hardening, firewall configuration, and incident basics.",
+        "tools": "Wireshark, Nmap, Linux Terminal, VirtualBox, Packet Tracer",
+        "roles": "Cyber Security Analyst, Network Defense Associate, Desktop Engineer",
+        "salary": "₹25,000 - ₹50,000 / month",
+    },
+    "DIGITAL_MKT": {
+        "code": "KLIC-DIGITAL",
+        "name": "Digital Marketing & Freelance Growth",
+        "category": "General",
+        "duration": "2 Months (90 Hours)",
+        "fee": "5000.0",
+        "desc": "SEO optimization, social media marketing (Meta & Google Ads), content strategy, AI copy generation, and client freelancing.",
+        "tools": "Google Analytics, Meta Ads Manager, Canva, WordPress, ChatGPT",
+        "roles": "Digital Marketer, Social Media Manager, Freelance Growth Specialist",
+        "salary": "₹20,000 - ₹35,000 / month",
+    },
+    "CLOUD_OFFICE": {
+        "code": "KLIC-GWORKSPACE-PRO",
+        "name": "Google Workspace & Modern Office Administration",
+        "category": "Office",
+        "duration": "1 Month (60 Hours)",
+        "fee": "4000.0",
+        "desc": "Professional cloud office administration: Docs, Sheets, Slides, Drive collaboration, Gmail automation, and forms.",
+        "tools": "Google Workspace, Docs, Sheets, Drive, Forms, MS Office 365",
+        "roles": "Office Executive, Executive Assistant, Administrative Coordinator",
+        "salary": "₹16,000 - ₹28,000 / month",
+    },
+}
+
 
 class CourseFormModal(ft.AlertDialog):
     """
@@ -37,17 +128,38 @@ class CourseFormModal(ft.AlertDialog):
         # Dialog Title
         title_text = "Edit Course" if self.is_edit else "Add New Course"
         icon_name = ft.Icons.EDIT if self.is_edit else ft.Icons.ADD_BOX
-        self.title = ft.Row(
-            controls=[
-                ft.Icon(icon_name, color=AppTheme.PRIMARY, size=24),
-                ft.Text(
-                    title_text,
-                    size=AppTheme.SIZE_H2,
-                    weight=ft.FontWeight.W_600,
-                    color=AppTheme.TEXT_PRIMARY,
-                ),
+        self.title = ft.SelectionArea(
+            content=ft.Row(
+                controls=[
+                    ft.Icon(icon_name, color=AppTheme.PRIMARY, size=24),
+                    ft.Text(
+                        title_text,
+                        size=AppTheme.SIZE_H2,
+                        weight=ft.FontWeight.W_600,
+                        color=AppTheme.TEXT_PRIMARY,
+                    ),
+                ],
+                spacing=AppTheme.PAD_SM,
+            ),
+        )
+
+        # Ready Format Preset Selector (in Create mode)
+        self.preset_dropdown = ft.Dropdown(
+            label="⚡ Load Ready-to-List Preset Template",
+            options=[
+                ft.DropdownOption(key="CUSTOM", text="Custom / Blank (Enter Details Manually)"),
+                ft.DropdownOption(key="PYTHON_AI", text="Python with Generative AI & Automation"),
+                ft.DropdownOption(key="FULLSTACK_WEB", text="Full Stack Web & Frontend Development"),
+                ft.DropdownOption(key="TALLY_GST", text="Tally Prime with Corporate GST & TDS"),
+                ft.DropdownOption(key="ADV_EXCEL", text="Advanced Excel & MIS Business Analytics"),
+                ft.DropdownOption(key="GRAPHIC_UI", text="Graphic Designing, Branding & UI/UX"),
+                ft.DropdownOption(key="CYBER_NET", text="Cyber Security & Ethical Network Defense"),
+                ft.DropdownOption(key="DIGITAL_MKT", text="Digital Marketing & Freelance Growth"),
+                ft.DropdownOption(key="CLOUD_OFFICE", text="Google Workspace & Office Administration"),
             ],
-            spacing=AppTheme.PAD_SM,
+            value="CUSTOM",
+            border_radius=AppTheme.RADIUS_MD,
+            on_select=self._handle_preset_change,
         )
 
         # 1. Course Code Input
@@ -160,6 +272,28 @@ class CourseFormModal(ft.AlertDialog):
                 border=ft.Border.all(1, AppTheme.BORDER),
             )
 
+        # 8. Showcase Presentation Fields
+        self.tools_input = ft.TextField(
+            label="Software & Tools Mastered",
+            hint_text="e.g. Python, VS Code, Git, Google Gemini API",
+            border_radius=AppTheme.RADIUS_MD,
+            text_size=AppTheme.SIZE_BODY,
+        )
+        self.roles_input = ft.TextField(
+            label="Target Job Roles / Opportunities",
+            hint_text="e.g. Python Developer, Automation Specialist",
+            border_radius=AppTheme.RADIUS_MD,
+            text_size=AppTheme.SIZE_BODY,
+            expand=True,
+        )
+        self.salary_input = ft.TextField(
+            label="Starting Salary Scope",
+            hint_text="e.g. ₹25,000 - ₹45,000 / month",
+            border_radius=AppTheme.RADIUS_MD,
+            text_size=AppTheme.SIZE_BODY,
+            width=200,
+        )
+
         # Error Container
         self.error_text = ft.Text("", color=AppTheme.DANGER, size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.W_500)
         self.error_container = ft.Container(
@@ -168,20 +302,41 @@ class CourseFormModal(ft.AlertDialog):
             padding=ft.Padding(8, 4, 8, 4),
         )
 
-        self.content = ft.Container(
-            content=ft.Column(
+        form_controls = []
+        if not self.is_edit:
+            form_controls.append(self.preset_dropdown)
+            form_controls.append(ft.Divider(height=6, color=AppTheme.BORDER))
+
+        form_controls.extend([
+            ft.Row(controls=[self.code_input, self.category_dropdown], spacing=AppTheme.PAD_MD),
+            self.name_input,
+            ft.Row(controls=[self.duration_input, self.status_dropdown], spacing=AppTheme.PAD_MD),
+            fee_control,
+            self.description_input,
+            ft.Divider(height=6, color=AppTheme.BORDER),
+            ft.Row(
                 controls=[
-                    ft.Row(controls=[self.code_input, self.category_dropdown], spacing=AppTheme.PAD_MD),
-                    self.name_input,
-                    ft.Row(controls=[self.duration_input, self.status_dropdown], spacing=AppTheme.PAD_MD),
-                    fee_control,
-                    self.description_input,
-                    self.error_container,
+                    ft.Icon(ft.Icons.AUTO_AWESOME, color=ft.Colors.AMBER_600, size=16),
+                    ft.Text("🌟 Showcase Presentation Highlights (Optional)", size=12, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
                 ],
-                spacing=AppTheme.PAD_MD,
-                tight=True,
+                spacing=6,
             ),
-            width=540,
+            self.tools_input,
+            ft.Row(controls=[self.roles_input, self.salary_input], spacing=AppTheme.PAD_MD),
+            self.error_container,
+        ])
+
+        self.content = ft.Container(
+            content=ft.SelectionArea(
+                content=ft.Column(
+                    controls=form_controls,
+                    spacing=AppTheme.PAD_MD,
+                    tight=True,
+                    scroll=ft.ScrollMode.AUTO,
+                ),
+            ),
+            width=580,
+            height=540,
             padding=ft.Padding(0, 8, 0, 0),
         )
 
@@ -198,6 +353,24 @@ class CourseFormModal(ft.AlertDialog):
             on_click=self.close_dialog,
         )
         self.actions = [self.cancel_btn, self.save_btn]
+
+    def _handle_preset_change(self, e: ft.ControlEvent) -> None:
+        """Populates all course fields from selected ready-to-list preset template."""
+        key = self.preset_dropdown.value
+        preset = PRESETS.get(key)
+        if not preset:
+            return
+        self.code_input.value = preset["code"]
+        self.name_input.value = preset["name"]
+        self.category_dropdown.value = preset["category"]
+        self.duration_input.value = preset["duration"]
+        if hasattr(self, "fee_input"):
+            self.fee_input.value = preset["fee"]
+        self.description_input.value = preset["desc"]
+        self.tools_input.value = preset["tools"]
+        self.roles_input.value = preset["roles"]
+        self.salary_input.value = preset["salary"]
+        self._safe_update()
 
     def _open_fee_dialog(self, e: ft.ControlEvent) -> None:
         """Opens dedicated fee authorization dialog from edit modal."""
@@ -286,6 +459,24 @@ class CourseFormModal(ft.AlertDialog):
                 f"Course #{saved_id} saved successfully.",
                 context=self.__class__.__name__,
             )
+
+            # Persist & sync into Showcase format
+            try:
+                from modules.course import showcase_adapter
+                course_dto = self.controller.get_course(saved_id)
+                raw_tools = str(self.tools_input.value or "").strip()
+                raw_roles = str(self.roles_input.value or "").strip()
+                raw_salary = str(self.salary_input.value or "").strip()
+
+                extra_showcase = {
+                    "tools": [t.strip() for t in raw_tools.split(",") if t.strip()] if raw_tools else None,
+                    "job_roles": [r.strip() for r in raw_roles.split(",") if r.strip()] if raw_roles else None,
+                    "salary_range": raw_salary if raw_salary else None,
+                }
+                showcase_dict = showcase_adapter.db_course_to_showcase(course_dto, extra_showcase)
+                showcase_adapter.persist_custom_course_to_showcase(showcase_dict)
+            except Exception as se:
+                LogService.warning(f"Could not persist custom showcase data: {se}", context=self.__class__.__name__)
 
             self.on_saved(saved_id)
             self.close_dialog()

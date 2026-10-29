@@ -24,6 +24,8 @@ class ContentHost(ft.Container):
             expand=True,
         )
 
+        self._is_loading: bool = False
+
         super().__init__(
             content=self.selection_area,
             expand=True,
@@ -31,6 +33,10 @@ class ContentHost(ft.Container):
             alignment=ft.Alignment.TOP_LEFT,
             animate_size=ft.Animation(250, ft.AnimationCurve.EASE_OUT),
         )
+
+    @property
+    def is_loading(self) -> bool:
+        return self._is_loading
 
     @property
     def content(self) -> ft.Control:
@@ -47,9 +53,28 @@ class ContentHost(ft.Container):
         else:
             self._values["content"] = val
 
+    def show_loader(
+        self,
+        route: str,
+        title: Optional[str] = None,
+        icon: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> ft.Control:
+        from ui.widgets.adaptive_loader import AdaptiveModuleLoader
+        loader = AdaptiveModuleLoader(route, title=title, icon=icon, description=description)
+        self._is_loading = True
+        self.switcher.content = loader
+        try:
+            self.update()
+        except (RuntimeError, AttributeError):
+            pass
+        return loader
+
     def mount(self, view: ft.Control) -> None:
+        self._is_loading = False
         self.switcher.content = view
         try:
             self.update()
-        except RuntimeError:
+        except (RuntimeError, AttributeError):
             pass
+

@@ -33,17 +33,19 @@ class CourseFeeDialog(ft.AlertDialog):
         self.controller = CourseController()
 
         # Dialog Header
-        self.title = ft.Row(
-            controls=[
-                ft.Icon(ft.Icons.LOCK, color=AppTheme.PRIMARY, size=24),
-                ft.Text(
-                    "Change Institute Course Fee",
-                    size=AppTheme.SIZE_H2,
-                    weight=ft.FontWeight.W_600,
-                    color=AppTheme.TEXT_PRIMARY,
-                ),
-            ],
-            spacing=AppTheme.PAD_SM,
+        self.title = ft.SelectionArea(
+            content=ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.LOCK, color=AppTheme.PRIMARY, size=24),
+                    ft.Text(
+                        "Change Institute Course Fee",
+                        size=AppTheme.SIZE_H2,
+                        weight=ft.FontWeight.W_600,
+                        color=AppTheme.TEXT_PRIMARY,
+                    ),
+                ],
+                spacing=AppTheme.PAD_SM,
+            ),
         )
 
         # Course Summary Box
@@ -140,17 +142,19 @@ class CourseFeeDialog(ft.AlertDialog):
         )
 
         self.content = ft.Container(
-            content=ft.Column(
-                controls=[
-                    summary_box,
-                    notice_box,
-                    self.new_fee_input,
-                    self.reason_input,
-                    self.pin_input,
-                    self.error_container,
-                ],
-                spacing=AppTheme.PAD_MD,
-                tight=True,
+            content=ft.SelectionArea(
+                content=ft.Column(
+                    controls=[
+                        summary_box,
+                        notice_box,
+                        self.new_fee_input,
+                        self.reason_input,
+                        self.pin_input,
+                        self.error_container,
+                    ],
+                    spacing=AppTheme.PAD_MD,
+                    tight=True,
+                ),
             ),
             width=480,
             padding=ft.Padding(0, 8, 0, 0),

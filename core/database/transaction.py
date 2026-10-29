@@ -69,7 +69,8 @@ class TransactionManager:
     def rollback(cls) -> None:
         state = cls._get_state()
         if not state.active or state.conn is None:
-            raise DatabaseExecutionError("No active transaction to rollback.")
+            cls._cleanup()
+            return
 
         try:
             state.conn.rollback()

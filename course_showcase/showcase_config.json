@@ -1,0 +1,43 @@
+{
+  "recommended_course_ids": [
+    "ms-cit",
+    "tally-prime-with-gst",
+    "python",
+    "c-cpp-programming",
+    "graphic-designing",
+    "autocad"
+  ],
+  "trending_course_ids": [
+    "ms-cit"
+  ],
+  "hidden_course_ids": [],
+  "course_sections": {
+    "ms-cit": "flagship",
+    "tally-prime-with-gst": "accounting",
+    "advanced-excel": "accounting",
+    "graphic-designing": "design",
+    "autocad": "design",
+    "3d-modelling": "design",
+    "introduction-to-3d-animation": "design",
+    "video-editing-techniques": "design",
+    "dtp-adobe-corel-draw": "design",
+    "content-illustrator": "design",
+    "python": "software",
+    "c-cpp-programming": "software",
+    "java": "software",
+    "web-designing": "software",
+    "php": "software",
+    "ai-ml-basics": "emerging",
+    "data-science": "emerging",
+    "digital-freelancing": "emerging",
+    "cyber-security": "hardware",
+    "desktop-support": "hardware",
+    "network-support": "hardware",
+    "data-entry-and-data-management": "office",
+    "google-workspace-expert": "office",
+    "office-assistance": "office",
+    "english": "frontoffice",
+    "soft-skills": "frontoffice",
+    "it": "frontoffice"
+  }
+}

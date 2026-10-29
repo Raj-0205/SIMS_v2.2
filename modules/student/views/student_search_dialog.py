@@ -22,7 +22,7 @@ class StudentSearchDialog(ft.AlertDialog):
         self.controller = controller
         self.on_student_selected = on_student_selected
         
-        self.title = ft.Text("Search Student")
+        self.title = ft.SelectionArea(content=ft.Text("Search Student"))
         self.modal = True
         
         # TODO (Commit Production Hardening): Add debounce (300ms) for real-time search
@@ -36,7 +36,7 @@ class StudentSearchDialog(ft.AlertDialog):
         
         self.results_list = ft.ListView(expand=1, spacing=5, height=350, width=500)
         
-        self.content = ft.Column(controls=[self.search_input, self.results_list], tight=True)
+        self.content = ft.SelectionArea(content=ft.Column(controls=[self.search_input, self.results_list], tight=True))
         self.actions = [ft.TextButton(content=ft.Text("Cancel"), on_click=self.close_dialog)]
 
     def handle_search(self, e: ft.ControlEvent) -> None:

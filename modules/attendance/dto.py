@@ -19,6 +19,7 @@ class BatchStudentDTO:
     course_id: int
     course_name: str
     admission_date: Optional[str]
+    photo_path: Optional[str] = None
     pending_fees: float = 0.0
     total_paid: float = 0.0
     final_fee: float = 0.0
@@ -140,3 +141,49 @@ class OCRScanResultDTO:
     total_present: int = 0
     total_absent: int = 0
     confidence_avg: float = 1.0
+
+
+@dataclass
+class OfflineRegisterConfigDTO:
+    """Configuration options for generating the multi-day Excel attendance register (.xlsx)."""
+    batch_id: int
+    duration_type: str = "15_DAYS"  # "8_DAYS", "15_DAYS", "1_MONTH", "2_MONTHS"
+    num_days: int = 15
+    start_date: str = ""  # YYYY-MM-DD
+    include_student_name: bool = True
+    include_contact_number: bool = True
+    include_admission_date: bool = False
+    include_pending_fees: bool = False
+
+
+@dataclass
+class ExcelAttendanceCellDiffDTO:
+    """Diff inspection item for an individual student attendance entry from Excel."""
+    student_id: int
+    student_name: str
+    candidate_number: Optional[str]
+    session_date: str
+    mark: str  # PRESENT / ABSENT
+    change_type: str  # NEW / OVERWRITE / UNCHANGED / INVALID
+    existing_status: Optional[str] = None
+    error_reason: Optional[str] = None
+
+
+@dataclass
+class ExcelAttendanceImportPreviewDTO:
+    """Comprehensive pre-import preview analyzing changes before committing .xlsx data."""
+    file_path: str
+    batch_id: int
+    batch_name: str
+    course_name: str
+    detected_dates: List[str] = field(default_factory=list)
+    total_cells_evaluated: int = 0
+    new_marks_count: int = 0
+    overwrite_marks_count: int = 0
+    unchanged_marks_count: int = 0
+    skipped_blank_count: int = 0
+    invalid_cells_count: int = 0
+    diff_items: List[ExcelAttendanceCellDiffDTO] = field(default_factory=list)
+    requires_admin_pin: bool = False
+    error_messages: List[str] = field(default_factory=list)
+

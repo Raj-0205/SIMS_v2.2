@@ -81,6 +81,13 @@ class DatabaseEngine:
         config = ConfigService.database()
         conn_timeout = config.busy_timeout / 1000.0
         
+        # Self-heal path if uninitialized
+        if cls._db_path is None:
+            project_root = Path(__file__).resolve().parent.parent.parent
+            safe_path = str(config.path).lstrip("/\\")
+            cls._db_path = (project_root / safe_path).resolve()
+            cls._db_path.parent.mkdir(parents=True, exist_ok=True)
+
         # Semantic mapping to SQLite's cryptic isolation_level
         iso_level = None if autocommit else ""
 
@@ -98,21 +105,22 @@ class DatabaseEngine:
         return conn
 
     @classmethod
-    def initialize(cls) -> None:
+    def initialize(cls, force: bool = False) -> None:
         """
         Initializes the Database Engine. 
         Normalizes paths, connects, applies & validates persistent PRAGMAs.
         """
-        if cls._is_initialized:
+        config = ConfigService.database()
+        project_root = Path(__file__).resolve().parent.parent.parent
+        safe_path = str(config.path).lstrip("/\\")
+        expected_path = (project_root / safe_path).resolve()
+
+        if cls._is_initialized and cls._db_path == expected_path and not force:
             return
 
         conn = None
         try:
-            config = ConfigService.database()
-            project_root = Path(__file__).resolve().parent.parent.parent
-            
-            safe_path = str(config.path).lstrip("/\\")
-            cls._db_path = (project_root / safe_path).resolve()
+            cls._db_path = expected_path
             cls._db_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Use lightweight connection (autocommit=True) for initialization
@@ -180,9 +188,7 @@ class DatabaseEngine:
         Uses standard transactional behavior (autocommit=False).
         """
         if not cls._is_initialized or cls._db_path is None:
-            raise DatabaseConnectionError(
-                "Database Engine is not initialized. Call initialize() first."
-            )
+            cls.initialize()
 
         conn = None
         try:
@@ -236,13 +242,17 @@ class DatabaseEngine:
     @classmethod
     def shutdown(cls) -> None:
         """Marks the Database Engine as offline."""
-        if cls._is_initialized:
+        if cls._is_initialized or cls._db_path is not None:
             cls._is_initialized = False
+            cls._db_path = None
             cls._DBLogger.info("Database Engine shut down successfully.")
+
     @classmethod
     def create_transaction_connection(cls) -> sqlite3.Connection:
         """
         Creates and returns a raw, transactional connection.
         Specifically exposed for the centralized TransactionManager.
         """
+        if not cls._is_initialized or cls._db_path is None:
+            cls.initialize()
         return cls._create_connection(autocommit=False)

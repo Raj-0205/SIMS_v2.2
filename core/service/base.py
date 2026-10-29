@@ -8,7 +8,6 @@ from core.logger.service import LogService
 from core.database.transaction import TransactionManager
 from core.database.exceptions import DatabaseError
 from core.exceptions import ServiceError, ValidationError, ConflictError, ArchitectureViolationError
-from core.exceptions import ArchitectureViolationError
 
 __all__ = ["BaseService"]
 
@@ -62,3 +61,6 @@ class BaseService:
             TransactionManager.rollback()
             LogService.error(f"Unexpected system failure during transaction: {exc}", context=cls.__name__)
             raise ServiceError("An unexpected system error occurred.") from exc
+        finally:
+            if TransactionManager.in_transaction():
+                TransactionManager.rollback()

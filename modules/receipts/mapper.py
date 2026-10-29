@@ -27,4 +27,5 @@ class ReceiptMapper:
             pdf_path=str(row["pdf_path"]) if row.get("pdf_path") else None,
             generated_at=str(row["generated_at"]) if row.get("generated_at") else None,
             generated_by=int(row["generated_by"]) if row.get("generated_by") else None,
+            transaction_ref=str(row["transaction_ref"]) if row.get("transaction_ref") else None,
         )

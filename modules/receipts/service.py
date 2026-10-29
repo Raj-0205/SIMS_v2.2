@@ -71,6 +71,7 @@ class ReceiptService(BaseService):
             "pending_amount": dto.pending_amount,
             "payment_mode": dto.payment_mode,
             "collector_name": dto.collector_name,
+            "transaction_ref": ctx.get("transaction_ref") or getattr(dto, "transaction_ref", None),
         }
 
         # Safe repository read without nested unit_of_work transaction

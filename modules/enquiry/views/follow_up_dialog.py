@@ -44,23 +44,36 @@ class EnquiryFollowUpDialog(ft.AlertDialog):
         self.follow_ups: list[FollowUpDTO] = []
 
         # Header Title
-        self.title = ft.Row(
-            controls=[
-                ft.Row(
-                    controls=[
-                        ft.Icon(ft.Icons.SUPPORT_AGENT, color=AppTheme.PRIMARY, size=24),
-                        ft.Text(f"Follow-up: {enquiry.student_name}", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
-                    ],
-                    spacing=AppTheme.PAD_SM,
-                ),
-                ft.IconButton(
-                    icon=ft.Icons.CLOSE,
-                    icon_size=20,
-                    tooltip="Close (Esc)",
-                    on_click=self.close_modal,
-                ),
-            ],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        self.title = ft.SelectionArea(
+            content=ft.Row(
+                controls=[
+                    ft.Row(
+                        controls=[
+                            ft.Container(
+                                content=ft.Icon(ft.Icons.SUPPORT_AGENT_ROUNDED, color=AppTheme.PRIMARY, size=22),
+                                padding=7,
+                                bgcolor="#EFF6FF",
+                                border_radius=AppTheme.RADIUS_SM,
+                            ),
+                            ft.Column(
+                                controls=[
+                                    ft.Text(f"Follow-up: {enquiry.student_name}", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
+                                    ft.Text("Multi-turn conversation timeline & counseling history", size=11, color=AppTheme.TEXT_SECONDARY),
+                                ],
+                                spacing=1,
+                            ),
+                        ],
+                        spacing=AppTheme.PAD_SM,
+                    ),
+                    ft.IconButton(
+                        icon=ft.Icons.CLOSE_ROUNDED,
+                        icon_size=20,
+                        tooltip="Close (Esc)",
+                        on_click=self.close_modal,
+                    ),
+                ],
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            )
         )
 
         # ── 1. Candidate Context Card ──
@@ -69,13 +82,16 @@ class EnquiryFollowUpDialog(ft.AlertDialog):
             content=ft.Text(cat_label, size=11, weight=ft.FontWeight.BOLD, color=cat_text),
             bgcolor=cat_bg,
             border=ft.Border.all(1, cat_border),
-            border_radius=12,
+            border_radius=ft.BorderRadius.all(8),
             padding=ft.Padding(8, 3, 8, 3),
         )
 
         self.whatsapp_btn = ft.OutlinedButton(
             content=ft.Row(
-                controls=[ft.Icon(ft.Icons.CHAT_ROUNDED, size=16, color="#16A34A"), ft.Text("WhatsApp Lead", color="#16A34A", size=12, weight=ft.FontWeight.BOLD)],
+                controls=[
+                    ft.Icon(ft.Icons.CHAT_ROUNDED, size=16, color="#16A34A"),
+                    ft.Text("WhatsApp Lead", color="#16A34A", size=12, weight=ft.FontWeight.BOLD),
+                ],
                 spacing=6,
             ),
             tooltip="Send pre-formatted WhatsApp message",
@@ -86,13 +102,37 @@ class EnquiryFollowUpDialog(ft.AlertDialog):
             on_click=self.handle_launch_whatsapp,
         )
 
+        initial = (enquiry.first_name[:1] if enquiry.first_name else (enquiry.student_name[:1] if enquiry.student_name else "E")).upper()
+        avatar = ft.CircleAvatar(
+            content=ft.Text(initial, size=13, weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
+            bgcolor=AppTheme.PRIMARY,
+            radius=16,
+        )
+
         context_card = ft.Container(
             content=ft.Row(
                 controls=[
+                    avatar,
                     ft.Column(
                         controls=[
-                            ft.Text(f"Mobile: {enquiry.mobile_number}  •  Course: {enquiry.interested_course or 'General Inquiry'}", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.W_600),
-                            ft.Text(f"Village/Area: {enquiry.village or 'Not Specified'}  •  Timing: {enquiry.preferred_timing or 'Any'}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
+                            ft.Row(
+                                controls=[
+                                    ft.Text(f"📞 {enquiry.mobile_number}", size=12, weight=ft.FontWeight.BOLD),
+                                    ft.Text("•", size=12, color=AppTheme.TEXT_MUTED),
+                                    ft.Text(f"📚 {enquiry.interested_course or 'General Inquiry'}", size=12, weight=ft.FontWeight.W_500),
+                                ],
+                                spacing=6,
+                                tight=True,
+                            ),
+                            ft.Row(
+                                controls=[
+                                    ft.Text(f"📍 {enquiry.village or 'Not Specified'}", size=11, color=AppTheme.TEXT_SECONDARY),
+                                    ft.Text("•", size=11, color=AppTheme.TEXT_MUTED),
+                                    ft.Text(f"🕒 Timing: {enquiry.preferred_timing or 'Any'}", size=11, color=AppTheme.TEXT_SECONDARY),
+                                ],
+                                spacing=6,
+                                tight=True,
+                            ),
                         ],
                         spacing=2,
                         expand=True,
@@ -102,8 +142,9 @@ class EnquiryFollowUpDialog(ft.AlertDialog):
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=10,
             ),
-            padding=ft.Padding(12, 10, 12, 10),
+            padding=ft.Padding(14, 10, 14, 10),
             bgcolor="#F8FAFC",
             border=ft.Border.all(1, "#E2E8F0"),
             border_radius=AppTheme.RADIUS_MD,
@@ -112,12 +153,13 @@ class EnquiryFollowUpDialog(ft.AlertDialog):
         # ── 2. Error Banner ──
         self.banner_text = ft.Text("", size=AppTheme.SIZE_CAPTION, color=AppTheme.DANGER, weight=ft.FontWeight.W_500)
         self.banner_container = ft.Container(
-            content=ft.Row([ft.Icon(ft.Icons.ERROR_OUTLINE, size=16, color=AppTheme.DANGER), self.banner_text], spacing=6),
+            content=ft.Row([ft.Icon(ft.Icons.ERROR_OUTLINE_ROUNDED, size=16, color=AppTheme.DANGER), self.banner_text], spacing=6),
             padding=ft.Padding(10, 6, 10, 6),
             bgcolor="#FEF2F2",
             border=ft.Border.all(1, "#FECACA"),
             border_radius=AppTheme.RADIUS_SM,
             visible=False,
+            animate_opacity=ft.Animation(180, ft.AnimationCurve.EASE_IN_OUT),
         )
 
         # ── 3. Add Follow-up Controls ──
@@ -168,8 +210,10 @@ class EnquiryFollowUpDialog(ft.AlertDialog):
         self.next_date_input = ft.TextField(
             label="Next Follow-up Date (YYYY-MM-DD)",
             value=default_next_date,
+            prefix_icon=ft.Icons.CALENDAR_TODAY_ROUNDED,
             border_radius=AppTheme.RADIUS_MD,
-            width=200,
+            content_padding=ft.Padding(12, 10, 12, 10),
+            width=210,
         )
 
         def _set_next_days(days: int):
@@ -182,19 +226,30 @@ class EnquiryFollowUpDialog(ft.AlertDialog):
 
         quick_chips = ft.Row(
             controls=[
-                ft.Text("Quick Date:", size=11, color=AppTheme.TEXT_SECONDARY),
-                ft.TextButton("Tomorrow", on_click=lambda _: _set_next_days(1)),
-                ft.TextButton("In 3 Days", on_click=lambda _: _set_next_days(3)),
-                ft.TextButton("Next Week", on_click=lambda _: _set_next_days(7)),
+                ft.Text("Quick Date:", size=11, color=AppTheme.TEXT_SECONDARY, weight=ft.FontWeight.W_500),
+                ft.TextButton(
+                    content=ft.Row([ft.Icon(ft.Icons.TODAY_ROUNDED, size=12), ft.Text("Tomorrow", size=11)], spacing=3),
+                    on_click=lambda _: _set_next_days(1),
+                ),
+                ft.TextButton(
+                    content=ft.Row([ft.Icon(ft.Icons.EVENT_ROUNDED, size=12), ft.Text("In 3 Days", size=11)], spacing=3),
+                    on_click=lambda _: _set_next_days(3),
+                ),
+                ft.TextButton(
+                    content=ft.Row([ft.Icon(ft.Icons.DATE_RANGE_ROUNDED, size=12), ft.Text("Next Week", size=11)], spacing=3),
+                    on_click=lambda _: _set_next_days(7),
+                ),
             ],
-            spacing=2,
+            spacing=3,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
         self.remark_input = ft.TextField(
             label="Discussion Remarks / Conversation Details *",
             hint_text="e.g. Student loved the demo class. Father will visit Saturday to deposit fees...",
+            prefix_icon=ft.Icons.NOTES_ROUNDED,
             border_radius=AppTheme.RADIUS_MD,
+            content_padding=ft.Padding(12, 10, 12, 10),
             multiline=True,
             min_lines=2,
             max_lines=3,
@@ -204,17 +259,27 @@ class EnquiryFollowUpDialog(ft.AlertDialog):
 
         self.save_remark_btn = ft.ElevatedButton(
             content=ft.Row(
-                controls=[ft.Icon(ft.Icons.ADD_COMMENT, size=16), ft.Text("Save Remark", weight=ft.FontWeight.BOLD)],
+                controls=[ft.Icon(ft.Icons.ADD_COMMENT_ROUNDED, size=16), ft.Text("Save Remark", weight=ft.FontWeight.BOLD)],
                 spacing=6,
             ),
-            style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=ft.Colors.WHITE),
+            style=ft.ButtonStyle(
+                bgcolor=AppTheme.PRIMARY,
+                color=ft.Colors.WHITE,
+                elevation=2,
+            ),
             on_click=self.handle_save_remark,
         )
 
         new_remark_card = ft.Container(
             content=ft.Column(
                 controls=[
-                    ft.Text("Log New Follow-up Remark:", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                    ft.Row(
+                        controls=[
+                            ft.Icon(ft.Icons.RECORD_VOICE_OVER_ROUNDED, size=16, color=AppTheme.PRIMARY),
+                            ft.Text("Log New Follow-up Remark:", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                        ],
+                        spacing=6,
+                    ),
                     ft.Row(
                         controls=[self.call_type_dropdown, self.category_update_dropdown, self.loss_reason_dropdown],
                         spacing=10,
@@ -247,17 +312,25 @@ class EnquiryFollowUpDialog(ft.AlertDialog):
         )
 
         self.content = ft.Container(
-            content=ft.Column(
-                controls=[
-                    context_card,
-                    self.banner_container,
-                    new_remark_card,
-                    ft.Text("Conversation History Timeline:", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
-                    self.timeline_box,
-                ],
-                spacing=10,
-                scroll=ft.ScrollMode.AUTO,
-                tight=True,
+            content=ft.SelectionArea(
+                content=ft.Column(
+                    controls=[
+                        context_card,
+                        self.banner_container,
+                        new_remark_card,
+                        ft.Row(
+                            controls=[
+                                ft.Icon(ft.Icons.HISTORY_ROUNDED, size=16, color=AppTheme.PRIMARY),
+                                ft.Text("Conversation History Timeline:", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                            ],
+                            spacing=6,
+                        ),
+                        self.timeline_box,
+                    ],
+                    spacing=10,
+                    scroll=ft.ScrollMode.AUTO,
+                    tight=True,
+                )
             ),
             width=720,
             height=540,
@@ -313,8 +386,15 @@ class EnquiryFollowUpDialog(ft.AlertDialog):
         if not self.follow_ups:
             self.timeline_column.controls = [
                 ft.Container(
-                    content=ft.Text("No previous call logs recorded yet. Add the first conversation remark above.", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
-                    padding=20,
+                    content=ft.Column(
+                        controls=[
+                            ft.Icon(ft.Icons.CHAT_BUBBLE_OUTLINE_ROUNDED, size=32, color=AppTheme.TEXT_MUTED),
+                            ft.Text("No previous call logs recorded yet. Add the first conversation remark above.", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
+                        ],
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                        spacing=6,
+                    ),
+                    padding=24,
                     alignment=ft.Alignment(0, 0),
                 )
             ]
@@ -323,6 +403,15 @@ class EnquiryFollowUpDialog(ft.AlertDialog):
         items = []
         for f in self.follow_ups:
             cat_label, cat_bg, cat_text, cat_border = CATEGORY_CONFIG.get(f.category_after_call, CATEGORY_CONFIG["WARM"])
+            
+            call_type_icons = {
+                "PHONE": ft.Icons.PHONE_IN_TALK_ROUNDED,
+                "WALK_IN": ft.Icons.DIRECTIONS_WALK_ROUNDED,
+                "WHATSAPP": ft.Icons.CHAT_ROUNDED,
+                "VISIT": ft.Icons.LOCATION_CITY_ROUNDED,
+            }
+            call_icon = call_type_icons.get(f.call_type, ft.Icons.PHONE_ROUNDED)
+
             item = ft.Container(
                 content=ft.Column(
                     controls=[
@@ -330,27 +419,40 @@ class EnquiryFollowUpDialog(ft.AlertDialog):
                             controls=[
                                 ft.Row(
                                     controls=[
-                                        ft.Icon(ft.Icons.HISTORY, size=14, color=AppTheme.PRIMARY),
+                                        ft.Container(
+                                            content=ft.Icon(call_icon, size=13, color=AppTheme.PRIMARY),
+                                            padding=4,
+                                            bgcolor="#EFF6FF",
+                                            border_radius=4,
+                                        ),
                                         ft.Text(f"{f.follow_up_date} • {f.call_type} by {f.counselor_name or 'Staff'}", size=11, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
                                     ],
-                                    spacing=4,
+                                    spacing=6,
+                                    tight=True,
                                 ),
                                 ft.Container(
                                     content=ft.Text(cat_label, size=10, weight=ft.FontWeight.BOLD, color=cat_text),
                                     bgcolor=cat_bg,
                                     border=ft.Border.all(1, cat_border),
-                                    border_radius=8,
+                                    border_radius=ft.BorderRadius.all(6),
                                     padding=ft.Padding(6, 2, 6, 2),
                                 ),
                             ],
                             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                         ),
                         ft.Text(f.discussion_notes, size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_PRIMARY),
-                        ft.Text(f"Next Reminder: {f.next_follow_up_date or 'None'}", size=10, color=AppTheme.TEXT_SECONDARY, italic=True),
+                        ft.Row(
+                            controls=[
+                                ft.Icon(ft.Icons.SCHEDULE_ROUNDED, size=11, color=AppTheme.TEXT_MUTED),
+                                ft.Text(f"Next Reminder: {f.next_follow_up_date or 'None'}", size=10, color=AppTheme.TEXT_SECONDARY, italic=True),
+                            ],
+                            spacing=3,
+                            tight=True,
+                        ),
                     ],
-                    spacing=2,
+                    spacing=4,
                 ),
-                padding=ft.Padding(10, 8, 10, 8),
+                padding=ft.Padding(12, 10, 12, 10),
                 bgcolor="#FFFFFF",
                 border=ft.Border.all(1, "#E2E8F0"),
                 border_radius=AppTheme.RADIUS_SM,

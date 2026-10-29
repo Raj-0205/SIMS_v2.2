@@ -204,12 +204,13 @@ class TestFrozenHeaderArchitecture(unittest.TestCase):
         self.assertIsInstance(header_table, ft.DataTable)
         self.assertEqual(header_table.heading_row_height, 44)
         self.assertEqual(len(header_table.rows), 0)
-        self.assertEqual(len(header_table.columns), 17)
+        self.assertEqual(len(header_table.columns), 18)
 
         # Check key columns
         self.assertIn("SR.NO", header_table.columns[0].label.content.value)
         self.assertIn("ADMISSION ID", header_table.columns[3].label.content.value)
         self.assertIn("NAME", header_table.columns[4].label.content.value)
+        self.assertIn("ACTION", header_table.columns[17].label.content.value)
 
         # Verify active data table points to the scrollable body table
         self.assertIs(view._active_data_table, table_col.controls[1].content.controls[0])

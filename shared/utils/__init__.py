@@ -17,6 +17,7 @@ from shared.utils.file_dialog import (
     pick_save_file_async,
     cancel_active_picker,
 )
+from shared.utils.export_helper import export_and_prompt_save
 
 __all__ = [
     "format_title_case",
@@ -32,6 +33,7 @@ __all__ = [
     "pick_file_async",
     "pick_save_file_async",
     "cancel_active_picker",
+    "export_and_prompt_save",
 ]
 
 

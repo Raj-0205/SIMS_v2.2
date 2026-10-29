@@ -46,8 +46,11 @@ class BaseRepository:
         LogService.debug("Repository Execute operation.", context=self.__class__.__name__)
         with self._connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(query, params)
-            return cursor.rowcount
+            try:
+                cursor.execute(query, params)
+                return cursor.rowcount
+            finally:
+                cursor.close()
 
     def execute_insert(self, query: str, params: Sequence[Any] | Mapping[str, Any] = ()) -> int:
         """
@@ -57,9 +60,12 @@ class BaseRepository:
         LogService.debug("Repository Execute Insert operation.", context=self.__class__.__name__)
         with self._connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(query, params)
-            # Returns the generated Primary Key (defaults to 0 if not auto-generated)
-            return cursor.lastrowid or 0
+            try:
+                cursor.execute(query, params)
+                # Returns the generated Primary Key (defaults to 0 if not auto-generated)
+                return cursor.lastrowid or 0
+            finally:
+                cursor.close()
 
     def execute_fetchone(self, query: str, params: Sequence[Any] | Mapping[str, Any] = ()) -> Optional[dict[str, Any]]:
         """
@@ -69,11 +75,14 @@ class BaseRepository:
         LogService.debug("Repository Fetch One operation.", context=self.__class__.__name__)
         with self._connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(query, params)
-            row = cursor.fetchone()
-            if row:
-                return dict(row)
-            return None
+            try:
+                cursor.execute(query, params)
+                row = cursor.fetchone()
+                if row:
+                    return dict(row)
+                return None
+            finally:
+                cursor.close()
 
     def execute_fetchall(self, query: str, params: Sequence[Any] | Mapping[str, Any] = ()) -> list[dict[str, Any]]:
         """
@@ -82,8 +91,11 @@ class BaseRepository:
         LogService.debug("Repository Fetch All operation.", context=self.__class__.__name__)
         with self._connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(query, params)
-            return [dict(row) for row in cursor.fetchall()]
+            try:
+                cursor.execute(query, params)
+                return [dict(row) for row in cursor.fetchall()]
+            finally:
+                cursor.close()
 
     def exists(self, query: str, params: Sequence[Any] | Mapping[str, Any] = ()) -> bool:
         """
@@ -93,5 +105,8 @@ class BaseRepository:
         LogService.debug("Repository Exists operation.", context=self.__class__.__name__)
         with self._connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(query, params)
-            return cursor.fetchone() is not None
+            try:
+                cursor.execute(query, params)
+                return cursor.fetchone() is not None
+            finally:
+                cursor.close()

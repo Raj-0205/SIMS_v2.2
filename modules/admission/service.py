@@ -610,7 +610,13 @@ class AdmissionService(BaseService):
             )
 
         from core.cache.fees_cache import FeesCacheManager
-        FeesCacheManager.invalidate(f"Admission created #{admission_id}")
+        if FeesCacheManager.is_loaded():
+            from modules.reports.service import ReportsService
+            single_rec = ReportsService().fetch_single_admission_fees_record(admission_id)
+            if single_rec:
+                FeesCacheManager.targeted_admission_refresh(admission_id, single_rec)
+        else:
+            FeesCacheManager.bump_version()
 
         return admission_id
 
@@ -679,7 +685,13 @@ class AdmissionService(BaseService):
             self.activity_repo.insert("ADMISSION", dto.id, "UPDATED", details=f"Updated admission ID {dto.id}")
 
         from core.cache.fees_cache import FeesCacheManager
-        FeesCacheManager.invalidate(f"Admission updated #{dto.id}")
+        if FeesCacheManager.is_loaded():
+            from modules.reports.service import ReportsService
+            single_rec = ReportsService().fetch_single_admission_fees_record(dto.id)
+            if single_rec:
+                FeesCacheManager.targeted_admission_refresh(dto.id, single_rec)
+        else:
+            FeesCacheManager.bump_version()
 
     def get_admission(self, admission_id: int) -> AdmissionDTO:
         with self.unit_of_work():
@@ -777,9 +789,28 @@ class AdmissionService(BaseService):
         with self.unit_of_work():
             self.friendship_repo.add_friendship(student_id, friend_student_id, admission_id)
             self.activity_repo.insert("STUDENT", student_id, "FRIEND_ADDED", details=f"Linked friend ID {friend_student_id}")
+            from modules.student.repository import StudentRepository
+            s_repo = StudentRepository()
+            s_row = s_repo.get_by_id(student_id)
+            f_row = s_repo.get_by_id(friend_student_id)
 
         from core.cache.fees_cache import FeesCacheManager
-        FeesCacheManager.invalidate(f"Admission friendship linked {student_id} <-> {friend_student_id}")
+        if FeesCacheManager.is_loaded():
+            if s_row and f_row:
+                s_name = f"{s_row.get('first_name', '')} {s_row.get('last_name', '')}".strip()
+                s_mob = s_row.get("mobile_number") or "—"
+                f_name = f"{f_row.get('first_name', '')} {f_row.get('last_name', '')}".strip()
+                f_mob = f_row.get("mobile_number") or "—"
+                FeesCacheManager.targeted_friendship_update(
+                    student_id=student_id,
+                    friend_student_id=friend_student_id,
+                    friend_name=f_name,
+                    friend_mobile=f_mob,
+                    student_name=s_name,
+                    student_mobile=s_mob,
+                )
+        else:
+            FeesCacheManager.bump_version()
 
     def get_active_institutions(self) -> list[dict[str, Any]]:
         with self.unit_of_work():
@@ -891,7 +922,7 @@ class AdmissionService(BaseService):
             LogService.info(f"Admission #{adm.admission_number} cancelled. Reason: {reason.strip()}", context="AdmissionService")
 
         from core.cache.fees_cache import FeesCacheManager
-        FeesCacheManager.invalidate(f"Admission cancelled #{admission_id}")
+        FeesCacheManager.targeted_admission_cancelled(admission_id)
 
         return True
 
@@ -935,7 +966,7 @@ class AdmissionService(BaseService):
             LogService.info(f"Admission #{adm.admission_number} permanently deleted by Administrator.", context="AdmissionService")
 
         from core.cache.fees_cache import FeesCacheManager
-        FeesCacheManager.invalidate(f"Admission deleted #{admission_id}")
+        FeesCacheManager.targeted_admission_deleted(admission_id)
 
     def export_admissions_csv(self, dto: AdmissionFilterDTO, target_path: Optional[str | Path] = None) -> Path:
         """Exports filtered admissions into Excel-compatible CSV with installment breakdown."""

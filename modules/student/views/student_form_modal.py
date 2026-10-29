@@ -36,21 +36,23 @@ class StudentFormModal(ft.AlertDialog):
         self.modal = True
 
         title_text = "Edit Student Master Profile" if self.is_edit_mode else "Register New Student Master"
-        self.title = ft.Row(
-            controls=[
-                ft.Icon(
-                    ft.Icons.EDIT_NOTE if self.is_edit_mode else ft.Icons.PERSON_ADD,
-                    color=AppTheme.PRIMARY,
-                    size=24,
-                ),
-                ft.Text(
-                    title_text,
-                    size=AppTheme.SIZE_H2,
-                    weight=ft.FontWeight.BOLD,
-                    color=AppTheme.TEXT_PRIMARY,
-                ),
-            ],
-            spacing=AppTheme.PAD_SM,
+        self.title = ft.SelectionArea(
+            content=ft.Row(
+                controls=[
+                    ft.Icon(
+                        ft.Icons.EDIT_NOTE if self.is_edit_mode else ft.Icons.PERSON_ADD,
+                        color=AppTheme.PRIMARY,
+                        size=24,
+                    ),
+                    ft.Text(
+                        title_text,
+                        size=AppTheme.SIZE_H2,
+                        weight=ft.FontWeight.BOLD,
+                        color=AppTheme.TEXT_PRIMARY,
+                    ),
+                ],
+                spacing=AppTheme.PAD_SM,
+            ),
         )
 
         # ── Form Inputs ──
@@ -244,19 +246,21 @@ class StudentFormModal(ft.AlertDialog):
         self.content = ft.Container(
             width=760,
             padding=ft.Padding(24, 16, 24, 16),
-            content=ft.Column(
-                controls=[
-                    self.error_container,
-                    ft.Row(controls=[self.first_name_input, self.middle_name_input, self.last_name_input], spacing=AppTheme.PAD_SM),
-                    ft.Row(controls=[self.mother_name_input, self.dob_input, self.gender_dropdown], spacing=AppTheme.PAD_SM),
-                    ft.Row(controls=[self.mobile_input, self.email_input, self.aadhaar_input], spacing=AppTheme.PAD_SM),
-                    ft.Row(controls=[self.parent_guardian_input, self.village_input], spacing=AppTheme.PAD_SM),
-                    self.address_input,
-                    ft.Row(controls=[self.qualification_input, self.blood_group_dropdown], spacing=AppTheme.PAD_SM),
-                ],
-                spacing=AppTheme.PAD_MD,
-                tight=True,
-                scroll=ft.ScrollMode.AUTO,
+            content=ft.SelectionArea(
+                content=ft.Column(
+                    controls=[
+                        self.error_container,
+                        ft.Row(controls=[self.first_name_input, self.middle_name_input, self.last_name_input], spacing=AppTheme.PAD_SM),
+                        ft.Row(controls=[self.mother_name_input, self.dob_input, self.gender_dropdown], spacing=AppTheme.PAD_SM),
+                        ft.Row(controls=[self.mobile_input, self.email_input, self.aadhaar_input], spacing=AppTheme.PAD_SM),
+                        ft.Row(controls=[self.parent_guardian_input, self.village_input], spacing=AppTheme.PAD_SM),
+                        self.address_input,
+                        ft.Row(controls=[self.qualification_input, self.blood_group_dropdown], spacing=AppTheme.PAD_SM),
+                    ],
+                    spacing=AppTheme.PAD_MD,
+                    tight=True,
+                    scroll=ft.ScrollMode.AUTO,
+                ),
             ),
         )
 

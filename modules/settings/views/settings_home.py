@@ -195,13 +195,17 @@ class SettingsHome(ft.Container):
 
             dlg = ft.AlertDialog(
                 modal=True,
-                title=ft.Text("Edit Institution" if inst else "Add School / College", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
+                title=ft.SelectionArea(
+                    content=ft.Text("Edit Institution" if inst else "Add School / College", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD)
+                ),
                 content=ft.Container(
                     width=460,
-                    content=ft.Column(
-                        controls=[name_input, type_dropdown, addr_input, err_text],
-                        spacing=AppTheme.PAD_SM,
-                        tight=True,
+                    content=ft.SelectionArea(
+                        content=ft.Column(
+                            controls=[name_input, type_dropdown, addr_input, err_text],
+                            spacing=AppTheme.PAD_SM,
+                            tight=True,
+                        )
                     ),
                 ),
                 actions=[
@@ -322,6 +326,18 @@ class SettingsHome(ft.Container):
         alc_in = ft.TextField(label="ALC Code (MKCL / MSBTE) *", value=prof["alc_code"], border_radius=AppTheme.RADIUS_MD)
         addr1_in = ft.TextField(label="Address Line 1", value=prof["address_line1"], border_radius=AppTheme.RADIUS_MD)
         addr2_in = ft.TextField(label="Address Line 2", value=prof["address_line2"], border_radius=AppTheme.RADIUS_MD)
+        upi_id_in = ft.TextField(
+            label="Owner UPI ID (for Dynamic QR) *",
+            value=prof.get("upi_id") or "9271226772@yescred",
+            border_radius=AppTheme.RADIUS_MD,
+            prefix_icon=ft.Icons.QR_CODE_2,
+        )
+        upi_payee_in = ft.TextField(
+            label="UPI Payee / Merchant Name *",
+            value=prof.get("upi_payee_name") or "Sudharm Infotech",
+            border_radius=AppTheme.RADIUS_MD,
+            prefix_icon=ft.Icons.VERIFIED_USER_OUTLINED,
+        )
 
         def save_branding(e):
             try:
@@ -332,8 +348,10 @@ class SettingsHome(ft.Container):
                     "alc_code": alc_in.value or "",
                     "address_line1": addr1_in.value or "",
                     "address_line2": addr2_in.value or "",
+                    "upi_id": upi_id_in.value or "9271226772@yescred",
+                    "upi_payee_name": upi_payee_in.value or "Sudharm Infotech",
                 })
-                self.show_toast("Institute branding & receipt header saved.", is_success=True)
+                self.show_toast("Institute branding & UPI payment configuration saved.", is_success=True)
             except Exception as ex:
                 self.show_toast(str(ex), is_error=True)
 
@@ -354,6 +372,7 @@ class SettingsHome(ft.Container):
                         ft.Row([name_in, person_in], spacing=AppTheme.PAD_MD),
                         ft.Row([mob_in, alc_in], spacing=AppTheme.PAD_MD),
                         ft.Row([addr1_in, addr2_in], spacing=AppTheme.PAD_MD),
+                        ft.Row([upi_id_in, upi_payee_in], spacing=AppTheme.PAD_MD),
                         ft.ElevatedButton(
                             "Save Profile Changes",
                             icon=ft.Icons.SAVE,

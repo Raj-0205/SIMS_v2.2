@@ -15,6 +15,7 @@ from modules.student.dto import StudentDTO
 from modules.student.views.student_form_modal import StudentFormModal
 from modules.student.views.student_workspace_dialog import StudentWorkspaceDialog
 from shared.utils.os_helper import open_path_externally
+from shared.utils.export_helper import export_and_prompt_save
 from ui.themes.theme import AppTheme
 from ui.widgets.badge import StatusBadge
 
@@ -1254,8 +1255,8 @@ class StudentHome(ft.Container):
 
     # ══════════════════════════════════════════════════════════════════════
     # 14. EXPORT HANDLERS
-    def handle_export_excel(self, e: ft.ControlEvent) -> None:
-        """Exports currently filtered and sorted student dataset to styled Microsoft Excel (.xlsx) format."""
+    def handle_export_excel(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Exports currently filtered and sorted student dataset to styled Microsoft Excel (.xlsx) format with custom save prompt."""
         try:
             filters = {
                 "query": self.current_query or None,
@@ -1268,18 +1269,42 @@ class StudentHome(ft.Container):
                 "sort_dir": self.sort_keys[0][1] if self.sort_keys else "desc",
             }
             path = self.controller.export_students_excel(filters)
-            self.show_snackbar(f"Student data exported to Excel (.xlsx): {path}")
-            open_path_externally(Path(path).parent)
+            export_and_prompt_save(
+                source_file_path=path,
+                dialog_title="Save Student Directory As",
+                allowed_extensions=[".xlsx"],
+                show_toast=self.show_snackbar,
+            )
         except Exception as ex:
             LogService.error(f"Error exporting Excel: {ex}", context=self.__class__.__name__)
             self.show_snackbar("Failed to export student Excel data.", is_error=True)
 
-    def handle_export_csv(self, e: ft.ControlEvent) -> None:
-        """Delegates export to professional Excel (.xlsx) format per template specifications."""
-        self.handle_export_excel(e)
+    def handle_export_csv(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Exports currently filtered and sorted student dataset to CSV format with custom save prompt."""
+        try:
+            filters = {
+                "query": self.current_query or None,
+                "course_id": self.current_course_id,
+                "status": self.current_status,
+                "year": self.current_year,
+                "month": self.current_month,
+                "sort_keys": self.sort_keys,
+                "sort_by": self.sort_keys[0][0] if self.sort_keys else "id",
+                "sort_dir": self.sort_keys[0][1] if self.sort_keys else "desc",
+            }
+            path = self.controller.export_students_csv(filters)
+            export_and_prompt_save(
+                source_file_path=path,
+                dialog_title="Save Student Directory CSV As",
+                allowed_extensions=[".csv"],
+                show_toast=self.show_snackbar,
+            )
+        except Exception as ex:
+            LogService.error(f"Error exporting CSV: {ex}", context=self.__class__.__name__)
+            self.show_snackbar("Failed to export student CSV data.", is_error=True)
 
-    def handle_export_pdf(self, e: ft.ControlEvent) -> None:
-        """Exports currently filtered and sorted student dataset to PDF report format."""
+    def handle_export_pdf(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Exports currently filtered and sorted student dataset to PDF report format with custom save prompt."""
         try:
             filters = {
                 "query": self.current_query or None,
@@ -1292,7 +1317,12 @@ class StudentHome(ft.Container):
                 "sort_dir": self.sort_keys[0][1] if self.sort_keys else "desc",
             }
             path = self.controller.export_students_pdf(filters)
-            self.show_snackbar(f"Student data exported to PDF: {path}")
+            export_and_prompt_save(
+                source_file_path=path,
+                dialog_title="Save Student Report As",
+                allowed_extensions=[".pdf"],
+                show_toast=self.show_snackbar,
+            )
         except Exception as ex:
             LogService.error(f"Error exporting PDF: {ex}", context=self.__class__.__name__)
             self.show_snackbar("Failed to export student PDF report.", is_error=True)
@@ -1420,19 +1450,23 @@ class StudentHome(ft.Container):
 
         dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Row(
-                controls=[
-                    ft.Icon(ft.Icons.WARNING_AMBER, color=AppTheme.DANGER, size=24),
-                    ft.Text("Administrator: Delete Student Profile", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
-                ],
-                spacing=AppTheme.PAD_SM,
+            title=ft.SelectionArea(
+                content=ft.Row(
+                    controls=[
+                        ft.Icon(ft.Icons.WARNING_AMBER, color=AppTheme.DANGER, size=24),
+                        ft.Text("Administrator: Delete Student Profile", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
+                    ],
+                    spacing=AppTheme.PAD_SM,
+                ),
             ),
             content=ft.Container(
                 width=460,
-                content=ft.Column(
-                    controls=details_controls,
-                    spacing=AppTheme.PAD_XS,
-                    tight=True,
+                content=ft.SelectionArea(
+                    content=ft.Column(
+                        controls=details_controls,
+                        spacing=AppTheme.PAD_XS,
+                        tight=True,
+                    ),
                 ),
             ),
             actions=[

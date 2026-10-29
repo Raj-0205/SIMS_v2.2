@@ -63,27 +63,62 @@ class EnquiryFormModal(ft.AlertDialog):
 
         # Header Title
         title_text = "Edit Enquiry Record" if self.is_edit_mode else "New Student Walk-in / Enquiry"
-        self.title = ft.Row(
-            controls=[
-                ft.Row(
-                    controls=[
-                        ft.Icon(ft.Icons.SUPPORT_AGENT, color=AppTheme.PRIMARY, size=24),
-                        ft.Text(title_text, size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
-                    ],
-                    spacing=AppTheme.PAD_SM,
-                ),
-                ft.IconButton(
-                    icon=ft.Icons.CLOSE,
-                    icon_size=20,
-                    tooltip="Cancel & Close",
-                    on_click=self.close_modal,
-                ),
-            ],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        mode_badge = ft.Container(
+            content=ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.EDIT_NOTE_ROUNDED if self.is_edit_mode else ft.Icons.ADD_TASK_ROUNDED, size=12, color="#1D4ED8" if not self.is_edit_mode else "#D97706"),
+                    ft.Text("EDIT MODE" if self.is_edit_mode else "NEW LEAD INTAKE", size=10, weight=ft.FontWeight.BOLD, color="#1D4ED8" if not self.is_edit_mode else "#B45309"),
+                ],
+                spacing=3,
+                tight=True,
+            ),
+            bgcolor="#EFF6FF" if not self.is_edit_mode else "#FFFBEB",
+            border=ft.Border.all(1, "#BFDBFE" if not self.is_edit_mode else "#FDE68A"),
+            border_radius=ft.BorderRadius.all(6),
+            padding=ft.Padding(6, 2, 6, 2),
+        )
+
+        self.title = ft.SelectionArea(
+            content=ft.Row(
+                controls=[
+                    ft.Row(
+                        controls=[
+                            ft.Container(
+                                content=ft.Icon(ft.Icons.SUPPORT_AGENT_ROUNDED, color=AppTheme.PRIMARY, size=22),
+                                padding=7,
+                                bgcolor="#EFF6FF",
+                                border_radius=AppTheme.RADIUS_SM,
+                            ),
+                            ft.Column(
+                                controls=[
+                                    ft.Row(
+                                        controls=[
+                                            ft.Text(title_text, size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
+                                            mode_badge,
+                                        ],
+                                        spacing=8,
+                                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                    ),
+                                    ft.Text("Complete prospective student profile with village friends matching & counseling timeline", size=11, color=AppTheme.TEXT_SECONDARY),
+                                ],
+                                spacing=1,
+                            ),
+                        ],
+                        spacing=AppTheme.PAD_SM,
+                    ),
+                    ft.IconButton(
+                        icon=ft.Icons.CLOSE_ROUNDED,
+                        icon_size=20,
+                        tooltip="Cancel & Close (Esc)",
+                        on_click=self.close_modal,
+                    ),
+                ],
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            )
         )
 
         # ── Global Validation & Status Banner ──
-        self.banner_icon = ft.Icon(ft.Icons.INFO_OUTLINE, size=20, color=AppTheme.INFO)
+        self.banner_icon = ft.Icon(ft.Icons.INFO_OUTLINE_ROUNDED, size=20, color=AppTheme.INFO)
         self.banner_text = ft.Text("", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.W_500, expand=True)
         self.banner_container = ft.Container(
             content=ft.Row([self.banner_icon, self.banner_text], spacing=AppTheme.PAD_SM),
@@ -92,6 +127,7 @@ class EnquiryFormModal(ft.AlertDialog):
             bgcolor="#EFF6FF",
             border=ft.Border.all(1, "#BFDBFE"),
             visible=False,
+            animate_opacity=ft.Animation(180, ft.AnimationCurve.EASE_IN_OUT),
         )
 
         # ── Input Fields ──
@@ -99,8 +135,10 @@ class EnquiryFormModal(ft.AlertDialog):
         self.name_input = ft.TextField(
             label="Student Full Name *",
             hint_text="e.g. Rameshwar Patel",
+            prefix_icon=ft.Icons.PERSON_ROUNDED,
             value=enquiry.student_name if enquiry else "",
             border_radius=AppTheme.RADIUS_MD,
+            content_padding=ft.Padding(12, 10, 12, 10),
             expand=True,
             on_change=lambda _: _clear_error(self.name_input),
         )
@@ -108,10 +146,12 @@ class EnquiryFormModal(ft.AlertDialog):
         self.mobile_input = ft.TextField(
             label="Primary 10-Digit Mobile *",
             hint_text="e.g. 9876543210",
+            prefix_icon=ft.Icons.PHONE_ROUNDED,
             max_length=10,
             keyboard_type=ft.KeyboardType.PHONE,
             value=enquiry.mobile_number if enquiry else "",
             border_radius=AppTheme.RADIUS_MD,
+            content_padding=ft.Padding(12, 10, 12, 10),
             expand=True,
             on_change=self._on_mobile_change,
         )
@@ -119,10 +159,12 @@ class EnquiryFormModal(ft.AlertDialog):
         self.alt_mobile_input = ft.TextField(
             label="Secondary Mobile (Optional)",
             hint_text="e.g. 9123456780",
+            prefix_icon=ft.Icons.PHONE_ANDROID_ROUNDED,
             max_length=10,
             keyboard_type=ft.KeyboardType.PHONE,
             value=enquiry.alternate_mobile if (enquiry and enquiry.alternate_mobile) else "",
             border_radius=AppTheme.RADIUS_MD,
+            content_padding=ft.Padding(12, 10, 12, 10),
             expand=True,
             on_change=lambda _: _clear_error(self.alt_mobile_input),
         )
@@ -130,8 +172,10 @@ class EnquiryFormModal(ft.AlertDialog):
         self.email_input = ft.TextField(
             label="Email Address (Optional)",
             hint_text="student@example.com",
+            prefix_icon=ft.Icons.EMAIL_ROUNDED,
             value=enquiry.email if (enquiry and enquiry.email) else "",
             border_radius=AppTheme.RADIUS_MD,
+            content_padding=ft.Padding(12, 10, 12, 10),
             expand=True,
         )
 
@@ -151,8 +195,10 @@ class EnquiryFormModal(ft.AlertDialog):
         self.village_input = ft.TextField(
             label="Village / Hometown",
             hint_text="e.g. Khadki, Rampur",
+            prefix_icon=ft.Icons.LOCATION_ON_ROUNDED,
             value=enquiry.village if (enquiry and enquiry.village) else "",
             border_radius=AppTheme.RADIUS_MD,
+            content_padding=ft.Padding(12, 10, 12, 10),
             expand=True,
             on_change=self._on_village_changed,
         )
@@ -160,8 +206,10 @@ class EnquiryFormModal(ft.AlertDialog):
         self.address_input = ft.TextField(
             label="Residential Address / Landmark",
             hint_text="Street, colony or landmark",
+            prefix_icon=ft.Icons.HOME_ROUNDED,
             value=enquiry.address if (enquiry and enquiry.address) else "",
             border_radius=AppTheme.RADIUS_MD,
+            content_padding=ft.Padding(12, 10, 12, 10),
             expand=True,
         )
 
@@ -172,8 +220,8 @@ class EnquiryFormModal(ft.AlertDialog):
                 controls=[
                     ft.Row(
                         controls=[
-                            ft.Icon(ft.Icons.PEOPLE_ALT_OUTLINED, size=16, color=AppTheme.PRIMARY),
-                            ft.Text("Enrolled Peers from this Village:", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_SECONDARY),
+                            ft.Icon(ft.Icons.PEOPLE_ALT_ROUNDED, size=16, color="#15803D"),
+                            ft.Text("Enrolled Peers from this Village:", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color="#166534"),
                         ],
                         spacing=6,
                     ),
@@ -181,11 +229,12 @@ class EnquiryFormModal(ft.AlertDialog):
                 ],
                 spacing=6,
             ),
-            padding=ft.Padding(12, 10, 12, 10),
+            padding=ft.Padding(14, 10, 14, 10),
             bgcolor="#F0FDF4",
             border=ft.Border.all(1, "#BBF7D0"),
             border_radius=AppTheme.RADIUS_MD,
             visible=False,
+            animate_opacity=ft.Animation(200, ft.AnimationCurve.EASE_IN_OUT),
         )
 
         # Section 3: Academic Interest & Source
@@ -205,8 +254,10 @@ class EnquiryFormModal(ft.AlertDialog):
         self.qualification_input = ft.TextField(
             label="Educational Qualification",
             hint_text="e.g. 10th Pass, 12th Sci, B.Com, Graduate",
+            prefix_icon=ft.Icons.SCHOOL_ROUNDED,
             value=enquiry.qualification if (enquiry and enquiry.qualification) else "",
             border_radius=AppTheme.RADIUS_MD,
+            content_padding=ft.Padding(12, 10, 12, 10),
             width=220,
         )
 
@@ -257,11 +308,11 @@ class EnquiryFormModal(ft.AlertDialog):
         self.timing_dropdown = ft.Dropdown(
             label="Preferred Timing",
             options=[
-                ft.dropdown.Option("ANY", "Any / Flexible"),
+                ft.dropdown.Option("ANY", "Any / Flexible Timing"),
                 ft.dropdown.Option("MORNING", "Morning (8 AM - 12 PM)"),
                 ft.dropdown.Option("AFTERNOON", "Afternoon (12 PM - 4 PM)"),
                 ft.dropdown.Option("EVENING", "Evening (4 PM - 8 PM)"),
-                ft.dropdown.Option("WEEKEND", "Weekend Special"),
+                ft.dropdown.Option("WEEKEND", "Weekend Special Batch"),
             ],
             value=enquiry.preferred_timing if (enquiry and enquiry.preferred_timing) else "ANY",
             border_radius=AppTheme.RADIUS_MD,
@@ -271,8 +322,10 @@ class EnquiryFormModal(ft.AlertDialog):
         self.loss_reason_input = ft.TextField(
             label="Drop / Loss Reason (Optional)",
             hint_text="e.g. Fees too high, Joined other institute, College timing clash",
+            prefix_icon=ft.Icons.REPORT_PROBLEM_ROUNDED,
             value=enquiry.loss_reason if (enquiry and enquiry.loss_reason) else "",
             border_radius=AppTheme.RADIUS_MD,
+            content_padding=ft.Padding(12, 10, 12, 10),
             expand=True,
             visible=((enquiry.category == "LOST" or enquiry.status == "CLOSED") if enquiry else False),
         )
@@ -280,16 +333,20 @@ class EnquiryFormModal(ft.AlertDialog):
         self.counselor_input = ft.TextField(
             label="Counselor / Attendant",
             hint_text="Name of staff who counseled",
+            prefix_icon=ft.Icons.BADGE_ROUNDED,
             value=enquiry.counselor_name if (enquiry and enquiry.counselor_name) else "",
             border_radius=AppTheme.RADIUS_MD,
+            content_padding=ft.Padding(12, 10, 12, 10),
             expand=True,
         )
 
         self.follow_up_input = ft.TextField(
             label="Next Follow-up Date (YYYY-MM-DD)",
             hint_text="e.g. 2026-10-15",
+            prefix_icon=ft.Icons.CALENDAR_TODAY_ROUNDED,
             value=enquiry.follow_up_date if (enquiry and enquiry.follow_up_date) else "",
             border_radius=AppTheme.RADIUS_MD,
+            content_padding=ft.Padding(12, 10, 12, 10),
             width=220,
         )
 
@@ -298,6 +355,7 @@ class EnquiryFormModal(ft.AlertDialog):
             hint_text="Specific requirements, preferred timings, family background, questions asked...",
             value=enquiry.notes if (enquiry and enquiry.notes) else "",
             border_radius=AppTheme.RADIUS_MD,
+            content_padding=ft.Padding(12, 10, 12, 10),
             multiline=True,
             min_lines=2,
             max_lines=3,
@@ -311,8 +369,19 @@ class EnquiryFormModal(ft.AlertDialog):
                 controls=[
                     ft.Row(
                         controls=[
-                            ft.Icon(ft.Icons.PERSON_PIN, size=18, color=AppTheme.PRIMARY),
-                            ft.Text("1. Student Identity & Contact", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                            ft.Container(
+                                content=ft.Icon(ft.Icons.PERSON_PIN_ROUNDED, size=18, color=AppTheme.PRIMARY),
+                                padding=6,
+                                bgcolor="#EFF6FF",
+                                border_radius=AppTheme.RADIUS_SM,
+                            ),
+                            ft.Column(
+                                controls=[
+                                    ft.Text("1. Student Identity & Contact", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                                    ft.Text("Primary contact verification and candidate identification", size=11, color=AppTheme.TEXT_SECONDARY),
+                                ],
+                                spacing=0,
+                            ),
                         ],
                         spacing=8,
                     ),
@@ -333,8 +402,19 @@ class EnquiryFormModal(ft.AlertDialog):
                 controls=[
                     ft.Row(
                         controls=[
-                            ft.Icon(ft.Icons.LOCATION_ON, size=18, color=AppTheme.PRIMARY),
-                            ft.Text("2. Location & Hometown", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                            ft.Container(
+                                content=ft.Icon(ft.Icons.LOCATION_ON_ROUNDED, size=18, color=AppTheme.PRIMARY),
+                                padding=6,
+                                bgcolor="#EFF6FF",
+                                border_radius=AppTheme.RADIUS_SM,
+                            ),
+                            ft.Column(
+                                controls=[
+                                    ft.Text("2. Location & Hometown", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                                    ft.Text("Locality tracking and live peer/classmate discovery", size=11, color=AppTheme.TEXT_SECONDARY),
+                                ],
+                                spacing=0,
+                            ),
                         ],
                         spacing=8,
                     ),
@@ -355,8 +435,19 @@ class EnquiryFormModal(ft.AlertDialog):
                 controls=[
                     ft.Row(
                         controls=[
-                            ft.Icon(ft.Icons.SCHOOL, size=18, color=AppTheme.PRIMARY),
-                            ft.Text("3. Program of Interest & Follow-up Details", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                            ft.Container(
+                                content=ft.Icon(ft.Icons.SCHOOL_ROUNDED, size=18, color=AppTheme.PRIMARY),
+                                padding=6,
+                                bgcolor="#EFF6FF",
+                                border_radius=AppTheme.RADIUS_SM,
+                            ),
+                            ft.Column(
+                                controls=[
+                                    ft.Text("3. Program of Interest & Follow-up Details", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                                    ft.Text("Academic course preference, priority category, and next call schedule", size=11, color=AppTheme.TEXT_SECONDARY),
+                                ],
+                                spacing=0,
+                            ),
                         ],
                         spacing=8,
                     ),
@@ -389,14 +480,14 @@ class EnquiryFormModal(ft.AlertDialog):
         )
 
         self.content = ft.Container(
-            content=modal_content,
+            content=ft.SelectionArea(content=modal_content),
             padding=ft.Padding(24, 16, 24, 16),
         )
 
         # ── Action Controls (Bottom Bar with Go Back Button) ──
         self.back_button = ft.OutlinedButton(
             content=ft.Row(
-                [ft.Icon(ft.Icons.ARROW_BACK, size=16), ft.Text("◀ Cancel / Go Back")],
+                [ft.Icon(ft.Icons.ARROW_BACK_ROUNDED, size=16), ft.Text("Cancel / Go Back")],
                 spacing=6,
                 alignment=ft.MainAxisAlignment.CENTER,
             ),
@@ -406,12 +497,13 @@ class EnquiryFormModal(ft.AlertDialog):
 
         self.save_button = ft.ElevatedButton(
             content=ft.Row(
-                [ft.Icon(ft.Icons.SAVE, size=16), ft.Text("Save Enquiry Record")],
+                [ft.Icon(ft.Icons.SAVE_ROUNDED, size=16), ft.Text("Save Enquiry Record", weight=ft.FontWeight.BOLD)],
                 spacing=6,
                 alignment=ft.MainAxisAlignment.CENTER,
             ),
             bgcolor=AppTheme.PRIMARY,
             color=ft.Colors.WHITE,
+            elevation=2,
             height=40,
             on_click=self._on_save_clicked,
         )

@@ -464,11 +464,13 @@ def test_navigation_and_ui_view_mounting():
     # Critical Flutter DataTable Invariant: columns must contain at minimum one visible DataColumn
     assert len(view.matrix_table.columns) >= 1
     assert len(view.online_table.columns) >= 1
+    assert len(view.health_table.columns) >= 1
 
     # Verify load_data keeps columns non-empty
     view.load_data()
     assert len(view.matrix_table.columns) >= 1
     assert len(view.online_table.columns) >= 1
+    assert len(view.health_table.columns) >= 1
 
     # Verify empty matrix keeps columns non-empty
     empty_matrix = BatchAttendanceMatrixDTO(
@@ -481,3 +483,276 @@ def test_navigation_and_ui_view_mounting():
     )
     view._build_matrix_table(empty_matrix)
     assert len(view.matrix_table.columns) >= 1
+    view._build_health_table(empty_matrix)
+    assert len(view.health_table.columns) >= 1
+
+
+def test_attendance_home_kpis_and_date_steppers(setup_attendance_fixture):
+    """
+    Verifies top KPI metrics cards initialization and quick date stepper functionality
+    (< previous day, > next day, Today jump).
+    """
+    view = AttendanceHome()
+    view.load_data()
+
+    # Initial KPI card default values
+    assert view.kpi_session_status_text.value != ""
+    assert "%" in view.kpi_overall_rate_text.value
+    assert "Sessions" in view.kpi_total_sessions_text.value
+    assert "Students" in view.kpi_defaulters_text.value or "Defaulters" in view.kpi_defaulters_text.value
+
+    # Test Date Stepper
+    view.date_field.value = "2026-10-15"
+    view._handle_prev_day(None)
+    assert view.date_field.value == "2026-10-14"
+
+    view._handle_next_day(None)
+    assert view.date_field.value == "2026-10-15"
+
+    view._handle_jump_today(None)
+    assert view.date_field.value == date.today().isoformat()
+
+    # Test DatePicker handler presence and safe execution
+    assert hasattr(view, "datepicker_btn")
+    assert hasattr(view, "_handle_open_datepicker")
+    view._handle_open_datepicker(None)
+
+
+def test_attendance_home_online_search_filter_and_invert(setup_attendance_fixture):
+    """
+    Verifies Tab 0 Daily Attendance table search, status filter, and invert marks batch action.
+    """
+    view = AttendanceHome()
+    batch_id = setup_attendance_fixture["batch_id"]
+
+    view.batch_dropdown.value = str(batch_id)
+    view.load_batch_attendance(batch_id)
+
+    # 3 enrolled students
+    assert len(view.enrolled_students) == 3
+    assert len(view.online_table.rows) == 3
+
+    # Test Invert Marks: initially all False -> invert -> all True
+    initial_switches = [s.value for s in view.student_toggles.values()]
+    assert all(v is False for v in initial_switches)
+
+    view.handle_invert_marks(None)
+    assert all(s.value is True for s in view.student_toggles.values())
+
+    # Test Search filter (case-insensitive substring)
+    view.online_search_box.value = "Aarav"
+    view._handle_online_search_change(None)
+    assert len(view.online_table.rows) == 1
+
+    view.online_search_box.value = ""
+    view._handle_online_search_change(None)
+    assert len(view.online_table.rows) == 3
+
+    # Test Status filter: all are currently Present (True)
+    view.online_filter_dropdown.value = "PRESENT"
+    view._handle_online_filter_change(None)
+    assert len(view.online_table.rows) == 3
+
+    view.online_filter_dropdown.value = "ABSENT"
+    view._handle_online_filter_change(None)
+    assert len(view.online_table.rows) == 0
+
+    # Reset filter
+    view.online_filter_dropdown.value = "ALL"
+    view._handle_online_filter_change(None)
+    assert len(view.online_table.rows) == 3
+
+
+def test_attendance_home_defaulters_and_health_tab(setup_attendance_fixture):
+    """
+    Verifies Tab 2 Defaulters & Student Health analytics table, search, health filter,
+    and critical KPI count calculation.
+    """
+    ctrl = AttendanceController()
+    batch_id = setup_attendance_fixture["batch_id"]
+    stu_ids = setup_attendance_fixture["student_ids"]
+
+    # Record 3 sessions where student 0 is 100% present, students 1 and 2 are 100% absent (<60% -> CRITICAL)
+    for s_date in ["2026-10-10", "2026-10-11", "2026-10-12"]:
+        ctrl.record_online_attendance(
+            batch_id=batch_id,
+            session_date=s_date,
+            student_marks=[
+                {"student_id": stu_ids[0], "is_present": True},
+                {"student_id": stu_ids[1], "is_present": False},
+                {"student_id": stu_ids[2], "is_present": False},
+            ],
+            recorded_by="admin",
+        )
+
+    view = AttendanceHome()
+    view.batch_dropdown.value = str(batch_id)
+    view.load_batch_attendance(batch_id)
+
+    # Invariant: health_table columns >= 1
+    assert len(view.health_table.columns) >= 1
+    assert len(view.health_table.rows) == 3
+
+    # Defaulter count KPI should show 2 critical defaulters (<60%)
+    assert "2 Students" in view.kpi_defaulters_text.value
+
+    # Health Filter: Filter by CRITICAL
+    view.health_filter_dropdown.value = "CRITICAL"
+    view._handle_health_filter_change(None)
+    assert len(view.health_table.rows) == 2
+
+    # Health Filter: Filter by EXCELLENT
+    view.health_filter_dropdown.value = "EXCELLENT"
+    view._handle_health_filter_change(None)
+    assert len(view.health_table.rows) == 1
+
+    # Search in Health Tab
+    view.health_filter_dropdown.value = "ALL"
+    view._handle_health_filter_change(None)
+    assert len(view.health_table.rows) == 3
+
+    view.health_search_box.value = "Neha"
+    view._handle_health_search_change(None)
+    assert len(view.health_table.rows) == 1
+
+
+def test_attendance_home_two_stage_batch_selection_and_back_button(setup_attendance_fixture):
+    """
+    Verifies that selecting a batch hides the batch selection card and reveals the active
+    workspace with smooth transition, and clicking 'Change Batch' returns to the selector.
+    """
+    view = AttendanceHome()
+    batch_id = setup_attendance_fixture["batch_id"]
+
+    # Initial state before loading any batch
+    assert hasattr(view, "batch_selection_card")
+    assert hasattr(view, "active_batch_workspace")
+    assert hasattr(view, "back_to_batches_btn")
+
+    # Load batch attendance -> should transition into active workspace
+    view.batch_dropdown.value = str(batch_id)
+    view.load_batch_attendance(batch_id)
+
+    assert view.batch_selection_card.visible is False
+    assert view.active_batch_workspace.visible is True
+    assert view.selected_batch_id == batch_id
+    assert "Morning Batch" in view.active_batch_title_text.value
+
+    # Click Back button -> transitions back to batch selection card
+    view._handle_back_to_batches(None)
+
+    assert view.batch_selection_card.visible is True
+    assert view.active_batch_workspace.visible is False
+    assert view.selected_batch_id is None
+
+
+def test_future_date_attendance_validation_and_ui_blocking(setup_attendance_fixture):
+    """
+    Validates that:
+    1. Service layer rejects future dates with ValidationError.
+    2. AttendanceHome UI next_day button cannot advance past today.
+    3. AttendanceHome UI date input cannot mark attendance for future dates.
+    4. Save button rejects future dates cleanly.
+    """
+    from datetime import timedelta
+    from core.exceptions import ValidationError
+    from modules.attendance.repository import AttendanceRepository
+    from modules.attendance.views.excel_import_reconciliation_modal import ExcelImportReconciliationModal
+
+    ctrl = AttendanceController()
+    batch_id = setup_attendance_fixture["batch_id"]
+    students = ctrl.get_enrolled_students(batch_id)
+
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    student_marks = [{"student_id": s.student_id, "admission_id": s.admission_id, "is_present": True} for s in students]
+
+    # 1. Service layer must reject future attendance
+    with pytest.raises(ValidationError) as exc_info:
+        ctrl.record_online_attendance(
+            batch_id=batch_id,
+            session_date=tomorrow,
+            student_marks=student_marks,
+        )
+    assert "future dates" in str(exc_info.value).lower()
+
+    # 2. View level next day button on today's date should be blocked
+    view = AttendanceHome()
+    view.selected_batch_id = batch_id
+    view.selected_date = date.today().isoformat()
+    view.date_field.value = view.selected_date
+
+    view._handle_next_day(None)
+    assert view.selected_date == date.today().isoformat()
+
+    # 3. View level handle_date_change with future date should clamp to today
+    view.date_field.value = tomorrow
+    view.handle_date_change(None)
+    assert view.selected_date == date.today().isoformat()
+    assert view.date_field.value == date.today().isoformat()
+
+    # 4. View level save on future date should be blocked without throwing
+    view.selected_date = tomorrow
+    view.handle_save_online_attendance()
+    # Toast shown, save not executed
+
+
+def test_offline_upload_and_repository_posixpath_support(setup_attendance_fixture, tmp_path):
+    """
+    Verifies that passing a pathlib.Path to repository upsert_session and service commit_offline_attendance
+    binds cleanly without SQLite parameter binding errors, and ExcelImportReconciliationModal accepts both on_saved and on_success.
+    """
+    from modules.attendance.repository import AttendanceRepository
+    from modules.attendance.views.excel_import_reconciliation_modal import ExcelImportReconciliationModal
+
+    service = AttendanceService()
+    repo = AttendanceRepository()
+    ctrl = AttendanceController()
+    batch_id = setup_attendance_fixture["batch_id"]
+    students = ctrl.get_enrolled_students(batch_id)
+
+    # Passing pathlib.Path object for scanned_image_path
+    image_path = tmp_path / "offline_sheet.png"
+    image_path.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+    marks = [{"student_id": s.student_id, "admission_id": s.admission_id, "is_present": True} for s in students]
+
+    # Test commit_offline_attendance with PosixPath
+    session = service.commit_offline_attendance(
+        batch_id=batch_id,
+        session_date="2026-10-14",
+        student_marks=marks,
+        scanned_image_path=image_path,  # PosixPath instance
+    )
+    assert session is not None
+    assert str(image_path) in (session.scanned_image_path or "")
+
+    # Also test direct repo upsert_session with PosixPath within unit_of_work
+    with service.unit_of_work():
+        session_id = repo.upsert_session(
+            batch_id=batch_id,
+            session_date="2026-10-14",
+            mode="OFFLINE",
+            recorded_by="admin",
+            remarks="Direct repo test",
+            scanned_image_path=image_path,
+        )
+        assert session_id is not None
+        assert session_id > 0
+
+    # Verify ExcelImportReconciliationModal initializes with both on_success and on_saved
+    callback_called = False
+    def my_callback():
+        nonlocal callback_called
+        callback_called = True
+
+    modal_success = ExcelImportReconciliationModal(
+        batch_id=batch_id,
+        batch_name="Test Batch",
+        on_success=my_callback,
+    )
+    assert modal_success.on_saved is not None
+    modal_success.on_saved()
+    assert callback_called is True
+
+
+

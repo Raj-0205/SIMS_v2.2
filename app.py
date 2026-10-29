@@ -8,6 +8,10 @@ if __name__ == "__main__":
     ui_entry_point = bootstrapper.launch()
 
     try:
-        ft.run(ui_entry_point)
-    except AttributeError:
-        ft.app(target=ui_entry_point)
+        try:
+            ft.run(ui_entry_point)
+        except AttributeError:
+            ft.app(target=ui_entry_point)
+    finally:
+        from modules.course.showcase_server import stop_showcase_server
+        stop_showcase_server()

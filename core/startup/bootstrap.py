@@ -73,6 +73,7 @@ class ApplicationBootstrapper:
             self._initialize_logging,
             self._initialize_database,
             self._initialize_audit,
+            self._initialize_showcase_server,
         )
         for engine in engines:
             engine()
@@ -111,6 +112,14 @@ class ApplicationBootstrapper:
 
     def _initialize_audit(self) -> None:
         self._report("[✓] Audit Engine (Pending)")
+
+    def _initialize_showcase_server(self) -> None:
+        try:
+            from modules.course.showcase_server import start_showcase_server
+            url = start_showcase_server()
+            self._report(f"[✓] Course Showcase Web Server Active ({url})")
+        except Exception as exc:
+            self._report(f"[!] Showcase Web Server Note: {exc}")
 
     def _create_ui_entry_point(self) -> Callable[[ft.Page], None]:
         def main_ui(page: ft.Page) -> None:

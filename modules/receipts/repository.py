@@ -37,23 +37,48 @@ class ReceiptRepository(BaseRepository):
         return self.execute_insert(sql, params)
 
     def get_by_id(self, receipt_id: int) -> Optional[dict[str, Any]]:
-        sql = "SELECT * FROM receipts WHERE id = ? LIMIT 1;"
+        sql = """
+            SELECT r.*, p.transaction_ref
+            FROM receipts r
+            LEFT JOIN payments p ON r.payment_id = p.id
+            WHERE r.id = ? LIMIT 1;
+        """
         return self.execute_fetchone(sql, (receipt_id,))
 
     def get_by_payment_id(self, payment_id: int) -> Optional[dict[str, Any]]:
-        sql = "SELECT * FROM receipts WHERE payment_id = ? LIMIT 1;"
+        sql = """
+            SELECT r.*, p.transaction_ref
+            FROM receipts r
+            LEFT JOIN payments p ON r.payment_id = p.id
+            WHERE r.payment_id = ? LIMIT 1;
+        """
         return self.execute_fetchone(sql, (payment_id,))
 
     def get_by_receipt_number(self, receipt_no: str) -> Optional[dict[str, Any]]:
-        sql = "SELECT * FROM receipts WHERE receipt_number = ? LIMIT 1;"
+        sql = """
+            SELECT r.*, p.transaction_ref
+            FROM receipts r
+            LEFT JOIN payments p ON r.payment_id = p.id
+            WHERE r.receipt_number = ? LIMIT 1;
+        """
         return self.execute_fetchone(sql, (receipt_no,))
 
     def get_by_admission_id(self, admission_id: int) -> list[dict[str, Any]]:
-        sql = "SELECT * FROM receipts WHERE admission_id = ? ORDER BY id ASC;"
+        sql = """
+            SELECT r.*, p.transaction_ref
+            FROM receipts r
+            LEFT JOIN payments p ON r.payment_id = p.id
+            WHERE r.admission_id = ? ORDER BY r.id ASC;
+        """
         return self.execute_fetchall(sql, (admission_id,))
 
     def get_by_student_id(self, student_id: int) -> list[dict[str, Any]]:
-        sql = "SELECT * FROM receipts WHERE student_id = ? ORDER BY id DESC;"
+        sql = """
+            SELECT r.*, p.transaction_ref
+            FROM receipts r
+            LEFT JOIN payments p ON r.payment_id = p.id
+            WHERE r.student_id = ? ORDER BY r.id DESC;
+        """
         return self.execute_fetchall(sql, (student_id,))
 
     def get_next_sequence_for_year(self, year: int) -> int:

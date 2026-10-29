@@ -192,13 +192,19 @@ class ReceiptPDFGenerator:
         inst_no = int(receipt_data.get("installment_number", 1))
         pay_mode = str(receipt_data.get("payment_mode", "CASH")).upper()
         collector = str(receipt_data.get("collector_name", "Hemant Mahale (Sir)"))
+        tx_ref = str(receipt_data.get("transaction_ref") or "").strip()
 
         rows = [
             (f"Fee Payment (Installment {inst_no:02d}) via {pay_mode}", f"Rs. {amount_paid:,.2f}"),
+        ]
+        if tx_ref:
+            ref_label = "Bank UTR / UPI Ref" if pay_mode in ("UPI", "NET_BANKING") else "Transaction Ref"
+            rows.append((f"{ref_label}: {tx_ref}", "[ VERIFIED ]"))
+        rows.extend([
             ("Total Course Agreed Fee", f"Rs. {total_fee:,.2f}"),
             ("Total Fee Paid Till Date", f"Rs. {total_paid:,.2f}"),
             ("Remaining Balance / Pending Amount", f"Rs. {pending_amt:,.2f}"),
-        ]
+        ])
 
         y += tbl_h
         for idx, (desc, amt_str) in enumerate(rows):
@@ -209,6 +215,12 @@ class ReceiptPDFGenerator:
                 cr.rectangle(cls.MARGIN_LEFT, y - 13.0, content_width, 18.0)
                 cr.fill()
                 cr.set_source_rgb(0.08, 0.50, 0.25)
+                cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+            elif idx == 1 and tx_ref:
+                cr.set_source_rgb(0.93, 0.96, 1.0)  # Light Blue tint for verified UTR
+                cr.rectangle(cls.MARGIN_LEFT, y - 13.0, content_width, 18.0)
+                cr.fill()
+                cr.set_source_rgb(0.12, 0.35, 0.65)
                 cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
             else:
                 cr.set_source_rgb(0.25, 0.30, 0.38)
@@ -223,14 +235,24 @@ class ReceiptPDFGenerator:
             cr.show_text(amt_str)
 
         # ── 5. COLLECTED BY & NOTES ──
-        y += 26.0
+        y += 24.0
         cr.set_source_rgb(0.45, 0.50, 0.58)
         cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
         cr.set_font_size(8.5)
         cr.move_to(cls.MARGIN_LEFT, y)
         cr.show_text(f"Payment Received By: {collector}")
 
+        if tx_ref:
+            y += 12.0
+            ref_label = "Bank UTR / UPI Ref No" if pay_mode in ("UPI", "NET_BANKING") else "Transaction Ref No"
+            cr.set_source_rgb(0.12, 0.23, 0.36)
+            cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+            cr.move_to(cls.MARGIN_LEFT, y)
+            cr.show_text(f"{ref_label}: {tx_ref}")
+
         y += 12.0
+        cr.set_source_rgb(0.45, 0.50, 0.58)
+        cr.select_font_face("Sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
         cr.move_to(cls.MARGIN_LEFT, y)
         cr.show_text("Payment status: Confirmed & Audited in SIMS ERP.")
 

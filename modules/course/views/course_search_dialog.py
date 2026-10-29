@@ -20,7 +20,7 @@ class CourseSearchDialog(ft.AlertDialog):
         self.controller = controller
         self.on_course_selected = on_course_selected
         
-        self.title = ft.Text("Search Course")
+        self.title = ft.SelectionArea(content=ft.Text("Search Course"))
         self.modal = True
         
         self.search_input = ft.TextField(
@@ -32,7 +32,7 @@ class CourseSearchDialog(ft.AlertDialog):
         )
         
         self.results_list = ft.ListView(expand=1, spacing=5, height=350, width=500)
-        self.content = ft.Column(controls=[self.search_input, self.results_list], tight=True)
+        self.content = ft.SelectionArea(content=ft.Column(controls=[self.search_input, self.results_list], tight=True))
         self.actions = [ft.TextButton(content=ft.Text("Cancel"), on_click=self.close_dialog)]
 
     def handle_search(self, e: ft.ControlEvent) -> None:

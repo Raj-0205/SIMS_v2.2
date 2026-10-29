@@ -13,6 +13,21 @@ from core.logger.exceptions import LoggerInitializationError
 __all__ = ["LogService"]
 
 
+class _SafeStreamHandler(logging.StreamHandler):
+    """StreamHandler that gracefully ignores writes to closed streams during process shutdown."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            if self.stream and not getattr(self.stream, "closed", False):
+                super().emit(record)
+        except (ValueError, OSError):
+            pass
+
+    def handleError(self, record: logging.LogRecord) -> None:
+        if self.stream and not getattr(self.stream, "closed", False):
+            super().handleError(record)
+
+
 class LogService:
     """
     Central Logging Engine.
@@ -63,13 +78,18 @@ class LogService:
             )
             file_handler.setFormatter(formatter)
 
-            console_handler = logging.StreamHandler()
+            console_handler = _SafeStreamHandler()
             console_handler.setFormatter(formatter)
 
             root_logger = logging.getLogger()
             root_logger.setLevel(log_level)
             
             if root_logger.hasHandlers():
+                for h in list(root_logger.handlers):
+                    try:
+                        h.close()
+                    except Exception:
+                        pass
                 root_logger.handlers.clear()
 
             root_logger.addHandler(file_handler)
@@ -111,27 +131,45 @@ class LogService:
 
     @classmethod
     def debug(cls, message: str, context: str | None = None, *args: Any, **kwargs: Any) -> None:
-        cls._get_context_logger(context).debug(message, *args, **kwargs)
+        try:
+            cls._get_context_logger(context).debug(message, *args, **kwargs)
+        except (ValueError, OSError):
+            pass
 
     @classmethod
     def info(cls, message: str, context: str | None = None, *args: Any, **kwargs: Any) -> None:
-        cls._get_context_logger(context).info(message, *args, **kwargs)
+        try:
+            cls._get_context_logger(context).info(message, *args, **kwargs)
+        except (ValueError, OSError):
+            pass
 
     @classmethod
     def warning(cls, message: str, context: str | None = None, *args: Any, **kwargs: Any) -> None:
-        cls._get_context_logger(context).warning(message, *args, **kwargs)
+        try:
+            cls._get_context_logger(context).warning(message, *args, **kwargs)
+        except (ValueError, OSError):
+            pass
 
     @classmethod
     def error(cls, message: str, context: str | None = None, *args: Any, **kwargs: Any) -> None:
-        cls._get_context_logger(context).error(message, *args, **kwargs)
+        try:
+            cls._get_context_logger(context).error(message, *args, **kwargs)
+        except (ValueError, OSError):
+            pass
 
     @classmethod
     def critical(cls, message: str, context: str | None = None, *args: Any, **kwargs: Any) -> None:
-        cls._get_context_logger(context).critical(message, *args, **kwargs)
+        try:
+            cls._get_context_logger(context).critical(message, *args, **kwargs)
+        except (ValueError, OSError):
+            pass
 
     @classmethod
     def exception(cls, message: str, context: str | None = None, *args: Any, **kwargs: Any) -> None:
-        cls._get_context_logger(context).exception(message, *args, **kwargs)
+        try:
+            cls._get_context_logger(context).exception(message, *args, **kwargs)
+        except (ValueError, OSError):
+            pass
 
     @classmethod
     def shutdown(cls) -> None:

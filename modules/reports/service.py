@@ -50,7 +50,7 @@ class ReportsService(BaseService):
         if status and status.strip() and status.strip().upper() != "ALL":
             st = status.strip().upper()
             if st == "ACTIVE":
-                clauses.append("a.status IN ('DRAFT', 'REGISTERED', 'CONFIRMED')")
+                clauses.append("a.status IN ('DRAFT', 'REGISTERED')")
             else:
                 clauses.append("a.status = ?")
                 params.append(st)
@@ -102,6 +102,7 @@ class ReportsService(BaseService):
 
             results.append({
                 "sr_no": idx,
+                "admission_id_raw": int(adm_id),
                 "course_name": adm.get("course_name") or "General Course",
                 "admission_date": str(adm.get("admission_date") or "")[:10],
                 "admission_id": adm_num,
@@ -121,32 +122,93 @@ class ReportsService(BaseService):
             })
         return results
 
-    def get_admission_fees_report(
-        self,
-        course_id: Optional[int] = None,
-        status: Optional[str] = None,
-        search: Optional[str] = None,
-        sort_by: Optional[str] = None,
-    ) -> list[dict[str, Any]]:
-        """Returns full unpaginated admission fees report rows (legacy compatible with caching)."""
-        from core.cache.fees_cache import FeesCacheManager
+    def _map_bulk_admission_record(self, raw: dict[str, Any]) -> dict[str, Any]:
+        adm_id_raw = int(raw["admission_id_raw"])
+        inst1 = float(raw.get("inst1") or 0.0)
+        inst2 = float(raw.get("inst2") or 0.0)
+        inst3 = float(raw.get("inst3") or 0.0)
+        inst4 = float(raw.get("inst4") or 0.0)
+        total_paid = float(raw.get("total_paid") or 0.0)
 
-        status_clean = (status or "ALL").strip().upper()
-        search_clean = (search or "").strip()
-        sort_clean = (sort_by or "NONE").strip().upper()
-        cache_key = (course_id, status_clean, search_clean, sort_clean)
+        agreed_fee = float(raw.get("agreed_fee") or 0.0)
+        discount = float(raw.get("discount") or 0.0)
+        total_fees = agreed_fee - discount
+        pending_fees = max(0.0, total_fees - total_paid)
 
-        cached_report = FeesCacheManager.get_full_report(cache_key)
-        if cached_report is not None:
-            return cached_report
+        friend_name = (raw.get("friend_name") or "").strip() or "—"
+        friend_mobile = raw.get("friend_mobile") or "—"
 
+        c_year = raw.get("candidate_year") or 2026
+        c_seq = raw.get("candidate_sequence") or adm_id_raw
+        try:
+            c_seq_int = int(c_seq)
+            adm_num = f"{c_year}-{c_seq_int:03d}"
+        except (ValueError, TypeError):
+            adm_num = f"{c_year}-{c_seq}"
+
+        first_name = (raw.get("first_name") or "").strip()
+        last_name = (raw.get("last_name") or "").strip()
+        full_name = f"{first_name} {last_name}".strip()
+        mobile = raw.get("mobile_number") or "—"
+
+        all_courses_str = raw.get("all_courses") or raw.get("course_name") or ""
+        all_course_ids_raw = raw.get("all_course_ids") or ""
+        all_course_ids_set = set()
+        if raw.get("course_id"):
+            all_course_ids_set.add(int(raw["course_id"]))
+        for cid in str(all_course_ids_raw).split(","):
+            cid_s = cid.strip()
+            if cid_s.isdigit():
+                all_course_ids_set.add(int(cid_s))
+
+        course_map = {}
+        if raw.get("course_id") and raw.get("course_name"):
+            course_map[int(raw["course_id"])] = str(raw["course_name"])
+
+        friend_sid = int(raw["friend_student_id"]) if raw.get("friend_student_id") else None
+
+        return {
+            "admission_id_raw": adm_id_raw,
+            "student_id": int(raw["student_id"]) if raw.get("student_id") else 0,
+            "course_id": int(raw["course_id"]) if raw.get("course_id") else None,
+            "all_course_ids": all_course_ids_set,
+            "all_courses": all_courses_str,
+            "course_map": course_map,
+            "candidate_year": c_year,
+            "candidate_sequence": c_seq,
+            "admission_id": adm_num,
+            "admission_date": str(raw.get("admission_date") or "")[:10],
+            "admission_status": raw.get("admission_status") or "REGISTERED",
+            "first_name": first_name,
+            "last_name": last_name,
+            "name": full_name,
+            "mob_no": mobile,
+            "mobile_number": mobile,
+            "course_name": raw.get("course_name") or "General Course",
+            "agreed_fee": agreed_fee,
+            "discount": discount,
+            "total_fees": total_fees,
+            "inst1": inst1,
+            "inst2": inst2,
+            "inst3": inst3,
+            "inst4": inst4,
+            "total_paid": total_paid,
+            "pending_fees": pending_fees,
+            "address": raw.get("address") or raw.get("village") or "—",
+            "friend_student_id": friend_sid,
+            "friend_name": friend_name,
+            "friend_mobile": friend_mobile,
+        }
+
+    def _fetch_bulk_admission_fees_dataset(self) -> list[dict[str, Any]]:
+        """
+        Executes single bulk query fetching all admissions, payments, courses, and friends.
+        R1 First-Access Bulk Preload.
+        """
         with self.unit_of_work():
-            where_sql, params = self._build_fees_filter_clauses(course_id, status, search)
-            order_by_sql = self._resolve_sort_order(sort_by)
-
-            # High-performance aggregated SQL query eliminating correlated subqueries (SIMS-PERF-01)
-            sql = f"""
-                SELECT a.id AS admission_id,
+            sql = """
+                SELECT a.id AS admission_id_raw,
+                       a.id AS admission_id,
                        a.candidate_year,
                        a.candidate_sequence,
                        a.created_at AS admission_date,
@@ -167,12 +229,23 @@ class ReportsService(BaseService):
                        COALESCE(p.inst4, 0.0) AS inst4,
                        COALESCE(p.total_paid, 0.0) AS total_paid,
                        MAX(0.0, (COALESCE(a.agreed_fee, 0.0) - COALESCE(a.discount, 0.0)) - COALESCE(p.total_paid, 0.0)) AS pending_fees,
+                       f.friend_student_id,
                        f.friend_name,
-                       f.friend_mobile
+                       f.friend_mobile,
+                       ac_all.all_courses,
+                       ac_all.all_course_ids
                 FROM admissions a
                 JOIN students s ON s.id = a.student_id
                 LEFT JOIN admission_courses ac ON ac.admission_id = a.id
                 LEFT JOIN courses c ON c.id = ac.course_id
+                LEFT JOIN (
+                    SELECT ac2.admission_id,
+                           GROUP_CONCAT(c2.name, '|||') AS all_courses,
+                           GROUP_CONCAT(ac2.course_id, ',') AS all_course_ids
+                    FROM admission_courses ac2
+                    JOIN courses c2 ON c2.id = ac2.course_id
+                    GROUP BY ac2.admission_id
+                ) ac_all ON ac_all.admission_id = a.id
                 LEFT JOIN (
                     SELECT admission_id,
                            SUM(CASE WHEN installment_number = 1 THEN amount ELSE 0 END) AS inst1,
@@ -186,6 +259,7 @@ class ReportsService(BaseService):
                 LEFT JOIN (
                     SELECT 
                         sf.base_student_id,
+                        sf.target_friend_id AS friend_student_id,
                         TRIM(s_f.first_name || ' ' || s_f.last_name) AS friend_name,
                         s_f.mobile_number AS friend_mobile
                     FROM (
@@ -206,13 +280,132 @@ class ReportsService(BaseService):
                     JOIN students s_f ON s_f.id = sf.target_friend_id
                     WHERE sf.rn = 1
                 ) f ON f.base_student_id = s.id
-                {where_sql}
-                {order_by_sql};
+                GROUP BY a.id
+                ORDER BY a.id DESC;
             """
-            raw_admissions = self.repo.execute_fetchall(sql, tuple(params))
-            mapped_rows = self._map_report_rows(raw_admissions, start_idx=1)
-            FeesCacheManager.set_full_report(cache_key, mapped_rows)
-            return mapped_rows
+            raw_admissions = self.repo.execute_fetchall(sql)
+            return [self._map_bulk_admission_record(raw) for raw in raw_admissions]
+
+    def fetch_single_admission_fees_record(self, admission_id: int) -> Optional[dict[str, Any]]:
+        """
+        Fetches a single admission record formatted for targeted cache updates.
+        """
+        with self.unit_of_work():
+            sql = """
+                SELECT a.id AS admission_id_raw,
+                       a.id AS admission_id,
+                       a.candidate_year,
+                       a.candidate_sequence,
+                       a.created_at AS admission_date,
+                       a.status AS admission_status,
+                       a.agreed_fee,
+                       a.discount,
+                       a.village,
+                       a.address,
+                       s.id AS student_id,
+                       s.first_name,
+                       s.last_name,
+                       s.mobile_number,
+                       c.id AS course_id,
+                       COALESCE(c.name, 'General Course') AS course_name,
+                       COALESCE(p.inst1, 0.0) AS inst1,
+                       COALESCE(p.inst2, 0.0) AS inst2,
+                       COALESCE(p.inst3, 0.0) AS inst3,
+                       COALESCE(p.inst4, 0.0) AS inst4,
+                       COALESCE(p.total_paid, 0.0) AS total_paid,
+                       MAX(0.0, (COALESCE(a.agreed_fee, 0.0) - COALESCE(a.discount, 0.0)) - COALESCE(p.total_paid, 0.0)) AS pending_fees,
+                       f.friend_student_id,
+                       f.friend_name,
+                       f.friend_mobile,
+                       ac_all.all_courses,
+                       ac_all.all_course_ids
+                FROM admissions a
+                JOIN students s ON s.id = a.student_id
+                LEFT JOIN admission_courses ac ON ac.admission_id = a.id
+                LEFT JOIN courses c ON c.id = ac.course_id
+                LEFT JOIN (
+                    SELECT ac2.admission_id,
+                           GROUP_CONCAT(c2.name, '|||') AS all_courses,
+                           GROUP_CONCAT(ac2.course_id, ',') AS all_course_ids
+                    FROM admission_courses ac2
+                    JOIN courses c2 ON c2.id = ac2.course_id
+                    GROUP BY ac2.admission_id
+                ) ac_all ON ac_all.admission_id = a.id
+                LEFT JOIN (
+                    SELECT admission_id,
+                           SUM(CASE WHEN installment_number = 1 THEN amount ELSE 0 END) AS inst1,
+                           SUM(CASE WHEN installment_number = 2 THEN amount ELSE 0 END) AS inst2,
+                           SUM(CASE WHEN installment_number = 3 THEN amount ELSE 0 END) AS inst3,
+                           SUM(CASE WHEN installment_number = 4 THEN amount ELSE 0 END) AS inst4,
+                           SUM(amount) AS total_paid
+                    FROM payments
+                    WHERE admission_id = ?
+                    GROUP BY admission_id
+                ) p ON p.admission_id = a.id
+                LEFT JOIN (
+                    SELECT 
+                        sf.base_student_id,
+                        sf.target_friend_id AS friend_student_id,
+                        TRIM(s_f.first_name || ' ' || s_f.last_name) AS friend_name,
+                        s_f.mobile_number AS friend_mobile
+                    FROM (
+                        SELECT 
+                            student_id AS base_student_id,
+                            friend_student_id AS target_friend_id,
+                            ROW_NUMBER() OVER (PARTITION BY student_id ORDER BY id ASC) as rn
+                        FROM student_friendships
+                        WHERE is_active = 1
+                        UNION ALL
+                        SELECT 
+                            friend_student_id AS base_student_id,
+                            student_id AS target_friend_id,
+                            ROW_NUMBER() OVER (PARTITION BY friend_student_id ORDER BY id ASC) as rn
+                        FROM student_friendships
+                        WHERE is_active = 1
+                    ) sf
+                    JOIN students s_f ON s_f.id = sf.target_friend_id
+                    WHERE sf.rn = 1
+                ) f ON f.base_student_id = s.id
+                WHERE a.id = ?
+                GROUP BY a.id
+                LIMIT 1;
+            """
+            raw = self.repo.execute_fetchone(sql, (admission_id, admission_id))
+            if not raw:
+                return None
+            return self._map_bulk_admission_record(raw)
+
+    def get_admission_fees_report(
+        self,
+        course_id: Optional[int] = None,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+        sort_by: Optional[str] = None,
+    ) -> list[dict[str, Any]]:
+        """Returns full unpaginated admission fees report rows (legacy compatible with caching)."""
+        from core.cache.fees_cache import FeesCacheManager
+
+        if not FeesCacheManager.is_loaded():
+            bulk_dataset = self._fetch_bulk_admission_fees_dataset()
+            FeesCacheManager.bulk_preload(bulk_dataset)
+
+        rows = FeesCacheManager.query_all_preloaded(
+            course_id=course_id,
+            status=status,
+            search=search,
+            sort_by=sort_by,
+        )
+        if rows is not None:
+            return rows
+
+        bulk_dataset = self._fetch_bulk_admission_fees_dataset()
+        FeesCacheManager.bulk_preload(bulk_dataset)
+        return FeesCacheManager.query_all_preloaded(
+            course_id=course_id,
+            status=status,
+            search=search,
+            sort_by=sort_by,
+        ) or []
 
     def get_admission_fees_report_paginated(
         self,
@@ -226,227 +419,56 @@ class ReportsService(BaseService):
         """
         Returns paginated fees report with metadata, sequential sr_no,
         in-memory LRU block caching, and sub-millisecond Page-First execution.
+        R1 First-Access Bulk Preload + R2 Subsequent Cached Reads.
         """
         from core.cache.fees_cache import FeesCacheManager
 
         page_val = max(1, page)
         page_size_val = max(1, page_size)
-        status_clean = (status or "ALL").strip().upper()
-        search_clean = (search or "").strip()
-        sort_clean = (sort_by or "NONE").strip().upper()
 
-        cache_key = (course_id, status_clean, search_clean, sort_clean, page_size_val, page_val)
-        count_key = (course_id, status_clean, search_clean)
+        if not FeesCacheManager.is_loaded():
+            bulk_dataset = self._fetch_bulk_admission_fees_dataset()
+            FeesCacheManager.bulk_preload(bulk_dataset)
+            res = FeesCacheManager.query_preloaded(
+                course_id=course_id,
+                status=status,
+                search=search,
+                sort_by=sort_by,
+                page=page_val,
+                page_size=page_size_val,
+            )
+            if res is not None:
+                res["from_cache"] = False
+                return res
 
-        # 1. Fast Memory Cache Check
-        cached_block = FeesCacheManager.get_block(cache_key)
-        cached_count = FeesCacheManager.get_total_count(count_key)
+        res = FeesCacheManager.query_preloaded(
+            course_id=course_id,
+            status=status,
+            search=search,
+            sort_by=sort_by,
+            page=page_val,
+            page_size=page_size_val,
+        )
+        if res is not None:
+            return res
 
-        if cached_block is not None and cached_count is not None:
-            total_pages = max(1, (cached_count + page_size_val - 1) // page_size_val)
-            return {
-                "rows": cached_block,
-                "total_count": cached_count,
-                "page": page_val,
-                "page_size": page_size_val,
-                "total_pages": total_pages,
-                "from_cache": True,
-            }
-
-        # 2. Database Execution on Cache Miss
-        with self.unit_of_work():
-            where_sql, params = self._build_fees_filter_clauses(course_id, status, search)
-
-            # Resolve total matching count (cached or queried)
-            if cached_count is None:
-                count_sql = f"""
-                    SELECT COUNT(*) as cnt
-                    FROM admissions a
-                    JOIN students s ON s.id = a.student_id
-                    LEFT JOIN admission_courses ac ON ac.admission_id = a.id
-                    LEFT JOIN courses c ON c.id = ac.course_id
-                    {where_sql};
-                """
-                count_res = self.repo.execute_fetchone(count_sql, tuple(params))
-                total_count = int(count_res["cnt"]) if count_res else 0
-                FeesCacheManager.set_total_count(count_key, total_count)
-            else:
-                total_count = cached_count
-
-            offset_val = (page_val - 1) * page_size_val
-            total_pages = max(1, (total_count + page_size_val - 1) // page_size_val)
-            order_by_sql = self._resolve_sort_order(sort_by)
-
-            # 3. Choose Optimal Query Strategy
-            # If sorting by calculated fields (inst1..4, total_paid, pending_fees), use full aggregated sort.
-            # Otherwise (Default, ID, Date, etc.), use the ultra-fast Page-First CTE (SIMS-PERF-02).
-            is_calculated_sort = sort_clean in ("INST1", "INST2", "INST3", "INST4", "PAID", "PENDING")
-
-            if not is_calculated_sort:
-                sql = f"""
-                    WITH target_page AS (
-                        SELECT a.id as admission_id
-                        FROM admissions a
-                        JOIN students s ON s.id = a.student_id
-                        LEFT JOIN admission_courses ac ON ac.admission_id = a.id
-                        LEFT JOIN courses c ON c.id = ac.course_id
-                        {where_sql}
-                        {order_by_sql}
-                        LIMIT ? OFFSET ?
-                    )
-                    SELECT a.id AS admission_id,
-                           a.candidate_year,
-                           a.candidate_sequence,
-                           a.created_at AS admission_date,
-                           a.status AS admission_status,
-                           a.agreed_fee,
-                           a.discount,
-                           a.village,
-                           a.address,
-                           s.id AS student_id,
-                           s.first_name,
-                           s.last_name,
-                           s.mobile_number,
-                           c.id AS course_id,
-                           COALESCE(c.name, 'General Course') AS course_name,
-                           COALESCE(p.inst1, 0.0) AS inst1,
-                           COALESCE(p.inst2, 0.0) AS inst2,
-                           COALESCE(p.inst3, 0.0) AS inst3,
-                           COALESCE(p.inst4, 0.0) AS inst4,
-                           COALESCE(p.total_paid, 0.0) AS total_paid,
-                           MAX(0.0, (COALESCE(a.agreed_fee, 0.0) - COALESCE(a.discount, 0.0)) - COALESCE(p.total_paid, 0.0)) AS pending_fees,
-                           COALESCE(
-                               (
-                                   SELECT TRIM(s2.first_name || ' ' || s2.last_name)
-                                   FROM student_friendships sf INDEXED BY idx_friendships_student_active
-                                   JOIN students s2 ON s2.id = sf.friend_student_id
-                                   WHERE sf.student_id = s.id AND sf.is_active = 1
-                                   LIMIT 1
-                               ),
-                               (
-                                   SELECT TRIM(s2.first_name || ' ' || s2.last_name)
-                                   FROM student_friendships sf INDEXED BY idx_friendships_friend_active
-                                   JOIN students s2 ON s2.id = sf.student_id
-                                   WHERE sf.friend_student_id = s.id AND sf.is_active = 1
-                                   LIMIT 1
-                               )
-                           ) AS friend_name,
-                           COALESCE(
-                               (
-                                   SELECT s2.mobile_number
-                                   FROM student_friendships sf INDEXED BY idx_friendships_student_active
-                                   JOIN students s2 ON s2.id = sf.friend_student_id
-                                   WHERE sf.student_id = s.id AND sf.is_active = 1
-                                   LIMIT 1
-                               ),
-                               (
-                                   SELECT s2.mobile_number
-                                   FROM student_friendships sf INDEXED BY idx_friendships_friend_active
-                                   JOIN students s2 ON s2.id = sf.student_id
-                                   WHERE sf.friend_student_id = s.id AND sf.is_active = 1
-                                   LIMIT 1
-                               )
-                           ) AS friend_mobile
-                    FROM target_page tp
-                    JOIN admissions a ON a.id = tp.admission_id
-                    JOIN students s ON s.id = a.student_id
-                    LEFT JOIN admission_courses ac ON ac.admission_id = a.id
-                    LEFT JOIN courses c ON c.id = ac.course_id
-                    LEFT JOIN (
-                        SELECT admission_id,
-                               SUM(CASE WHEN installment_number = 1 THEN amount ELSE 0 END) AS inst1,
-                               SUM(CASE WHEN installment_number = 2 THEN amount ELSE 0 END) AS inst2,
-                               SUM(CASE WHEN installment_number = 3 THEN amount ELSE 0 END) AS inst3,
-                               SUM(CASE WHEN installment_number = 4 THEN amount ELSE 0 END) AS inst4,
-                               SUM(amount) AS total_paid
-                        FROM payments
-                        WHERE admission_id IN (SELECT admission_id FROM target_page)
-                        GROUP BY admission_id
-                    ) p ON p.admission_id = a.id
-                    {order_by_sql};
-                """
-            else:
-                sql = f"""
-                    SELECT a.id AS admission_id,
-                           a.candidate_year,
-                           a.candidate_sequence,
-                           a.created_at AS admission_date,
-                           a.status AS admission_status,
-                           a.agreed_fee,
-                           a.discount,
-                           a.village,
-                           a.address,
-                           s.id AS student_id,
-                           s.first_name,
-                           s.last_name,
-                           s.mobile_number,
-                           c.id AS course_id,
-                           COALESCE(c.name, 'General Course') AS course_name,
-                           COALESCE(p.inst1, 0.0) AS inst1,
-                           COALESCE(p.inst2, 0.0) AS inst2,
-                           COALESCE(p.inst3, 0.0) AS inst3,
-                           COALESCE(p.inst4, 0.0) AS inst4,
-                           COALESCE(p.total_paid, 0.0) AS total_paid,
-                           MAX(0.0, (COALESCE(a.agreed_fee, 0.0) - COALESCE(a.discount, 0.0)) - COALESCE(p.total_paid, 0.0)) AS pending_fees,
-                           f.friend_name,
-                           f.friend_mobile
-                    FROM admissions a
-                    JOIN students s ON s.id = a.student_id
-                    LEFT JOIN admission_courses ac ON ac.admission_id = a.id
-                    LEFT JOIN courses c ON c.id = ac.course_id
-                    LEFT JOIN (
-                        SELECT admission_id,
-                               SUM(CASE WHEN installment_number = 1 THEN amount ELSE 0 END) AS inst1,
-                               SUM(CASE WHEN installment_number = 2 THEN amount ELSE 0 END) AS inst2,
-                               SUM(CASE WHEN installment_number = 3 THEN amount ELSE 0 END) AS inst3,
-                               SUM(CASE WHEN installment_number = 4 THEN amount ELSE 0 END) AS inst4,
-                               SUM(amount) AS total_paid
-                        FROM payments
-                        GROUP BY admission_id
-                    ) p ON p.admission_id = a.id
-                    LEFT JOIN (
-                        SELECT 
-                            sf.base_student_id,
-                            TRIM(s_f.first_name || ' ' || s_f.last_name) AS friend_name,
-                            s_f.mobile_number AS friend_mobile
-                        FROM (
-                            SELECT 
-                                student_id AS base_student_id,
-                                friend_student_id AS target_friend_id,
-                                ROW_NUMBER() OVER (PARTITION BY student_id ORDER BY id ASC) as rn
-                            FROM student_friendships
-                            WHERE is_active = 1
-                            UNION ALL
-                            SELECT 
-                                friend_student_id AS base_student_id,
-                                student_id AS target_friend_id,
-                                ROW_NUMBER() OVER (PARTITION BY friend_student_id ORDER BY id ASC) as rn
-                            FROM student_friendships
-                            WHERE is_active = 1
-                        ) sf
-                        JOIN students s_f ON s_f.id = sf.target_friend_id
-                        WHERE sf.rn = 1
-                    ) f ON f.base_student_id = s.id
-                    {where_sql}
-                    {order_by_sql}
-                    LIMIT ? OFFSET ?;
-                """
-
-            exec_params = list(params) + [page_size_val, offset_val]
-            raw_admissions = self.repo.execute_fetchall(sql, tuple(exec_params))
-            rows = self._map_report_rows(raw_admissions, start_idx=offset_val + 1)
-
-            # Store in Memory Block Cache
-            FeesCacheManager.set_block(cache_key, rows)
-
-            return {
-                "rows": rows,
-                "total_count": total_count,
-                "page": page_val,
-                "page_size": page_size_val,
-                "total_pages": total_pages,
-                "from_cache": False,
-            }
+        bulk_dataset = self._fetch_bulk_admission_fees_dataset()
+        FeesCacheManager.bulk_preload(bulk_dataset)
+        return FeesCacheManager.query_preloaded(
+            course_id=course_id,
+            status=status,
+            search=search,
+            sort_by=sort_by,
+            page=page_val,
+            page_size=page_size_val,
+        ) or {
+            "rows": [],
+            "total_count": 0,
+            "page": page_val,
+            "page_size": page_size_val,
+            "total_pages": 1,
+            "from_cache": True,
+        }
 
     def get_admission_fees_report_chunk(
         self,
@@ -458,216 +480,56 @@ class ReportsService(BaseService):
         limit: int = 10,
     ) -> dict[str, Any]:
         """
-        Retrieves a single micro-chunk (e.g. 10 students) of the fees report
+        Retrieves a single micro-chunk of the fees report
         for progressive streaming with continuous sequential sr_no and total count.
         """
         from core.cache.fees_cache import FeesCacheManager
 
         offset_val = max(0, offset)
         limit_val = max(1, limit)
-        status_clean = (status or "ALL").strip().upper()
-        search_clean = (search or "").strip()
-        sort_clean = (sort_by or "NONE").strip().upper()
 
-        count_key = (course_id, status_clean, search_clean)
-        cached_count = FeesCacheManager.get_total_count(count_key)
-        chunk_key = (course_id, status_clean, search_clean, sort_clean, offset_val, limit_val)
-        cached_chunk = FeesCacheManager.get_block(chunk_key)
+        if not FeesCacheManager.is_loaded():
+            bulk_dataset = self._fetch_bulk_admission_fees_dataset()
+            FeesCacheManager.bulk_preload(bulk_dataset)
+            res = FeesCacheManager.query_chunk_preloaded(
+                course_id=course_id,
+                status=status,
+                search=search,
+                sort_by=sort_by,
+                offset=offset_val,
+                limit=limit_val,
+            )
+            if res is not None:
+                res["from_cache"] = False
+                return res
 
-        if cached_chunk is not None and cached_count is not None:
-            return {
-                "rows": cached_chunk,
-                "total_count": cached_count,
-                "offset": offset_val,
-                "limit": limit_val,
-                "from_cache": True,
-            }
+        res = FeesCacheManager.query_chunk_preloaded(
+            course_id=course_id,
+            status=status,
+            search=search,
+            sort_by=sort_by,
+            offset=offset_val,
+            limit=limit_val,
+        )
+        if res is not None:
+            return res
 
-        with self.unit_of_work():
-            where_sql, params = self._build_fees_filter_clauses(course_id, status, search)
-
-            if cached_count is None:
-                count_sql = f"""
-                    SELECT COUNT(*) as cnt
-                    FROM admissions a
-                    JOIN students s ON s.id = a.student_id
-                    LEFT JOIN admission_courses ac ON ac.admission_id = a.id
-                    LEFT JOIN courses c ON c.id = ac.course_id
-                    {where_sql};
-                """
-                count_res = self.repo.execute_fetchone(count_sql, tuple(params))
-                total_count = int(count_res["cnt"]) if count_res else 0
-                FeesCacheManager.set_total_count(count_key, total_count)
-            else:
-                total_count = cached_count
-
-            order_by_sql = self._resolve_sort_order(sort_by)
-            is_calculated_sort = sort_clean in ("INST1", "INST2", "INST3", "INST4", "PAID", "PENDING")
-
-            if not is_calculated_sort:
-                sql = f"""
-                    WITH target_page AS (
-                        SELECT a.id as admission_id
-                        FROM admissions a
-                        JOIN students s ON s.id = a.student_id
-                        LEFT JOIN admission_courses ac ON ac.admission_id = a.id
-                        LEFT JOIN courses c ON c.id = ac.course_id
-                        {where_sql}
-                        {order_by_sql}
-                        LIMIT ? OFFSET ?
-                    )
-                    SELECT a.id AS admission_id,
-                           a.candidate_year,
-                           a.candidate_sequence,
-                           a.created_at AS admission_date,
-                           a.status AS admission_status,
-                           a.agreed_fee,
-                           a.discount,
-                           a.village,
-                           a.address,
-                           s.id AS student_id,
-                           s.first_name,
-                           s.last_name,
-                           s.mobile_number,
-                           c.id AS course_id,
-                           COALESCE(c.name, 'General Course') AS course_name,
-                           COALESCE(p.inst1, 0.0) AS inst1,
-                           COALESCE(p.inst2, 0.0) AS inst2,
-                           COALESCE(p.inst3, 0.0) AS inst3,
-                           COALESCE(p.inst4, 0.0) AS inst4,
-                           COALESCE(p.total_paid, 0.0) AS total_paid,
-                           MAX(0.0, (COALESCE(a.agreed_fee, 0.0) - COALESCE(a.discount, 0.0)) - COALESCE(p.total_paid, 0.0)) AS pending_fees,
-                           COALESCE(
-                               (
-                                   SELECT TRIM(s2.first_name || ' ' || s2.last_name)
-                                   FROM student_friendships sf INDEXED BY idx_friendships_student_active
-                                   JOIN students s2 ON s2.id = sf.friend_student_id
-                                   WHERE sf.student_id = s.id AND sf.is_active = 1
-                                   LIMIT 1
-                               ),
-                               (
-                                   SELECT TRIM(s2.first_name || ' ' || s2.last_name)
-                                   FROM student_friendships sf INDEXED BY idx_friendships_friend_active
-                                   JOIN students s2 ON s2.id = sf.student_id
-                                   WHERE sf.friend_student_id = s.id AND sf.is_active = 1
-                                   LIMIT 1
-                               )
-                           ) AS friend_name,
-                           COALESCE(
-                               (
-                                   SELECT s2.mobile_number
-                                   FROM student_friendships sf INDEXED BY idx_friendships_student_active
-                                   JOIN students s2 ON s2.id = sf.friend_student_id
-                                   WHERE sf.student_id = s.id AND sf.is_active = 1
-                                   LIMIT 1
-                               ),
-                               (
-                                   SELECT s2.mobile_number
-                                   FROM student_friendships sf INDEXED BY idx_friendships_friend_active
-                                   JOIN students s2 ON s2.id = sf.student_id
-                                   WHERE sf.friend_student_id = s.id AND sf.is_active = 1
-                                   LIMIT 1
-                               )
-                           ) AS friend_mobile
-                    FROM target_page tp
-                    JOIN admissions a ON a.id = tp.admission_id
-                    JOIN students s ON s.id = a.student_id
-                    LEFT JOIN admission_courses ac ON ac.admission_id = a.id
-                    LEFT JOIN courses c ON c.id = ac.course_id
-                    LEFT JOIN (
-                        SELECT admission_id,
-                               SUM(CASE WHEN installment_number = 1 THEN amount ELSE 0 END) AS inst1,
-                               SUM(CASE WHEN installment_number = 2 THEN amount ELSE 0 END) AS inst2,
-                               SUM(CASE WHEN installment_number = 3 THEN amount ELSE 0 END) AS inst3,
-                               SUM(CASE WHEN installment_number = 4 THEN amount ELSE 0 END) AS inst4,
-                               SUM(amount) AS total_paid
-                        FROM payments
-                        WHERE admission_id IN (SELECT admission_id FROM target_page)
-                        GROUP BY admission_id
-                    ) p ON p.admission_id = a.id
-                    {order_by_sql};
-                """
-            else:
-                sql = f"""
-                    SELECT a.id AS admission_id,
-                           a.candidate_year,
-                           a.candidate_sequence,
-                           a.created_at AS admission_date,
-                           a.status AS admission_status,
-                           a.agreed_fee,
-                           a.discount,
-                           a.village,
-                           a.address,
-                           s.id AS student_id,
-                           s.first_name,
-                           s.last_name,
-                           s.mobile_number,
-                           c.id AS course_id,
-                           COALESCE(c.name, 'General Course') AS course_name,
-                           COALESCE(p.inst1, 0.0) AS inst1,
-                           COALESCE(p.inst2, 0.0) AS inst2,
-                           COALESCE(p.inst3, 0.0) AS inst3,
-                           COALESCE(p.inst4, 0.0) AS inst4,
-                           COALESCE(p.total_paid, 0.0) AS total_paid,
-                           MAX(0.0, (COALESCE(a.agreed_fee, 0.0) - COALESCE(a.discount, 0.0)) - COALESCE(p.total_paid, 0.0)) AS pending_fees,
-                           f.friend_name,
-                           f.friend_mobile
-                    FROM admissions a
-                    JOIN students s ON s.id = a.student_id
-                    LEFT JOIN admission_courses ac ON ac.admission_id = a.id
-                    LEFT JOIN courses c ON c.id = ac.course_id
-                    LEFT JOIN (
-                        SELECT admission_id,
-                               SUM(CASE WHEN installment_number = 1 THEN amount ELSE 0 END) AS inst1,
-                               SUM(CASE WHEN installment_number = 2 THEN amount ELSE 0 END) AS inst2,
-                               SUM(CASE WHEN installment_number = 3 THEN amount ELSE 0 END) AS inst3,
-                               SUM(CASE WHEN installment_number = 4 THEN amount ELSE 0 END) AS inst4,
-                               SUM(amount) AS total_paid
-                        FROM payments
-                        GROUP BY admission_id
-                    ) p ON p.admission_id = a.id
-                    LEFT JOIN (
-                        SELECT 
-                            sf.base_student_id,
-                            TRIM(s_f.first_name || ' ' || s_f.last_name) AS friend_name,
-                            s_f.mobile_number AS friend_mobile
-                        FROM (
-                            SELECT 
-                                student_id AS base_student_id,
-                                friend_student_id AS target_friend_id,
-                                ROW_NUMBER() OVER (PARTITION BY student_id ORDER BY id ASC) as rn
-                            FROM student_friendships
-                            WHERE is_active = 1
-                            UNION ALL
-                            SELECT 
-                                friend_student_id AS base_student_id,
-                                student_id AS target_friend_id,
-                                ROW_NUMBER() OVER (PARTITION BY friend_student_id ORDER BY id ASC) as rn
-                            FROM student_friendships
-                            WHERE is_active = 1
-                        ) sf
-                        JOIN students s_f ON s_f.id = sf.target_friend_id
-                        WHERE sf.rn = 1
-                    ) f ON f.base_student_id = s.id
-                    {where_sql}
-                    {order_by_sql}
-                    LIMIT ? OFFSET ?;
-                """
-
-            exec_params = list(params) + [limit_val, offset_val]
-            raw_admissions = self.repo.execute_fetchall(sql, tuple(exec_params))
-            rows = self._map_report_rows(raw_admissions, start_idx=offset_val + 1)
-
-            # Store in Memory Block Cache
-            FeesCacheManager.set_block(chunk_key, rows)
-
-            return {
-                "rows": rows,
-                "total_count": total_count,
-                "offset": offset_val,
-                "limit": limit_val,
-                "from_cache": False,
-            }
+        bulk_dataset = self._fetch_bulk_admission_fees_dataset()
+        FeesCacheManager.bulk_preload(bulk_dataset)
+        return FeesCacheManager.query_chunk_preloaded(
+            course_id=course_id,
+            status=status,
+            search=search,
+            sort_by=sort_by,
+            offset=offset_val,
+            limit=limit_val,
+        ) or {
+            "rows": [],
+            "total_count": 0,
+            "offset": offset_val,
+            "limit": limit_val,
+            "from_cache": True,
+        }
 
     def export_filtered_fees_report_csv(
         self,
@@ -754,6 +616,7 @@ class ReportsService(BaseService):
                     adm_num = f"{c_year}-{c_seq}"
                 out.append({
                     "payment_id": r["id"],
+                    "admission_id": r["admission_id"],
                     "admission_number": adm_num,
                     "student_name": f"{r['first_name']} {r['last_name']}".strip(),
                     "mobile_number": r.get("mobile_number") or "—",
@@ -777,96 +640,17 @@ class ReportsService(BaseService):
         """
         from core.cache.fees_cache import FeesCacheManager
 
-        cache_key = (course_id,)
-        cached_kpi = FeesCacheManager.get_kpi_summary(cache_key)
-        if cached_kpi is not None:
-            return cached_kpi
+        if not FeesCacheManager.is_loaded():
+            bulk_dataset = self._fetch_bulk_admission_fees_dataset()
+            FeesCacheManager.bulk_preload(bulk_dataset)
 
-        with self.unit_of_work():
-            filter_course = course_id is not None and course_id > 0
-            course_clause = "AND ac.course_id = ?" if filter_course else ""
-            course_params = (course_id,) if filter_course else ()
+        kpi = FeesCacheManager.get_kpi_summary_preloaded(course_id)
+        if kpi is not None:
+            return kpi
 
-            # 1. Total Billed Fees & Admissions
-            adm_sql = f"""
-                SELECT 
-                    COUNT(DISTINCT a.id) AS total_admissions,
-                    COALESCE(SUM(a.agreed_fee - a.discount), 0.0) AS total_billed_fees
-                FROM admissions a
-                LEFT JOIN admission_courses ac ON ac.admission_id = a.id
-                WHERE a.status != 'CANCELLED'
-                {course_clause};
-            """
-            adm_row = self.repo.execute_fetchone(adm_sql, course_params) or {}
-            total_admissions = int(adm_row.get("total_admissions") or 0)
-            total_billed_fees = round(float(adm_row.get("total_billed_fees") or 0.0), 2)
-
-            # 2. Total Collected Fees & Installment Breakdown
-            pay_sql = f"""
-                SELECT 
-                    COALESCE(SUM(p.amount), 0.0) AS total_collected_fees,
-                    COALESCE(SUM(CASE WHEN p.installment_number = 1 THEN p.amount ELSE 0.0 END), 0.0) AS inst1_total,
-                    COALESCE(SUM(CASE WHEN p.installment_number = 2 THEN p.amount ELSE 0.0 END), 0.0) AS inst2_total,
-                    COALESCE(SUM(CASE WHEN p.installment_number = 3 THEN p.amount ELSE 0.0 END), 0.0) AS inst3_total,
-                    COALESCE(SUM(CASE WHEN p.installment_number = 4 THEN p.amount ELSE 0.0 END), 0.0) AS inst4_total
-                FROM payments p
-                JOIN admissions a ON a.id = p.admission_id
-                LEFT JOIN admission_courses ac ON ac.admission_id = a.id
-                WHERE a.status != 'CANCELLED'
-                {course_clause};
-            """
-            pay_row = self.repo.execute_fetchone(pay_sql, course_params) or {}
-            total_collected_fees = round(float(pay_row.get("total_collected_fees") or 0.0), 2)
-            inst1_total = round(float(pay_row.get("inst1_total") or 0.0), 2)
-            inst2_total = round(float(pay_row.get("inst2_total") or 0.0), 2)
-            inst3_total = round(float(pay_row.get("inst3_total") or 0.0), 2)
-            inst4_total = round(float(pay_row.get("inst4_total") or 0.0), 2)
-
-            # 3. Total Pending Fees & Collection Rate
-            total_pending_fees = max(0.0, round(total_billed_fees - total_collected_fees, 2))
-            collection_rate_pct = (
-                round((total_collected_fees / total_billed_fees) * 100.0, 1)
-                if total_billed_fees > 0
-                else 0.0
-            )
-
-            # 4. Count of Students with Pending Dues
-            dues_sql = f"""
-                SELECT COUNT(*) AS dues_count
-                FROM (
-                    SELECT a.id,
-                           (a.agreed_fee - a.discount) AS final_fee,
-                           COALESCE(SUM(p.amount), 0.0) AS paid
-                    FROM admissions a
-                    LEFT JOIN admission_courses ac ON ac.admission_id = a.id
-                    LEFT JOIN payments p ON p.admission_id = a.id
-                    WHERE a.status != 'CANCELLED'
-                    {course_clause}
-                    GROUP BY a.id
-                    HAVING (final_fee - paid) > 0.01
-                );
-            """
-            dues_row = self.repo.execute_fetchone(dues_sql, course_params) or {}
-            students_with_dues = int(dues_row.get("dues_count") or 0)
-
-            summary = {
-                "course_id": course_id,
-                "total_admissions": total_admissions,
-                "total_billed_fees": total_billed_fees,
-                "total_collected_fees": total_collected_fees,
-                "total_pending_fees": total_pending_fees,
-                "collection_rate_pct": collection_rate_pct,
-                "students_with_dues": students_with_dues,
-                "installment_totals": {
-                    "inst1": inst1_total,
-                    "inst2": inst2_total,
-                    "inst3": inst3_total,
-                    "inst4": inst4_total,
-                },
-            }
-
-            FeesCacheManager.set_kpi_summary(cache_key, summary)
-            return summary
+        bulk_dataset = self._fetch_bulk_admission_fees_dataset()
+        FeesCacheManager.bulk_preload(bulk_dataset)
+        return FeesCacheManager.get_kpi_summary_preloaded(course_id) or {}
 
     def export_fees_report_csv(self, report_rows: list[dict[str, Any]], target_path: Optional[str | Path] = None) -> Path:
         headers = [

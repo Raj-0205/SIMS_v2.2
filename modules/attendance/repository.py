@@ -37,6 +37,7 @@ class AttendanceRepository(BaseRepository):
                 (s.first_name || ' ' || s.last_name) AS student_name,
                 s.mobile_number,
                 s.village,
+                s.photo_path,
                 c.id AS course_id,
                 COALESCE(c.name, '—') AS course_name,
                 a.created_at AS admission_date,
@@ -64,6 +65,7 @@ class AttendanceRepository(BaseRepository):
                     last_name=r["last_name"] or "",
                     mobile_number=r["mobile_number"],
                     village=r["village"],
+                    photo_path=r["photo_path"] if r.get("photo_path") else None,
                     course_id=r["course_id"],
                     course_name=r["course_name"] or "—",
                     admission_date=r["admission_date"][:10] if r["admission_date"] else None,
@@ -123,12 +125,15 @@ class AttendanceRepository(BaseRepository):
         mode: str = "ONLINE",
         recorded_by: Optional[str] = None,
         remarks: Optional[str] = None,
-        scanned_image_path: Optional[str] = None,
+        scanned_image_path: Optional[Any] = None,
     ) -> int:
         """
         Creates or updates a session for a batch and date.
         Returns the session ID.
         """
+        # Defensive conversion: Ensure Path/PosixPath is converted to str for SQLite driver
+        clean_image_path = str(scanned_image_path) if scanned_image_path is not None else None
+
         existing = self.get_session(batch_id, session_date)
         if existing:
             session_id = existing["id"]
@@ -141,7 +146,7 @@ class AttendanceRepository(BaseRepository):
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?;
             """
-            self.execute(sql_update, (mode, recorded_by, remarks, scanned_image_path, session_id))
+            self.execute(sql_update, (mode, recorded_by, remarks, clean_image_path, session_id))
             return session_id
         else:
             sql_insert = """
@@ -150,7 +155,7 @@ class AttendanceRepository(BaseRepository):
                 ) VALUES (?, ?, ?, ?, ?, ?);
             """
             return self.execute_insert(
-                sql_insert, (batch_id, session_date, mode, recorded_by, remarks, scanned_image_path)
+                sql_insert, (batch_id, session_date, mode, recorded_by, remarks, clean_image_path)
             )
 
     def save_records(
@@ -423,3 +428,42 @@ class AttendanceRepository(BaseRepository):
             ORDER BY c.name ASC, b.batch_name ASC;
         """
         return self.execute_fetchall(sql)
+
+    def get_batch_by_id(self, batch_id: int) -> Optional[Dict[str, Any]]:
+        """Retrieves details of a single batch with its course information."""
+        sql = """
+            SELECT 
+                b.id,
+                b.batch_name,
+                b.timing,
+                b.status,
+                c.id AS course_id,
+                c.name AS course_name,
+                (SELECT COUNT(*) FROM admissions a WHERE a.batch_id = b.id AND a.status IN ('CONFIRMED', 'REGISTERED', 'COMPLETED')) AS enrolled_count
+            FROM batches b
+            JOIN courses c ON c.id = b.course_id
+            WHERE b.id = ?;
+        """
+        return self.execute_fetchone(sql, (batch_id,))
+
+    def get_session_marks_for_dates(self, batch_id: int, dates: List[str]) -> Dict[tuple[int, str], str]:
+        """
+        Returns a mapping of (student_id, session_date) -> status ('PRESENT' | 'ABSENT')
+        for all existing recorded attendance in the specified batch and date list.
+        """
+        if not dates:
+            return {}
+        placeholders = ",".join("?" for _ in dates)
+        sql = f"""
+            SELECT 
+                r.student_id,
+                s.session_date,
+                r.status
+            FROM student_attendance_records r
+            JOIN batch_attendance_sessions s ON s.id = r.session_id
+            WHERE r.batch_id = ? AND s.session_date IN ({placeholders});
+        """
+        params = [batch_id] + list(dates)
+        rows = self.execute_fetchall(sql, params)
+        return {(r["student_id"], r["session_date"]): r["status"] for r in rows}
+

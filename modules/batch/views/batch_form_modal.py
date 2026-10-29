@@ -40,17 +40,19 @@ class BatchFormModal(ft.AlertDialog):
         # Dialog Title
         title_text = "Edit Batch" if self.is_edit else "Create New Batch"
         icon_name = ft.Icons.EDIT if self.is_edit else ft.Icons.GROUP_ADD
-        self.title = ft.Row(
-            controls=[
-                ft.Icon(icon_name, color=AppTheme.PRIMARY, size=24),
-                ft.Text(
-                    title_text,
-                    size=AppTheme.SIZE_H2,
-                    weight=ft.FontWeight.W_600,
-                    color=AppTheme.TEXT_PRIMARY,
-                ),
-            ],
-            spacing=AppTheme.PAD_SM,
+        self.title = ft.SelectionArea(
+            content=ft.Row(
+                controls=[
+                    ft.Icon(icon_name, color=AppTheme.PRIMARY, size=24),
+                    ft.Text(
+                        title_text,
+                        size=AppTheme.SIZE_H2,
+                        weight=ft.FontWeight.W_600,
+                        color=AppTheme.TEXT_PRIMARY,
+                    ),
+                ],
+                spacing=AppTheme.PAD_SM,
+            )
         )
 
         # 1. Course Dropdown
@@ -159,35 +161,37 @@ class BatchFormModal(ft.AlertDialog):
         # Assemble Form Content
         self.content = ft.Container(
             width=580,
-            content=ft.Column(
-                controls=[
-                    self.error_banner,
-                    self.course_dropdown,
-                    ft.Row(
-                        controls=[
-                            ft.Container(self.name_input, expand=2),
-                            ft.Container(self.code_input, expand=1),
-                        ],
-                        spacing=AppTheme.PAD_SM,
-                    ),
-                    ft.Row(
-                        controls=[
-                            ft.Container(self.timing_input, expand=2),
-                            ft.Container(self.capacity_input, expand=1),
-                        ],
-                        spacing=AppTheme.PAD_SM,
-                    ),
-                    self.status_dropdown,
-                    ft.Row(
-                        controls=[
-                            ft.Container(self.start_date_input, expand=1),
-                            ft.Container(self.end_date_input, expand=1),
-                        ],
-                        spacing=AppTheme.PAD_SM,
-                    ),
-                ],
-                spacing=AppTheme.PAD_MD,
-                tight=True,
+            content=ft.SelectionArea(
+                content=ft.Column(
+                    controls=[
+                        self.error_banner,
+                        self.course_dropdown,
+                        ft.Row(
+                            controls=[
+                                ft.Container(self.name_input, expand=2),
+                                ft.Container(self.code_input, expand=1),
+                            ],
+                            spacing=AppTheme.PAD_SM,
+                        ),
+                        ft.Row(
+                            controls=[
+                                ft.Container(self.timing_input, expand=2),
+                                ft.Container(self.capacity_input, expand=1),
+                            ],
+                            spacing=AppTheme.PAD_SM,
+                        ),
+                        self.status_dropdown,
+                        ft.Row(
+                            controls=[
+                                ft.Container(self.start_date_input, expand=1),
+                                ft.Container(self.end_date_input, expand=1),
+                            ],
+                            spacing=AppTheme.PAD_SM,
+                        ),
+                    ],
+                    spacing=AppTheme.PAD_MD,
+                    tight=True,
+                )
             ),
             padding=ft.Padding(0, AppTheme.PAD_SM, 0, AppTheme.PAD_SM),
         )

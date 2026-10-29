@@ -14,6 +14,7 @@ from modules.admission.views.admission_form_modal import AdmissionFormModal
 from modules.admission.views.admission_workspace_dialog import AdmissionWorkspaceDialog
 from modules.course.controller import CourseController
 from shared.utils.os_helper import open_path_externally
+from shared.utils.export_helper import export_and_prompt_save
 from ui.widgets.badge import StatusBadge
 
 __all__ = ["AdmissionHome"]
@@ -101,6 +102,19 @@ class AdmissionHome(ft.Container):
             on_click=self.handle_new_admission,
         )
 
+        self.collect_payment_btn = ft.ElevatedButton(
+            content=ft.Text("Collect Payment", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.W_600),
+            icon=ft.Icons.POINT_OF_SALE,
+            tooltip="Quick Payment Gateway Shortcut",
+            style=ft.ButtonStyle(
+                bgcolor="#059669",
+                color=ft.Colors.WHITE,
+                shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+                padding=ft.Padding(left=16, top=12, right=16, bottom=12),
+            ),
+            on_click=lambda _: self.handle_collect_payment(None),
+        )
+
         self.refresh_btn = ft.IconButton(
             icon=ft.Icons.REFRESH,
             icon_size=20,
@@ -129,6 +143,7 @@ class AdmissionHome(ft.Container):
                         self.toggle_autofit_btn,
                         self.export_excel_btn,
                         self.refresh_btn,
+                        self.collect_payment_btn,
                         self.new_adm_btn,
                     ],
                     spacing=AppTheme.PAD_SM,
@@ -541,6 +556,15 @@ class AdmissionHome(ft.Container):
             )
 
             actions = [open_btn]
+            if adm.pending_amount > 0:
+                pay_action_btn = ft.IconButton(
+                    icon=ft.Icons.PAYMENTS,
+                    icon_size=16,
+                    icon_color=AppTheme.SUCCESS,
+                    tooltip=f"Collect Payment (Pending: ₹{adm.pending_amount:,.0f})",
+                    on_click=lambda e, a_id=adm.id: self.handle_collect_payment(a_id),
+                )
+                actions.append(pay_action_btn)
             if is_admin:
                 delete_btn = ft.IconButton(
                     icon=ft.Icons.DELETE_OUTLINE,
@@ -645,6 +669,17 @@ class AdmissionHome(ft.Container):
             modal = AdmissionFormModal(on_saved=self.load_data)
             p.show_dialog(modal)
 
+    def handle_collect_payment(self, admission_id: Optional[int] = None) -> None:
+        p = self.safe_page
+        if p:
+            from modules.admission.views.payment_dialog import PaymentDialog
+            dlg = PaymentDialog(
+                admission_id=admission_id,
+                page=p,
+                on_payment_completed=lambda pid: self.load_data(),
+            )
+            p.show_dialog(dlg)
+
     def open_admission_workspace(self, admission_id: int) -> None:
         p = self.safe_page
         if p:
@@ -726,15 +761,19 @@ class AdmissionHome(ft.Container):
 
         dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Row(
-                controls=[
-                    ft.Icon(ft.Icons.WARNING_AMBER, color=AppTheme.DANGER, size=24),
-                    ft.Text("Permanent Admission Deletion", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H2),
-                ],
-                spacing=8,
+            title=ft.SelectionArea(
+                content=ft.Row(
+                    controls=[
+                        ft.Icon(ft.Icons.WARNING_AMBER, color=AppTheme.DANGER, size=24),
+                        ft.Text("Permanent Admission Deletion", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H2),
+                    ],
+                    spacing=8,
+                ),
             ),
             content=ft.Container(
-                content=ft.Column(controls=details_controls, tight=True, spacing=4),
+                content=ft.SelectionArea(
+                    content=ft.Column(controls=details_controls, tight=True, spacing=4),
+                ),
                 width=480,
                 padding=ft.Padding(0, 8, 0, 8),
             ),
@@ -783,8 +822,8 @@ class AdmissionHome(ft.Container):
         except RuntimeError:
             pass
 
-    def handle_export_excel(self, e: ft.ControlEvent) -> None:
-        """Exports currently filtered admission dataset to styled Microsoft Excel (.xlsx) format."""
+    def handle_export_excel(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Exports currently filtered admission dataset to styled Microsoft Excel (.xlsx) format with custom save prompt."""
         try:
             filters: dict[str, Any] = {}
             if self.search_query:
@@ -795,12 +834,34 @@ class AdmissionHome(ft.Container):
                 filters["course_id"] = self.selected_course_id
 
             path = self.controller.export_admissions_excel(filters)
-            self._show_toast(f"Admissions data exported to Excel (.xlsx): {path}", is_success=True)
-            open_path_externally(Path(path).parent)
+            export_and_prompt_save(
+                source_file_path=path,
+                dialog_title="Save Admissions Export As",
+                allowed_extensions=[".xlsx"],
+                show_toast=self._show_toast,
+            )
         except Exception as ex:
             LogService.error(f"Error exporting admissions to Excel: {ex}", context=self.__class__.__name__)
             self._show_toast("Failed to export admissions Excel data.", is_error=True)
 
-    def handle_export_csv(self, e: ft.ControlEvent) -> None:
-        """Delegates export to professional Excel (.xlsx) format per template specifications."""
-        self.handle_export_excel(e)
+    def handle_export_csv(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Exports currently filtered admission dataset to clean CSV format with custom save prompt."""
+        try:
+            filters: dict[str, Any] = {}
+            if self.search_query:
+                filters["query"] = self.search_query
+            if self.selected_status != "ALL":
+                filters["status"] = self.selected_status
+            if self.selected_course_id:
+                filters["course_id"] = self.selected_course_id
+
+            path = self.controller.export_admissions_csv(filters)
+            export_and_prompt_save(
+                source_file_path=path,
+                dialog_title="Save Admissions CSV As",
+                allowed_extensions=[".csv"],
+                show_toast=self._show_toast,
+            )
+        except Exception as ex:
+            LogService.error(f"Error exporting admissions to CSV: {ex}", context=self.__class__.__name__)
+            self._show_toast("Failed to export admissions CSV data.", is_error=True)

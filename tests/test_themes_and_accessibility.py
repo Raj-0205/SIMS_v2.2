@@ -24,12 +24,12 @@ def contrast_ratio(color1: str, color2: str) -> float:
     return (lighter + 0.05) / (darker + 0.05)
 
 
-def test_all_five_themes_registered():
-    expected_themes = {"minimalism", "neumorphism", "claymorphism", "flat", "bento"}
+def test_all_themes_registered():
+    expected_themes = {"minimalism", "neumorphism", "claymorphism", "flat", "bento", "arp_studio"}
     assert expected_themes.issubset(set(THEMES.keys()))
 
 
-@pytest.mark.parametrize("theme_id", ["minimalism", "neumorphism", "claymorphism", "flat", "bento"])
+@pytest.mark.parametrize("theme_id", ["minimalism", "neumorphism", "claymorphism", "flat", "bento", "arp_studio"])
 def test_theme_wcag_text_contrast_conformance(theme_id):
     tokens = THEMES[theme_id]
     contrast_surface = contrast_ratio(tokens.TEXT_PRIMARY, tokens.SURFACE)
@@ -146,7 +146,7 @@ def test_theme_persistence_atomic_write_integrity():
     assert not tmp_path.exists(), "Temporary file was not cleaned up after atomic rename"
 
 
-@pytest.mark.parametrize("theme_id", ["minimalism", "neumorphism", "claymorphism", "flat", "bento"])
+@pytest.mark.parametrize("theme_id", ["minimalism", "neumorphism", "claymorphism", "flat", "bento", "arp_studio"])
 def test_theme_persistence_all_themes_roundtrip(theme_id):
     from ui.themes.theme_manager import ThemePersistence
 

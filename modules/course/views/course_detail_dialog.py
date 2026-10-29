@@ -42,59 +42,64 @@ class CourseDetailDialog(ft.AlertDialog):
         status_color = AppTheme.SUCCESS if self.course.is_active else AppTheme.TEXT_MUTED
         status_text = "ACTIVE" if self.course.is_active else "INACTIVE"
 
-        self.title = ft.Row(
-            controls=[
-                ft.Icon(ft.Icons.SCHOOL, color=AppTheme.PRIMARY, size=26),
-                ft.Column(
-                    controls=[
-                        ft.Row(
-                            controls=[
-                                ft.Text(
-                                    self.course.name,
-                                    size=AppTheme.SIZE_H2,
-                                    weight=ft.FontWeight.BOLD,
-                                    color=AppTheme.TEXT_PRIMARY,
-                                ),
-                                ft.Container(
-                                    content=ft.Text(self.course.code, size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
-                                    bgcolor=AppTheme.PRIMARY_LIGHT,
-                                    padding=ft.Padding(8, 2, 8, 2),
-                                    border_radius=AppTheme.RADIUS_SM,
-                                ),
-                                ft.Container(
-                                    content=ft.Text(f"● {status_text}", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=status_color),
-                                    bgcolor=AppTheme.SURFACE_VARIANT,
-                                    padding=ft.Padding(8, 2, 8, 2),
-                                    border_radius=AppTheme.RADIUS_SM,
-                                    border=ft.Border.all(1, AppTheme.BORDER),
-                                ),
-                            ],
-                            spacing=AppTheme.PAD_SM,
-                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                        ),
-                        ft.Text(f"Category: {self.course.category}  |  Duration: {self.course.duration or 'Self-paced'}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
-                    ],
-                    spacing=2,
-                ),
-            ],
-            spacing=AppTheme.PAD_SM,
+        self.title = ft.SelectionArea(
+            content=ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.SCHOOL, color=AppTheme.PRIMARY, size=26),
+                    ft.Column(
+                        controls=[
+                            ft.Row(
+                                controls=[
+                                    ft.Text(
+                                        self.course.name,
+                                        size=AppTheme.SIZE_H2,
+                                        weight=ft.FontWeight.BOLD,
+                                        color=AppTheme.TEXT_PRIMARY,
+                                    ),
+                                    ft.Container(
+                                        content=ft.Text(self.course.code, size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                                        bgcolor=AppTheme.PRIMARY_LIGHT,
+                                        padding=ft.Padding(8, 2, 8, 2),
+                                        border_radius=AppTheme.RADIUS_SM,
+                                    ),
+                                    ft.Container(
+                                        content=ft.Text(f"● {status_text}", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=status_color),
+                                        bgcolor=AppTheme.SURFACE_VARIANT,
+                                        padding=ft.Padding(8, 2, 8, 2),
+                                        border_radius=AppTheme.RADIUS_SM,
+                                        border=ft.Border.all(1, AppTheme.BORDER),
+                                    ),
+                                ],
+                                spacing=AppTheme.PAD_SM,
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                            ft.Text(f"Category: {self.course.category}  |  Duration: {self.course.duration or 'Self-paced'}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
+                        ],
+                        spacing=2,
+                    ),
+                ],
+                spacing=AppTheme.PAD_SM,
+            ),
         )
 
         # Build Body Content
-        self.content = ft.Container(
-            content=self._build_body(),
-            width=650,
-            height=500,
-            padding=ft.Padding(0, 8, 0, 0),
-        )
+        self.content = self._wrap_body()
 
         # Action Buttons
         self.actions = [
             ft.TextButton(content=ft.Text("Close"), on_click=self.close_dialog),
         ]
 
+    def _is_administrator(self) -> bool:
+        from core.security.context import SecurityContext
+        from core.security.roles import Role
+        current_role = SecurityContext.get_current_role()
+        return str(current_role).upper() == Role.ADMINISTRATOR.value
+
     def _build_body(self) -> ft.Control:
         """Constructs all workspace panels."""
+        is_admin = self._is_administrator()
+
         # 1. Pricing Box
         pricing_box = ft.Container(
             content=ft.Row(
@@ -113,6 +118,7 @@ class CourseDetailDialog(ft.AlertDialog):
                         bgcolor=AppTheme.PRIMARY,
                         color=AppTheme.SURFACE,
                         on_click=self._handle_change_fee_click,
+                        visible=is_admin,
                     ),
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -177,10 +183,17 @@ class CourseDetailDialog(ft.AlertDialog):
         # 5. Administrative Toolbar
         status_btn_text = "Deactivate Course" if self.course.is_active else "Activate Course"
         status_btn_icon = ft.Icons.PAUSE_CIRCLE if self.course.is_active else ft.Icons.PLAY_CIRCLE
-        status_btn_color = AppTheme.WARNING if self.course.is_active else AppTheme.SUCCESS
 
-        admin_toolbar = ft.Row(
-            controls=[
+        toolbar_controls = [
+            ft.OutlinedButton(
+                content=ft.Row([ft.Text("🌟"), ft.Text("Showcase Preview")], spacing=4),
+                on_click=self._handle_showcase_preview_click,
+                tooltip="Open Parent & Student interactive intro presentation for this course",
+            ),
+        ]
+
+        if is_admin:
+            toolbar_controls.extend([
                 ft.OutlinedButton(
                     content=ft.Text("Edit Details"),
                     icon=ft.Icons.EDIT,
@@ -198,8 +211,12 @@ class CourseDetailDialog(ft.AlertDialog):
                     disabled=(self.summary.total_admissions_count > 0 or self.summary.batch_count > 0),
                     tooltip="Cannot delete course with associated admissions or batches." if (self.summary.total_admissions_count > 0 or self.summary.batch_count > 0) else "Delete unlinked course",
                 ),
-            ],
+            ])
+
+        admin_toolbar = ft.Row(
+            controls=toolbar_controls,
             spacing=AppTheme.PAD_SM,
+            wrap=True,
         )
 
         return ft.Column(
@@ -275,7 +292,7 @@ class CourseDetailDialog(ft.AlertDialog):
                     ft.Row(
                         controls=[
                             ft.Text("Course Batches", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
-                            ft.TextButton("+ Add Batch", on_click=on_add_batch),
+                            ft.TextButton("+ Add Batch", on_click=on_add_batch, visible=self._is_administrator()),
                         ],
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     ),
@@ -289,14 +306,17 @@ class CourseDetailDialog(ft.AlertDialog):
             border=ft.Border.all(1, AppTheme.BORDER),
         )
 
-    def _refresh_dialog(self) -> None:
-        self.summary = self.controller.get_operational_summary(self.course_id)
-        self.content = ft.Container(
-            content=self._build_body(),
+    def _wrap_body(self) -> ft.Container:
+        return ft.Container(
+            content=ft.SelectionArea(content=self._build_body()),
             width=650,
             height=500,
             padding=ft.Padding(0, 8, 0, 0),
         )
+
+    def _refresh_dialog(self) -> None:
+        self.summary = self.controller.get_operational_summary(self.course_id)
+        self.content = self._wrap_body()
         try:
             self.update()
         except RuntimeError:
@@ -366,17 +386,20 @@ class CourseDetailDialog(ft.AlertDialog):
             # Refresh local course state
             self.course = self.controller.get_course(self.course_id)
             self.fee_history = self.controller.get_fee_history(self.course_id)
-            self.content = ft.Container(
-                content=self._build_body(),
-                width=650,
-                height=500,
-                padding=ft.Padding(0, 8, 0, 0),
-            )
+            self.content = self._wrap_body()
             self.update()
             self.on_course_mutated()
 
         fee_diag = CourseFeeDialog(course=self.course, on_fee_updated=on_updated, page=target_page)
         target_page.show_dialog(fee_diag)
+
+    def _handle_showcase_preview_click(self, e: ft.ControlEvent) -> None:
+        target_page = self.safe_page
+        if not target_page:
+            return
+        from modules.course.views.course_showcase_view import CourseShowcaseView
+        showcase = CourseShowcaseView(page=target_page, controller=self.controller)
+        showcase._show_course_intro_dialog(self.course.code or str(self.course_id))
 
     def _handle_edit_click(self, e: ft.ControlEvent) -> None:
         target_page = self.page or self._root_page
@@ -385,12 +408,7 @@ class CourseDetailDialog(ft.AlertDialog):
 
         def on_saved(cid: int) -> None:
             self.course = self.controller.get_course(self.course_id)
-            self.content = ft.Container(
-                content=self._build_body(),
-                width=650,
-                height=500,
-                padding=ft.Padding(0, 8, 0, 0),
-            )
+            self.content = self._wrap_body()
             self.update()
             self.on_course_mutated()
 
@@ -401,12 +419,7 @@ class CourseDetailDialog(ft.AlertDialog):
         try:
             new_status = self.controller.toggle_status(self.course_id)
             self.course = self.controller.get_course(self.course_id)
-            self.content = ft.Container(
-                content=self._build_body(),
-                width=650,
-                height=500,
-                padding=ft.Padding(0, 8, 0, 0),
-            )
+            self.content = self._wrap_body()
             self.update()
             self.on_course_mutated()
         except Exception as exc:

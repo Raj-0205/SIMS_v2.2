@@ -22,6 +22,7 @@ class ReceiptCreateDTO:
     collector_name: str
     generated_by: Optional[int] = None
     pdf_path: Optional[str] = None
+    transaction_ref: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,7 @@ class ReceiptDTO:
     pdf_path: Optional[str] = None
     generated_at: Optional[str] = None
     generated_by: Optional[int] = None
+    transaction_ref: Optional[str] = None
 
     @property
     def formatted_installment(self) -> str:

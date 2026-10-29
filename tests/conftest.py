@@ -81,6 +81,14 @@ def isolated_test_database():
             """
         )
 
+    # Snapshot existing upload files before tests execute to prevent disk file leaks
+    upload_root = project_root / "uploads"
+    initial_upload_files: set[Path] = set()
+    if upload_root.exists():
+        for p in upload_root.rglob("*"):
+            if p.is_file():
+                initial_upload_files.add(p.resolve())
+
     try:
         yield test_db_path
     finally:
@@ -98,6 +106,15 @@ def isolated_test_database():
                     f.unlink()
                 except Exception:
                     pass
+
+        # Clean up any upload files generated during this test run
+        if upload_root.exists():
+            for p in upload_root.rglob("*"):
+                if p.is_file() and p.resolve() not in initial_upload_files:
+                    try:
+                        p.unlink()
+                    except Exception:
+                        pass
 
         # Clean up any session-level test theme preferences
         theme_test_file = project_root / "config" / "theme_preference_test.json"

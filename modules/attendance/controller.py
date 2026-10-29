@@ -7,8 +7,10 @@ from modules.attendance.dto import (
     AttendanceSessionDTO,
     BatchAttendanceMatrixDTO,
     BatchStudentDTO,
+    ExcelAttendanceImportPreviewDTO,
     OCRScanResultDTO,
     OfflineFormatConfigDTO,
+    OfflineRegisterConfigDTO,
     StudentAttendanceHealthDTO,
 )
 from modules.attendance.service import AttendanceService
@@ -102,3 +104,57 @@ class AttendanceController:
     def get_student_attendance_health(self, student_id: int) -> StudentAttendanceHealthDTO:
         """Computes aggregate attendance health and recent history for student profile."""
         return self.service.get_student_attendance_health(student_id)
+
+    def generate_offline_register(
+        self,
+        config: OfflineRegisterConfigDTO,
+        target_dir: str | Path = "exports/attendance/registers",
+    ) -> str:
+        """Generates a downloadable multi-day attendance register in Excel (.xlsx)."""
+        path = self.service.generate_offline_register_excel(config, target_dir=target_dir)
+        return str(path)
+
+    def parse_offline_register(
+        self,
+        file_path: str | Path,
+        expected_batch_id: Optional[int] = None,
+        batch_id: Optional[int] = None,
+    ) -> ExcelAttendanceImportPreviewDTO:
+        """Parses and computes pre-import diff for an uploaded Excel attendance register."""
+        target_b_id = expected_batch_id if expected_batch_id is not None else batch_id
+        return self.service.parse_offline_register_excel(file_path, target_b_id)
+
+
+    def commit_offline_register_import(
+        self,
+        batch_id_or_preview: int | ExcelAttendanceImportPreviewDTO,
+        import_preview: Optional[ExcelAttendanceImportPreviewDTO] = None,
+        admin_pin: Optional[str] = None,
+        recorded_by: str = "admin",
+    ) -> int:
+        """Commits verified marks from an offline Excel register into the database."""
+        if isinstance(batch_id_or_preview, ExcelAttendanceImportPreviewDTO):
+            preview = batch_id_or_preview
+            b_id = preview.batch_id
+            pin = import_preview if isinstance(import_preview, str) else admin_pin
+        else:
+            b_id = batch_id_or_preview
+            preview = import_preview
+            pin = admin_pin
+
+        return self.service.commit_offline_register_import(
+            batch_id=b_id,
+            import_preview=preview,
+            admin_pin=pin,
+            recorded_by=recorded_by,
+        )
+
+
+    def get_attendance_settings(self) -> Dict[str, bool]:
+        """Returns administrator configuration flags for attendance columns and security."""
+        return self.service.get_attendance_settings()
+
+    def verify_admin_pin(self, pin: str) -> bool:
+        """Verifies administrator authorization PIN."""
+        return self.service.verify_admin_pin(pin)
+

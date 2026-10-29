@@ -333,7 +333,7 @@ class ControlCenterScreen(ft.Container):
         reauth_pwd = ft.TextField(label="Administrator Password (Re-Authentication)", password=True, can_reveal_password=True)
         new_pwd = ft.TextField(label="New Admin Password (min 8 chars)", password=True, can_reveal_password=True)
         otp_field = ft.TextField(label="6-Digit Authorization OTP", max_length=6, text_align=ft.TextAlign.CENTER, visible=False)
-        msg_text = ft.Text("", size=12)
+        msg_text = ft.Text("", size=12, selectable=True)
 
         challenge_data = {"token": None, "new_pwd": None}
 
@@ -397,12 +397,12 @@ class ControlCenterScreen(ft.Container):
 
         dlg = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Reset Operational Admin Password", weight=ft.FontWeight.BOLD),
+            title=ft.Text("Reset Operational Admin Password", weight=ft.FontWeight.BOLD, selectable=True),
             content=ft.Container(
                 width=420,
                 content=ft.Column(
                     controls=[
-                        ft.Text("This ceremony requires Administrator re-authentication and email OTP authorization.", size=12, color=AppTheme.TEXT_SECONDARY),
+                        ft.Text("This ceremony requires Administrator re-authentication and email OTP authorization.", size=12, color=AppTheme.TEXT_SECONDARY, selectable=True),
                         reauth_pwd,
                         new_pwd,
                         otp_field,
@@ -430,7 +430,7 @@ class ControlCenterScreen(ft.Container):
         curr_pwd = ft.TextField(label="Current Password", password=True, can_reveal_password=True)
         new_pwd = ft.TextField(label="New Password (min 8 chars)", password=True, can_reveal_password=True)
         confirm_pwd = ft.TextField(label="Confirm New Password", password=True, can_reveal_password=True)
-        msg_text = ft.Text("", size=12)
+        msg_text = ft.Text("", size=12, selectable=True)
 
         def do_change(_):
             if not curr_pwd.value or not new_pwd.value:
@@ -456,7 +456,7 @@ class ControlCenterScreen(ft.Container):
 
         dlg = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Change Administrator Password", weight=ft.FontWeight.BOLD),
+            title=ft.Text("Change Administrator Password", weight=ft.FontWeight.BOLD, selectable=True),
             content=ft.Container(
                 width=400,
                 content=ft.Column(
@@ -482,7 +482,7 @@ class ControlCenterScreen(ft.Container):
         new_email = ft.TextField(label="New Email Address", hint_text="e.g. admin@school.edu")
         curr_otp = ft.TextField(label="Current Email Verification OTP", max_length=6, visible=False)
         new_otp = ft.TextField(label="New Email Verification OTP", max_length=6, visible=False)
-        msg_text = ft.Text("", size=12)
+        msg_text = ft.Text("", size=12, selectable=True)
 
         state = {"req_token": None, "curr_token": None, "new_token": None}
 
@@ -538,12 +538,12 @@ class ControlCenterScreen(ft.Container):
 
         dlg = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Update Authentication Email", weight=ft.FontWeight.BOLD),
+            title=ft.Text("Update Authentication Email", weight=ft.FontWeight.BOLD, selectable=True),
             content=ft.Container(
                 width=420,
                 content=ft.Column(
                     controls=[
-                        ft.Text("Dual verification is required to update your registered email.", size=12, color=AppTheme.TEXT_SECONDARY),
+                        ft.Text("Dual verification is required to update your registered email.", size=12, color=AppTheme.TEXT_SECONDARY, selectable=True),
                         new_email,
                         curr_otp,
                         new_otp,
@@ -575,6 +575,7 @@ class ControlCenterScreen(ft.Container):
                     "A new 256-bit emergency key will be generated and dispatched to your email.",
                     size=13,
                     color=AppTheme.TEXT_SECONDARY,
+                    selectable=True,
                 ),
             ],
             spacing=12,
@@ -585,28 +586,28 @@ class ControlCenterScreen(ft.Container):
             try:
                 key, key_id, deliv = RecoveryKeyService.issue_recovery_key(user_id, send_email=True)
                 body_column.controls = [
-                    ft.Text("New Recovery Key Generated Successfully", weight=ft.FontWeight.BOLD, color=AppTheme.SUCCESS),
-                    ft.Text(f"Identifier: {key_id} • Email Delivery: {deliv}", size=12, color=AppTheme.TEXT_SECONDARY),
+                    ft.Text("New Recovery Key Generated Successfully", weight=ft.FontWeight.BOLD, color=AppTheme.SUCCESS, selectable=True),
+                    ft.Text(f"Identifier: {key_id} • Email Delivery: {deliv}", size=12, color=AppTheme.TEXT_SECONDARY, selectable=True),
                     ft.Container(
                         content=ft.Text(key, size=13, weight=ft.FontWeight.BOLD, font_family="monospace", selectable=True),
                         padding=10,
                         bgcolor=AppTheme.SURFACE_VARIANT,
                         border_radius=AppTheme.RADIUS_SM,
                     ),
-                    ft.Text("Store this key securely in an encrypted vault. It cannot be recovered later.", size=12, color=AppTheme.DANGER),
+                    ft.Text("Store this key securely in an encrypted vault. It cannot be recovered later.", size=12, color=AppTheme.DANGER, selectable=True),
                 ]
                 rotate_btn.visible = False
                 self._update_dialog(dlg)
                 self.load_data()
             except Exception as exc:
-                body_column.controls.append(ft.Text(f"Failed to rotate key: {exc}", color=AppTheme.DANGER, size=12))
+                body_column.controls.append(ft.Text(f"Failed to rotate key: {exc}", color=AppTheme.DANGER, size=12, selectable=True))
                 self._update_dialog(dlg)
 
         rotate_btn = ft.ElevatedButton("Rotate Key Now", on_click=do_rotate, style=ft.ButtonStyle(bgcolor=AppTheme.DANGER, color=ft.Colors.WHITE))
 
         dlg = ft.AlertDialog(
             modal=True,
-            title=ft.Text("Rotate Emergency Recovery Key", weight=ft.FontWeight.BOLD),
+            title=ft.Text("Rotate Emergency Recovery Key", weight=ft.FontWeight.BOLD, selectable=True),
             content=ft.Container(
                 width=460,
                 content=body_column,

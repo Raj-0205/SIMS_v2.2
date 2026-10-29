@@ -43,6 +43,8 @@ class SettingsService(BaseService):
             "alc_code": self.get_setting("alc_code", "57210242") or "57210242",
             "address_line1": self.get_setting("address_line1", "Renuka Complex, 3rd Floor,") or "Renuka Complex, 3rd Floor,",
             "address_line2": self.get_setting("address_line2", "Opp. Market Yard, Chandwad - 423101") or "Opp. Market Yard, Chandwad - 423101",
+            "upi_id": self.get_setting("upi_id", "9271226772@yescred") or "9271226772@yescred",
+            "upi_payee_name": self.get_setting("upi_payee_name", "Sudharm Infotech") or "Sudharm Infotech",
         }
 
     def save_institute_profile(self, profile: dict[str, str]) -> None:

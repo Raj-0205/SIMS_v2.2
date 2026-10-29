@@ -22,16 +22,104 @@ _active_picker_proc: Optional[subprocess.Popen] = None
 _picker_lock = threading.Lock()
 
 
+def _try_tkinter_open(
+    title: str,
+    initial_dir: Path,
+    allowed_extensions: Optional[list[str]],
+) -> tuple[bool, Optional[Path]]:
+    """Attempts opening a file with native Tkinter dialog. Returns (handled, result_path)."""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        filetypes = []
+        if allowed_extensions:
+            ext_patterns = " ".join([f"*.{ext.lstrip('.')}" for ext in allowed_extensions])
+            filetypes.append(("Allowed Files", ext_patterns))
+        filetypes.append(("All Files", "*.*"))
+        res = filedialog.askopenfilename(
+            parent=root,
+            title=title,
+            initialdir=str(initial_dir),
+            filetypes=filetypes,
+        )
+        root.destroy()
+        if res and Path(res).is_file():
+            return True, Path(res)
+        return True, None
+    except Exception as ex:
+        LogService.warning(f"Tkinter open file dialog unavailable: {ex}", context="FileDialog")
+        return False, None
+
+
+def _try_tkinter_save(
+    title: str,
+    default_filename: str,
+    initial_dir: Path,
+    allowed_extensions: Optional[list[str]],
+) -> tuple[bool, Optional[Path]]:
+    """Attempts saving a file with native Tkinter dialog. Returns (handled, result_path)."""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        filetypes = []
+        if allowed_extensions:
+            ext_patterns = " ".join([f"*.{ext.lstrip('.')}" for ext in allowed_extensions])
+            filetypes.append(("Allowed Files", ext_patterns))
+        filetypes.append(("All Files", "*.*"))
+        default_ext = allowed_extensions[0] if allowed_extensions else ""
+        if default_ext and not default_ext.startswith("."):
+            default_ext = f".{default_ext}"
+        res = filedialog.asksaveasfilename(
+            parent=root,
+            title=title,
+            initialdir=str(initial_dir),
+            initialfile=default_filename,
+            filetypes=filetypes,
+            defaultextension=default_ext,
+        )
+        root.destroy()
+        if res:
+            p = Path(res)
+            if allowed_extensions and not p.suffix:
+                p = p.with_suffix(default_ext)
+            return True, p
+        return True, None
+    except Exception as ex:
+        LogService.warning(f"Tkinter save file dialog unavailable: {ex}", context="FileDialog")
+        return False, None
+
+
+
+def _safe_cleanup_proc(proc: Optional[subprocess.Popen]) -> None:
+    """Guarantees process termination and wait to prevent zombie process/pipe leaks."""
+    global _active_picker_proc
+    with _picker_lock:
+        if _active_picker_proc is proc:
+            _active_picker_proc = None
+    if proc is not None and proc.poll() is None:
+        try:
+            proc.terminate()
+            proc.wait(timeout=0.5)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
+
 def cancel_active_picker() -> None:
     """Terminates any active OS file picker subprocess immediately to prevent background hang."""
     global _active_picker_proc
     with _picker_lock:
-        if _active_picker_proc is not None:
-            try:
-                _active_picker_proc.terminate()
-            except Exception:
-                pass
-            _active_picker_proc = None
+        proc = _active_picker_proc
+        _active_picker_proc = None
+    _safe_cleanup_proc(proc)
 
 
 def pick_file(title: str = "Select File", allowed_extensions: Optional[list[str]] = None) -> Optional[Path]:
@@ -52,13 +140,12 @@ def pick_file(title: str = "Select File", allowed_extensions: Optional[list[str]
             cmd = ["zenity", "--file-selection", "--modal", f"--title={title}"]
             if filter_arg:
                 cmd.append(filter_arg)
+            proc = None
             try:
                 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 with _picker_lock:
                     _active_picker_proc = proc
                 stdout, _ = proc.communicate()
-                with _picker_lock:
-                    _active_picker_proc = None
 
                 selected = (stdout or "").strip()
                 if selected and Path(selected).is_file():
@@ -66,17 +153,15 @@ def pick_file(title: str = "Select File", allowed_extensions: Optional[list[str]
             except Exception as ex:
                 LogService.warning(f"Zenity file picker failed: {ex}", context="FileDialog")
             finally:
-                with _picker_lock:
-                    _active_picker_proc = None
+                _safe_cleanup_proc(proc)
         elif shutil.which("kdialog"):
             cmd = ["kdialog", "--getopenfilename", ".", f"--title={title}"]
+            proc = None
             try:
                 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 with _picker_lock:
                     _active_picker_proc = proc
                 stdout, _ = proc.communicate()
-                with _picker_lock:
-                    _active_picker_proc = None
 
                 selected = (stdout or "").strip()
                 if selected and Path(selected).is_file():
@@ -84,10 +169,13 @@ def pick_file(title: str = "Select File", allowed_extensions: Optional[list[str]
             except Exception as ex:
                 LogService.warning(f"Kdialog file picker failed: {ex}", context="FileDialog")
             finally:
-                with _picker_lock:
-                    _active_picker_proc = None
+                _safe_cleanup_proc(proc)
 
     elif sys_name == "Windows":
+        tk_handled, tk_path = _try_tkinter_open(title=title, initial_dir=Path.home(), allowed_extensions=allowed_extensions)
+        if tk_handled:
+            return tk_path
+
         filter_str = "All Files (*.*)|*.*"
         if allowed_extensions:
             ext_patterns = ";".join([f"*.{ext.lstrip('.')}" for ext in allowed_extensions])
@@ -101,18 +189,19 @@ def pick_file(title: str = "Select File", allowed_extensions: Optional[list[str]
             Write-Output $dlg.FileName
         }}
         """
+        proc = None
         try:
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
             proc = subprocess.Popen(
                 ["powershell", "-NoProfile", "-Command", ps_script],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                creationflags=creationflags,
             )
             with _picker_lock:
                 _active_picker_proc = proc
             stdout, _ = proc.communicate()
-            with _picker_lock:
-                _active_picker_proc = None
 
             selected = (stdout or "").strip()
             if selected and Path(selected).is_file():
@@ -120,11 +209,11 @@ def pick_file(title: str = "Select File", allowed_extensions: Optional[list[str]
         except Exception as ex:
             LogService.warning(f"Windows PowerShell file dialog failed: {ex}", context="FileDialog")
         finally:
-            with _picker_lock:
-                _active_picker_proc = None
+            _safe_cleanup_proc(proc)
 
     elif sys_name == "Darwin":
         osa_script = f'POSIX path of (choose file with prompt "{title}")'
+        proc = None
         try:
             proc = subprocess.Popen(
                 ["osascript", "-e", osa_script],
@@ -135,8 +224,6 @@ def pick_file(title: str = "Select File", allowed_extensions: Optional[list[str]
             with _picker_lock:
                 _active_picker_proc = proc
             stdout, _ = proc.communicate()
-            with _picker_lock:
-                _active_picker_proc = None
 
             selected = (stdout or "").strip()
             if selected and Path(selected).is_file():
@@ -144,8 +231,7 @@ def pick_file(title: str = "Select File", allowed_extensions: Optional[list[str]
         except Exception as ex:
             LogService.warning(f"macOS osascript file dialog failed: {ex}", context="FileDialog")
         finally:
-            with _picker_lock:
-                _active_picker_proc = None
+            _safe_cleanup_proc(proc)
 
     return None
 
@@ -185,13 +271,12 @@ def pick_save_file(
             ]
             if filter_arg:
                 cmd.append(filter_arg)
+            proc = None
             try:
                 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 with _picker_lock:
                     _active_picker_proc = proc
                 stdout, _ = proc.communicate()
-                with _picker_lock:
-                    _active_picker_proc = None
 
                 if proc.returncode != 0:
                     return None
@@ -205,20 +290,18 @@ def pick_save_file(
             except Exception as ex:
                 LogService.warning(f"Zenity save file picker failed: {ex}", context="FileDialog")
             finally:
-                with _picker_lock:
-                    _active_picker_proc = None
+                _safe_cleanup_proc(proc)
         elif shutil.which("kdialog"):
             filter_pattern = "*"
             if allowed_extensions:
                 filter_pattern = " ".join([f"*.{ext.lstrip('.')}" for ext in allowed_extensions])
             cmd = ["kdialog", "--getsavefilename", str(initial_path), filter_pattern, f"--title={title}"]
+            proc = None
             try:
                 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 with _picker_lock:
                     _active_picker_proc = proc
                 stdout, _ = proc.communicate()
-                with _picker_lock:
-                    _active_picker_proc = None
 
                 if proc.returncode != 0:
                     return None
@@ -228,10 +311,18 @@ def pick_save_file(
             except Exception as ex:
                 LogService.warning(f"Kdialog save file picker failed: {ex}", context="FileDialog")
             finally:
-                with _picker_lock:
-                    _active_picker_proc = None
+                _safe_cleanup_proc(proc)
 
     elif sys_name == "Windows":
+        tk_handled, tk_path = _try_tkinter_save(
+            title=title,
+            default_filename=default_filename,
+            initial_dir=default_dir,
+            allowed_extensions=allowed_extensions,
+        )
+        if tk_handled:
+            return tk_path
+
         filter_str = "All Files (*.*)|*.*"
         if allowed_extensions:
             ext_patterns = ";".join([f"*.{ext.lstrip('.')}" for ext in allowed_extensions])
@@ -248,30 +339,35 @@ def pick_save_file(
             Write-Output $dlg.FileName
         }}
         """
+        proc = None
         try:
+            creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
             proc = subprocess.Popen(
                 ["powershell", "-NoProfile", "-Command", ps_script],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                creationflags=creationflags,
             )
             with _picker_lock:
                 _active_picker_proc = proc
             stdout, _ = proc.communicate()
-            with _picker_lock:
-                _active_picker_proc = None
 
             selected = (stdout or "").strip()
             if selected:
-                return Path(selected)
+                p = Path(selected)
+                if allowed_extensions and not p.suffix:
+                    first_ext = allowed_extensions[0]
+                    p = p.with_suffix(first_ext if first_ext.startswith(".") else f".{first_ext}")
+                return p
         except Exception as ex:
             LogService.warning(f"Windows PowerShell save file dialog failed: {ex}", context="FileDialog")
         finally:
-            with _picker_lock:
-                _active_picker_proc = None
+            _safe_cleanup_proc(proc)
 
     elif sys_name == "Darwin":
         osa_script = f'POSIX path of (choose file name with prompt "{title}" default name "{default_filename}" default location (path to downloads folder))'
+        proc = None
         try:
             proc = subprocess.Popen(
                 ["osascript", "-e", osa_script],
@@ -282,8 +378,6 @@ def pick_save_file(
             with _picker_lock:
                 _active_picker_proc = proc
             stdout, _ = proc.communicate()
-            with _picker_lock:
-                _active_picker_proc = None
 
             selected = (stdout or "").strip()
             if selected:
@@ -291,8 +385,7 @@ def pick_save_file(
         except Exception as ex:
             LogService.warning(f"macOS osascript save file dialog failed: {ex}", context="FileDialog")
         finally:
-            with _picker_lock:
-                _active_picker_proc = None
+            _safe_cleanup_proc(proc)
 
     if fallback_to_downloads:
         return initial_path

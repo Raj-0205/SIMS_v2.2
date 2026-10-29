@@ -25,6 +25,7 @@ from shared.utils.file_dialog import (
     cancel_active_picker,
 )
 from shared.utils.os_helper import open_path_externally
+from shared.utils.export_helper import export_and_prompt_save
 from ui.themes.theme import AppTheme
 
 __all__ = ["StudentWorkspaceDialog"]
@@ -86,15 +87,17 @@ class StudentWorkspaceDialog(ft.AlertDialog):
         self.content = ft.Container(
             width=940,
             height=620,
-            content=ft.Column(
-                controls=[
-                    self.toast_banner,
-                    self.tab_buttons_row,
-                    ft.Divider(height=1, color=AppTheme.BORDER),
-                    self.tab_content_area,
-                ],
-                spacing=AppTheme.PAD_XS,
-                expand=True,
+            content=ft.SelectionArea(
+                content=ft.Column(
+                    controls=[
+                        self.toast_banner,
+                        self.tab_buttons_row,
+                        ft.Divider(height=1, color=AppTheme.BORDER),
+                        self.tab_content_area,
+                    ],
+                    spacing=AppTheme.PAD_XS,
+                    expand=True,
+                ),
             ),
         )
 
@@ -238,11 +241,13 @@ class StudentWorkspaceDialog(ft.AlertDialog):
         )
 
         return ft.Container(
-            content=ft.Row(
-                controls=[
-                    ft.Row(controls=[avatar, header_info], spacing=AppTheme.PAD_MD),
-                ],
-                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            content=ft.SelectionArea(
+                content=ft.Row(
+                    controls=[
+                        ft.Row(controls=[avatar, header_info], spacing=AppTheme.PAD_MD),
+                    ],
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                ),
             ),
             padding=ft.Padding(left=0, top=0, right=0, bottom=AppTheme.PAD_SM),
         )
@@ -745,6 +750,19 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                 else:
                     self.show_toast("PDF receipt file not found on disk.", is_error=True)
 
+            def export_pdf(e, pth=r_pdf, num=r_num):
+                if pth and Path(pth).exists():
+                    clean_num = str(num).lower().replace("-", "_")
+                    export_and_prompt_save(
+                        source_file_path=pth,
+                        dialog_title="Save Official Receipt PDF As",
+                        default_filename=f"{clean_num}.pdf",
+                        allowed_extensions=[".pdf"],
+                        show_toast=self.show_toast,
+                    )
+                else:
+                    self.show_toast("PDF receipt file not found on disk.", is_error=True)
+
             def share_wa(e, rec=r):
                 stud_mobile = self.workspace_data.student.mobile_number
                 msg = f"Sudharm Infotech Receipt: {rec.get('receipt_number')}\nAmount Paid: ₹{float(rec.get('amount_paid') or 0.0):,.2f}\nCourse: {rec.get('course_name') or 'IT Training'}"
@@ -762,6 +780,7 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                             ft.Row(
                                 controls=[
                                     ft.IconButton(icon=ft.Icons.PICTURE_AS_PDF, icon_color=AppTheme.PRIMARY, tooltip="Open PDF", on_click=open_pdf),
+                                    ft.IconButton(icon=ft.Icons.DOWNLOAD, icon_color=AppTheme.PRIMARY, tooltip="Save / Export Receipt PDF", on_click=export_pdf),
                                     ft.IconButton(icon=ft.Icons.CHAT, icon_color=AppTheme.SUCCESS, tooltip="Share on WhatsApp", on_click=share_wa),
                                 ],
                                 spacing=2,

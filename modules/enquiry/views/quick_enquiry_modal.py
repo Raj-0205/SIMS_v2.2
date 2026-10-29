@@ -39,27 +39,62 @@ class QuickEnquiryModal(ft.AlertDialog):
             self.courses_list = []
 
         # Header Title
-        self.title = ft.Row(
-            controls=[
-                ft.Row(
-                    controls=[
-                        ft.Icon(ft.Icons.BOLT, color=AppTheme.PRIMARY, size=24),
-                        ft.Text("Quick Walk-in / Enquiry Intake", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
-                    ],
-                    spacing=AppTheme.PAD_SM,
-                ),
-                ft.IconButton(
-                    icon=ft.Icons.CLOSE,
-                    icon_size=20,
-                    tooltip="Cancel & Close (Esc)",
-                    on_click=self.close_modal,
-                ),
-            ],
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        title_badge = ft.Container(
+            content=ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.BOLT_ROUNDED, size=12, color="#2563EB"),
+                    ft.Text("15s RAPID INTAKE", size=10, weight=ft.FontWeight.BOLD, color="#1D4ED8"),
+                ],
+                spacing=3,
+                tight=True,
+            ),
+            bgcolor="#EFF6FF",
+            border=ft.Border.all(1, "#BFDBFE"),
+            border_radius=ft.BorderRadius.all(6),
+            padding=ft.Padding(6, 2, 6, 2),
+        )
+
+        self.title = ft.SelectionArea(
+            content=ft.Row(
+                controls=[
+                    ft.Row(
+                        controls=[
+                            ft.Container(
+                                content=ft.Icon(ft.Icons.FLASH_ON_ROUNDED, color="#2563EB", size=20),
+                                padding=7,
+                                bgcolor="#EFF6FF",
+                                border_radius=AppTheme.RADIUS_SM,
+                            ),
+                            ft.Column(
+                                controls=[
+                                    ft.Row(
+                                        controls=[
+                                            ft.Text("Quick Walk-in Intake", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
+                                            title_badge,
+                                        ],
+                                        spacing=8,
+                                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                    ),
+                                    ft.Text("Fast front-desk intake with live village social proof & timing preferences", size=11, color=AppTheme.TEXT_SECONDARY),
+                                ],
+                                spacing=1,
+                            ),
+                        ],
+                        spacing=AppTheme.PAD_SM,
+                    ),
+                    ft.IconButton(
+                        icon=ft.Icons.CLOSE_ROUNDED,
+                        icon_size=20,
+                        tooltip="Cancel & Close (Esc)",
+                        on_click=self.close_modal,
+                    ),
+                ],
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+            )
         )
 
         # ── Error & Validation Banner ──
-        self.banner_icon = ft.Icon(ft.Icons.INFO_OUTLINE, size=18, color=AppTheme.INFO)
+        self.banner_icon = ft.Icon(ft.Icons.INFO_OUTLINE_ROUNDED, size=18, color=AppTheme.INFO)
         self.banner_text = ft.Text("", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.W_500, expand=True)
         self.banner_container = ft.Container(
             content=ft.Row([self.banner_icon, self.banner_text], spacing=AppTheme.PAD_SM),
@@ -68,25 +103,30 @@ class QuickEnquiryModal(ft.AlertDialog):
             bgcolor="#EFF6FF",
             border=ft.Border.all(1, "#BFDBFE"),
             visible=False,
+            animate_opacity=ft.Animation(180, ft.AnimationCurve.EASE_IN_OUT),
         )
 
         # ── Form Controls ──
         self.name_input = ft.TextField(
             label="Candidate Full Name *",
             hint_text="e.g. Rameshwar Patel",
+            prefix_icon=ft.Icons.PERSON_ROUNDED,
             border_radius=AppTheme.RADIUS_MD,
             expand=True,
             autofocus=True,
+            content_padding=ft.Padding(12, 10, 12, 10),
             on_change=lambda _: self._clear_banner(),
         )
 
         self.mobile_input = ft.TextField(
             label="10-Digit Mobile *",
             hint_text="e.g. 9876543210",
+            prefix_icon=ft.Icons.PHONE_ROUNDED,
             max_length=10,
             keyboard_type=ft.KeyboardType.PHONE,
             border_radius=AppTheme.RADIUS_MD,
-            width=200,
+            content_padding=ft.Padding(12, 10, 12, 10),
+            width=210,
             on_change=self._on_mobile_change,
         )
 
@@ -96,7 +136,7 @@ class QuickEnquiryModal(ft.AlertDialog):
         ]
         self.course_dropdown = ft.Dropdown(
             label="Interested Course *",
-            hint_text="Select course...",
+            hint_text="Select target course...",
             options=course_options,
             border_radius=AppTheme.RADIUS_MD,
             expand=True,
@@ -106,37 +146,40 @@ class QuickEnquiryModal(ft.AlertDialog):
         self.village_input = ft.TextField(
             label="Village / Locality / Area",
             hint_text="e.g. Khadki, Rampur, Station Road",
+            prefix_icon=ft.Icons.LOCATION_ON_ROUNDED,
             border_radius=AppTheme.RADIUS_MD,
+            content_padding=ft.Padding(12, 10, 12, 10),
             expand=True,
             on_change=self._on_village_change,
         )
 
-        # Village peer discovery container
+        # Village peer discovery container (Social Proof)
         self.peer_text = ft.Text("", size=AppTheme.SIZE_CAPTION, color="#15803D", weight=ft.FontWeight.W_500)
         self.peer_box = ft.Container(
             content=ft.Row(
                 controls=[
-                    ft.Icon(ft.Icons.PEOPLE, size=16, color="#15803D"),
+                    ft.Icon(ft.Icons.PEOPLE_ALT_ROUNDED, size=16, color="#15803D"),
                     self.peer_text,
                 ],
                 spacing=6,
             ),
             bgcolor="#F0FDF4",
-            padding=ft.Padding(10, 6, 10, 6),
+            padding=ft.Padding(10, 7, 10, 7),
             border=ft.Border.all(1, "#BBF7D0"),
             border_radius=AppTheme.RADIUS_SM,
             visible=False,
+            animate_opacity=ft.Animation(200, ft.AnimationCurve.EASE_IN_OUT),
         )
 
         self.timing_dropdown = ft.Dropdown(
             label="Preferred Timing",
             value="ANY",
             options=[
-                ft.dropdown.Option("ANY", "Any / Flexible"),
+                ft.dropdown.Option("ANY", "Any / Flexible Timing"),
                 ft.dropdown.Option("MORNING", "Morning (8 AM - 12 PM)"),
                 ft.dropdown.Option("AFTERNOON", "Afternoon (12 PM - 4 PM)"),
                 ft.dropdown.Option("EVENING", "Evening (4 PM - 8 PM)"),
-                ft.dropdown.Option("WEEKEND", "Weekend Special"),
+                ft.dropdown.Option("WEEKEND", "Weekend Special Batch"),
             ],
             border_radius=AppTheme.RADIUS_MD,
             width=210,
@@ -160,7 +203,7 @@ class QuickEnquiryModal(ft.AlertDialog):
             options=[
                 ft.dropdown.Option("WALK_IN", "Walk-in (Counter)"),
                 ft.dropdown.Option("PHONE", "Phone Call"),
-                ft.dropdown.Option("WHATSAPP", "WhatsApp"),
+                ft.dropdown.Option("WHATSAPP", "WhatsApp Inquiry"),
                 ft.dropdown.Option("REFERENCE", "Friend Reference"),
                 ft.dropdown.Option("SOCIAL_MEDIA", "Social Media / Ads"),
                 ft.dropdown.Option("OTHER", "Other"),
@@ -173,7 +216,9 @@ class QuickEnquiryModal(ft.AlertDialog):
         self.follow_up_input = ft.TextField(
             label="Next Follow-up Date (YYYY-MM-DD)",
             value=default_follow_up,
+            prefix_icon=ft.Icons.CALENDAR_MONTH_ROUNDED,
             border_radius=AppTheme.RADIUS_MD,
+            content_padding=ft.Padding(12, 10, 12, 10),
             width=220,
         )
 
@@ -187,10 +232,19 @@ class QuickEnquiryModal(ft.AlertDialog):
 
         quick_date_chips = ft.Row(
             controls=[
-                ft.Text("Quick Date:", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
-                ft.TextButton("Tomorrow", on_click=lambda _: _set_follow_up_days(1)),
-                ft.TextButton("In 3 Days", on_click=lambda _: _set_follow_up_days(3)),
-                ft.TextButton("Next Week", on_click=lambda _: _set_follow_up_days(7)),
+                ft.Text("Quick Date:", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY, weight=ft.FontWeight.W_500),
+                ft.TextButton(
+                    content=ft.Row([ft.Icon(ft.Icons.TODAY_ROUNDED, size=13), ft.Text("Tomorrow", size=11)], spacing=3),
+                    on_click=lambda _: _set_follow_up_days(1),
+                ),
+                ft.TextButton(
+                    content=ft.Row([ft.Icon(ft.Icons.EVENT_ROUNDED, size=13), ft.Text("In 3 Days", size=11)], spacing=3),
+                    on_click=lambda _: _set_follow_up_days(3),
+                ),
+                ft.TextButton(
+                    content=ft.Row([ft.Icon(ft.Icons.DATE_RANGE_ROUNDED, size=13), ft.Text("Next Week", size=11)], spacing=3),
+                    on_click=lambda _: _set_follow_up_days(7),
+                ),
             ],
             spacing=4,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -204,22 +258,31 @@ class QuickEnquiryModal(ft.AlertDialog):
             min_lines=2,
             max_lines=3,
             expand=True,
+            content_padding=ft.Padding(12, 10, 12, 10),
         )
 
         # ── Dialog Layout ──
         self.content = ft.Container(
             content=ft.Column(
                 controls=[
-                    self.banner_container,
-                    ft.Row(controls=[self.name_input, self.mobile_input], spacing=12),
-                    ft.Row(controls=[self.course_dropdown, self.timing_dropdown], spacing=12),
-                    ft.Row(controls=[self.village_input, self.source_dropdown], spacing=12),
-                    self.peer_box,
-                    ft.Row(controls=[self.category_dropdown, self.follow_up_input], spacing=12),
-                    quick_date_chips,
-                    self.notes_input,
+                    ft.SelectionArea(
+                        content=ft.Column(
+                            controls=[
+                                self.banner_container,
+                                ft.Row(controls=[self.name_input, self.mobile_input], spacing=12),
+                                ft.Row(controls=[self.course_dropdown, self.timing_dropdown], spacing=12),
+                                ft.Row(controls=[self.village_input, self.source_dropdown], spacing=12),
+                                self.peer_box,
+                                ft.Row(controls=[self.category_dropdown, self.follow_up_input], spacing=12),
+                                quick_date_chips,
+                                self.notes_input,
+                            ],
+                            spacing=10,
+                            tight=True,
+                        )
+                    )
                 ],
-                spacing=10,
+                spacing=0,
                 scroll=ft.ScrollMode.AUTO,
                 tight=True,
             ),
@@ -230,10 +293,14 @@ class QuickEnquiryModal(ft.AlertDialog):
 
         self.save_btn = ft.ElevatedButton(
             content=ft.Row(
-                controls=[ft.Icon(ft.Icons.CHECK, size=18), ft.Text("Save Walk-in (Enter)", weight=ft.FontWeight.BOLD)],
+                controls=[ft.Icon(ft.Icons.CHECK_CIRCLE_ROUNDED, size=18), ft.Text("Save Walk-in (Enter)", weight=ft.FontWeight.BOLD)],
                 spacing=6,
             ),
-            style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=ft.Colors.WHITE),
+            style=ft.ButtonStyle(
+                bgcolor=AppTheme.PRIMARY,
+                color=ft.Colors.WHITE,
+                elevation=2,
+            ),
             on_click=self.handle_save,
         )
 
