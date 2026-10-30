@@ -113,6 +113,18 @@ class AdmissionController:
         )
         self.service.update_admission(dto)
 
+    def reassign_batch(self, admission_id: int, new_batch_id: Optional[int]) -> None:
+        from core.security.context import SecurityContext
+        user = SecurityContext.current_user()
+        actor_id = getattr(user, "id", None) or SecurityContext.get_current_user_id()
+        actor_name = getattr(user, "username", None) or SecurityContext.get_current_username()
+        self.service.reassign_batch(
+            admission_id=admission_id,
+            new_batch_id=new_batch_id,
+            actor_id=actor_id,
+            actor_name=actor_name,
+        )
+
     def get_admission(self, admission_id: int) -> AdmissionDTO:
         return self.service.get_admission(admission_id)
 

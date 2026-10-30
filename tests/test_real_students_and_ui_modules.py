@@ -116,6 +116,17 @@ class TestRealStudentsAndUIModules(unittest.TestCase):
         cls.reports_ctrl = ReportsController()
         cls.receipt_ctrl = ReceiptController()
 
+        # Idempotent pre-cleanup of test records
+        with DatabaseEngine.connection() as conn:
+            conn.execute("DELETE FROM activity_logs WHERE entity_type = 'COURSE' AND entity_id IN (SELECT id FROM courses WHERE code IN ('TEST-AUTOMATION', 'TEST-FULLSTACK'));")
+            conn.execute("DELETE FROM receipts WHERE student_id IN (SELECT id FROM students WHERE mobile_number = '9823456789');")
+            conn.execute("DELETE FROM payments WHERE student_id IN (SELECT id FROM students WHERE mobile_number = '9823456789');")
+            conn.execute("DELETE FROM admission_courses WHERE admission_id IN (SELECT id FROM admissions WHERE student_id IN (SELECT id FROM students WHERE mobile_number = '9823456789'));")
+            conn.execute("DELETE FROM admissions WHERE student_id IN (SELECT id FROM students WHERE mobile_number = '9823456789');")
+            conn.execute("DELETE FROM students WHERE mobile_number = '9823456789';")
+            conn.execute("DELETE FROM batches WHERE course_id IN (SELECT id FROM courses WHERE code IN ('TEST-AUTOMATION', 'TEST-FULLSTACK'));")
+            conn.execute("DELETE FROM courses WHERE code IN ('TEST-AUTOMATION', 'TEST-FULLSTACK');")
+
     def setUp(self):
         SecurityContext.clear()
         self.page = RealMockPage()
@@ -141,8 +152,8 @@ class TestRealStudentsAndUIModules(unittest.TestCase):
 
         # Fill and save modal
         modal: CourseFormModal = self.page.dialog
-        modal.code_input.value = "TEST-FULLSTACK"
-        modal.name_input.value = "Python Fullstack Web Development"
+        modal.code_input.value = "TEST-AUTOMATION"
+        modal.name_input.value = "Automation Scripting Lab"
         modal.category_dropdown.value = "Programming"
         modal.fee_input.value = "7500.0"
         modal.duration_input.value = "3 Months"
@@ -152,16 +163,16 @@ class TestRealStudentsAndUIModules(unittest.TestCase):
         self.assertIsNone(self.page.dialog)
 
         # Fetch created course
-        created = self.course_ctrl.get_course_by_code("TEST-FULLSTACK")
+        created = self.course_ctrl.get_course_by_code("TEST-AUTOMATION")
         self.assertIsNotNone(created)
-        self.assertEqual(created.name, "Python Fullstack Web Development")
+        self.assertEqual(created.name, "Automation Scripting Lab")
 
         # 2. Open Edit Course Modal
         course_home._handle_edit_course(created)
         self.assertIsNotNone(self.page.dialog)
         self.assertIsInstance(self.page.dialog, CourseFormModal)
         modal = self.page.dialog
-        modal.name_input.value = "Python Fullstack & AI"
+        modal.name_input.value = "Automation Scripting & AI"
         modal.handle_save(None)
         self.assertIsNone(self.page.dialog)
 
@@ -170,7 +181,7 @@ class TestRealStudentsAndUIModules(unittest.TestCase):
         self.assertIsNotNone(self.page.dialog)
         self.assertIsInstance(self.page.dialog, CourseDetailDialog)
         detail_dlg: CourseDetailDialog = self.page.dialog
-        self.assertEqual(detail_dlg.course.name, "Python Fullstack & AI")
+        self.assertEqual(detail_dlg.course.name, "Automation Scripting & AI")
         detail_dlg.close_dialog()
         self.assertIsNone(self.page.dialog)
 
@@ -186,7 +197,7 @@ class TestRealStudentsAndUIModules(unittest.TestCase):
         batch_home.did_mount()
 
         # Find our course
-        course = self.course_ctrl.get_course_by_code("TEST-FULLSTACK")
+        course = self.course_ctrl.get_course_by_code("TEST-AUTOMATION")
         self.assertIsNotNone(course)
 
         # Open Batch Modal
@@ -260,7 +271,7 @@ class TestRealStudentsAndUIModules(unittest.TestCase):
         self.page.session.set("role", Role.ADMIN.value)
 
         student = self.stud_ctrl.get_by_mobile("9823456789")
-        course = self.course_ctrl.get_course_by_code("TEST-FULLSTACK")
+        course = self.course_ctrl.get_course_by_code("TEST-AUTOMATION")
         batches = self.batch_ctrl.list_batches_by_course(course.id)
         batch = batches[0]
 
@@ -297,7 +308,7 @@ class TestRealStudentsAndUIModules(unittest.TestCase):
             payment_mode="UPI",
             admin_pin="1234",
             collector_name="Hemant Mahale (Sir)",
-            transaction_ref="UPI/2026/0930/123456",
+            transaction_ref="430299887711",
         )
         self.assertGreater(payment_id, 0)
 
@@ -398,6 +409,15 @@ class TestRealStudentsAndUIModules(unittest.TestCase):
         pay_ctrl = PaymentController()
         payments = pay_ctrl.get_payments_for_student(student.id)
         self.assertEqual(len(payments), 0)
+
+        # 3. Clean up test batch and test course so they NEVER leak into database
+        course = self.course_ctrl.get_course_by_code("TEST-AUTOMATION") or self.course_ctrl.get_course_by_code("TEST-FULLSTACK")
+        with DatabaseEngine.connection() as conn:
+            conn.execute("DELETE FROM batches WHERE course_id IN (SELECT id FROM courses WHERE code IN ('TEST-AUTOMATION', 'TEST-FULLSTACK'));")
+            conn.execute("DELETE FROM courses WHERE code IN ('TEST-AUTOMATION', 'TEST-FULLSTACK');")
+            conn.execute("DELETE FROM activity_logs WHERE entity_type = 'COURSE' AND entity_id IN (SELECT id FROM courses WHERE code IN ('TEST-AUTOMATION', 'TEST-FULLSTACK'));")
+        import modules.course.showcase_adapter as showcase_adapter
+        showcase_adapter.sync_showcase_web_stores(self.course_ctrl)
 
 
 if __name__ == "__main__":

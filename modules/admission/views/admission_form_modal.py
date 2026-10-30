@@ -21,6 +21,7 @@ from modules.batch.controller import BatchController
 from modules.receipts.controller import ReceiptController
 from shared.utils.formatting import format_title_case, format_file_size, normalize_mobile
 from shared.utils.file_dialog import pick_file, pick_file_async
+from core.utils.image_utils import is_valid_image_bytes
 from ui.themes.theme import AppTheme
 
 __all__ = ["AdmissionFormModal"]
@@ -47,6 +48,8 @@ class AdmissionFormModal(ft.AlertDialog):
         admission: Optional[AdmissionDTO] = None,
         on_saved: Optional[Callable[[], None]] = None,
         initial_enquiry_data: Optional[dict[str, Any]] = None,
+        initial_enquiry_id: Optional[int] = None,
+        **kwargs: Any,
     ) -> None:
         super().__init__(modal=True)
 
@@ -54,7 +57,7 @@ class AdmissionFormModal(ft.AlertDialog):
         self.is_edit_mode = admission is not None
         self.on_saved = on_saved or (lambda: None)
         self.initial_enquiry_data = initial_enquiry_data or {}
-        self.initial_enquiry_id = self.initial_enquiry_data.get("enquiry_id")
+        self.initial_enquiry_id = initial_enquiry_id or self.initial_enquiry_data.get("enquiry_id")
 
         self.controller = AdmissionController()
         self.student_controller = StudentController()
@@ -84,7 +87,7 @@ class AdmissionFormModal(ft.AlertDialog):
                 controls=[
                     ft.Row(
                         controls=[
-                            ft.Icon(ft.Icons.APP_REGISTRATION, color=AppTheme.PRIMARY, size=24),
+                            ft.Icon(ft.Icons.HOW_TO_REG, color=AppTheme.PRIMARY, size=24),
                             ft.Text(title_str, size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
                         ],
                         spacing=AppTheme.PAD_SM,
@@ -153,7 +156,7 @@ class AdmissionFormModal(ft.AlertDialog):
             selected=[self.enrollment_mode],
             allow_multiple_selection=False,
             segments=[
-                ft.Segment(value="new", label=ft.Text("Register New Student", size=AppTheme.SIZE_BODY), icon=ft.Icon(ft.Icons.PERSON_ADD, size=16)),
+                ft.Segment(value="new", label=ft.Text("New Student Admission", size=AppTheme.SIZE_BODY), icon=ft.Icon(ft.Icons.PERSON_ADD, size=16)),
                 ft.Segment(value="existing", label=ft.Text("Select Existing Student", size=AppTheme.SIZE_BODY), icon=ft.Icon(ft.Icons.PERSON_SEARCH, size=16)),
             ],
             on_change=self._on_mode_change,
@@ -343,7 +346,7 @@ class AdmissionFormModal(ft.AlertDialog):
             label="Blood Group",
             options=bg_options,
             value=admission.blood_group if (admission and admission.blood_group) else "B+",
-            width=130,
+            expand=True,
             border_radius=AppTheme.RADIUS_MD,
         )
 
@@ -440,46 +443,103 @@ class AdmissionFormModal(ft.AlertDialog):
         # Build Main Workspace Layout
         self._build_content_layout()
 
-    def _build_content_layout(self) -> None:
-        # Left Column: Identity, Contacts, Basic Profile & Friends (~570px)
-        left_col = ft.Column(
+    def _build_section_card(self, title: str, subtitle: str, icon: str, controls: list[ft.Control]) -> ft.Container:
+        header = ft.Row(
             controls=[
-                ft.Text("1. STUDENT IDENTITY & CONTACTS", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
-                ft.Row([self.first_name_input, self.middle_name_input, self.last_name_input], spacing=AppTheme.PAD_SM),
-                ft.Row([self.mobile_input, self.secondary_mobile_input], spacing=AppTheme.PAD_SM),
-                self.parent_name_input,
-                ft.Divider(height=1, color=AppTheme.BORDER),
-                ft.Text("2. BASIC PROFILE & RESIDENCE", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
-                ft.Row([self.mother_name_input, self.dob_input, self.gender_dropdown], spacing=AppTheme.PAD_SM),
-                ft.Row([self.aadhaar_input, self.village_input], spacing=AppTheme.PAD_SM),
-                self.address_input,
-                self.friends_card,
+                ft.Container(
+                    content=ft.Icon(icon, size=18, color=AppTheme.PRIMARY),
+                    padding=6,
+                    bgcolor="#EFF6FF",
+                    border_radius=AppTheme.RADIUS_SM,
+                ),
+                ft.Column(
+                    controls=[
+                        ft.Text(title, size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
+                        ft.Text(subtitle, size=11, color=AppTheme.TEXT_SECONDARY),
+                    ],
+                    spacing=0,
+                    tight=True,
+                ),
             ],
             spacing=AppTheme.PAD_SM,
-            expand=True,
-            scroll=ft.ScrollMode.AUTO,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+        return ft.Container(
+            content=ft.Column(
+                controls=[
+                    header,
+                    ft.Divider(height=1, color=AppTheme.BORDER),
+                    *controls,
+                ],
+                spacing=AppTheme.PAD_SM,
+            ),
+            padding=ft.Padding(14, 12, 14, 12),
+            bgcolor=AppTheme.SURFACE,
+            border=ft.Border.all(1, AppTheme.BORDER),
+            border_radius=AppTheme.RADIUS_MD,
         )
 
-        # Right Column: Academic, Course, Documents & Fees (~570px)
-        right_col = ft.Column(
+    def _build_content_layout(self) -> None:
+        # Section 1: Personal Details Card
+        card_personal = self._build_section_card(
+            title="1. PERSONAL DETAILS",
+            subtitle="Candidate identity, birth details, KYC & documents",
+            icon=ft.Icons.PERSON_PIN_ROUNDED,
             controls=[
-                ft.Text("3. ACADEMIC & INSTITUTION", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
-                ft.Row([self.qualification_dropdown, self.institution_dropdown, self.blood_group_dropdown], spacing=AppTheme.PAD_SM),
-                self.qual_other_input,
+                ft.Row([self.first_name_input, self.middle_name_input, self.last_name_input], spacing=AppTheme.PAD_SM),
+                ft.Row([self.mother_name_input, self.dob_input, self.gender_dropdown, self.blood_group_dropdown], spacing=AppTheme.PAD_SM),
+                self.aadhaar_input,
                 ft.Divider(height=1, color=AppTheme.BORDER),
-                ft.Text("4. COURSE & BATCH ENROLLMENT", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
-                ft.Row([self.course_dropdown, self.batch_dropdown], spacing=AppTheme.PAD_SM),
-                ft.Divider(height=1, color=AppTheme.BORDER),
-                ft.Text("5. DOCUMENTS & VERIFICATION (MAX: 100 KB)", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
                 ft.Row(
                     controls=[
-                        ft.Column([ft.Text("Student Photo", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD), ft.Row([self.photo_picker_btn, self.photo_clear_btn]), self.photo_info_text], spacing=2),
-                        ft.Column([ft.Text("Student Signature", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD), ft.Row([self.sig_picker_btn, self.sig_clear_btn]), self.sig_info_text], spacing=2),
+                        ft.Column([ft.Text("Student Photo (Max 100 KB)", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD), ft.Row([self.photo_picker_btn, self.photo_clear_btn]), self.photo_info_text], spacing=2, expand=True),
+                        ft.Column([ft.Text("Student Signature (Max 100 KB)", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD), ft.Row([self.sig_picker_btn, self.sig_clear_btn]), self.sig_info_text], spacing=2, expand=True),
                     ],
-                    spacing=AppTheme.PAD_LG,
+                    spacing=AppTheme.PAD_MD,
                 ),
-                ft.Divider(height=1, color=AppTheme.BORDER),
-                ft.Text("6. FINANCIAL SUMMARY & TERMS", weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_H3, color=AppTheme.PRIMARY),
+            ],
+        )
+
+        # Section 2: Contact & Address Details Card
+        card_contact_address = self._build_section_card(
+            title="2. CONTACT & ADDRESS DETAILS",
+            subtitle="Dual contact numbers, parent/guardian & locality",
+            icon=ft.Icons.CONTACT_PHONE_ROUNDED,
+            controls=[
+                ft.Row([self.mobile_input, self.secondary_mobile_input], spacing=AppTheme.PAD_SM),
+                self.parent_name_input,
+                ft.Row([self.village_input, self.address_input], spacing=AppTheme.PAD_SM),
+                self.friends_card,
+            ],
+        )
+
+        # Section 3: Academic Details Card
+        card_academics = self._build_section_card(
+            title="3. ACADEMIC DETAILS",
+            subtitle="Highest qualification and academic institution",
+            icon=ft.Icons.SCHOOL_ROUNDED,
+            controls=[
+                ft.Row([self.qualification_dropdown, self.institution_dropdown], spacing=AppTheme.PAD_SM),
+                self.qual_other_input,
+            ],
+        )
+
+        # Section 4: Course & Batch Allocation Card
+        card_course_batch = self._build_section_card(
+            title="4. COURSE & BATCH ALLOCATION",
+            subtitle="Enrolled course curriculum & batch timing schedule",
+            icon=ft.Icons.CLASS_ROUNDED,
+            controls=[
+                ft.Row([self.course_dropdown, self.batch_dropdown], spacing=AppTheme.PAD_SM),
+            ],
+        )
+
+        # Section 5: Fee & Payment Summary Card
+        card_fee_payment = self._build_section_card(
+            title="5. FEE & PAYMENT SUMMARY",
+            subtitle="Course base fee, applicable discount & terms",
+            icon=ft.Icons.PAYMENTS_ROUNDED,
+            controls=[
                 ft.Row(
                     controls=[
                         ft.Column([ft.Text("Course Base Fee", size=AppTheme.SIZE_CAPTION), self.base_fee_text], spacing=2),
@@ -487,6 +547,7 @@ class AdmissionFormModal(ft.AlertDialog):
                         ft.Column([ft.Text("Final Payable Fee", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD), self.final_fee_text], spacing=2),
                     ],
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
                 ft.Container(
                     content=ft.Row(
@@ -500,12 +561,25 @@ class AdmissionFormModal(ft.AlertDialog):
                         ],
                         spacing=AppTheme.PAD_XS,
                     ),
-                    padding=ft.Padding(8, 4, 8, 4),
-                    bgcolor=AppTheme.SURFACE_VARIANT,
+                    padding=ft.Padding(8, 6, 8, 6),
+                    bgcolor=AppTheme.PRIMARY_LIGHT,
                     border_radius=AppTheme.RADIUS_SM,
                 ),
             ],
-            spacing=AppTheme.PAD_SM,
+        )
+
+        # Left Column: Personal Details & Contact/Address (~570px)
+        left_col = ft.Column(
+            controls=[card_personal, card_contact_address],
+            spacing=AppTheme.PAD_MD,
+            expand=True,
+            scroll=ft.ScrollMode.AUTO,
+        )
+
+        # Right Column: Academics, Course/Batch & Financial (~570px)
+        right_col = ft.Column(
+            controls=[card_academics, card_course_batch, card_fee_payment],
+            spacing=AppTheme.PAD_MD,
             expand=True,
             scroll=ft.ScrollMode.AUTO,
         )
@@ -650,7 +724,7 @@ class AdmissionFormModal(ft.AlertDialog):
         if not result.is_identity_match:
             self._hide_duplicate_alert()
             if show_clean_toast:
-                self._show_success("✓ No duplicate student identity found. Registration may proceed.")
+                self._show_success("✓ No duplicate student identity found. Admission may proceed.")
             return
 
         # Classification-based styling and contextual actions
@@ -674,9 +748,10 @@ class AdmissionFormModal(ft.AlertDialog):
             self.duplicate_alert_title.value = "Existing Draft Found"
             self.duplicate_alert_title.color = AppTheme.WARNING
             self.duplicate_alert_message.value = result.message
-            self.duplicate_alert_action_btn.text = "Resume Draft"
+            self.duplicate_alert_action_btn.content = "Resume Draft"
             self.duplicate_alert_action_btn.icon = ft.Icons.EDIT_DOCUMENT
-            self.duplicate_alert_action_btn.style = ft.ButtonStyle(bgcolor=AppTheme.WARNING, color=AppTheme.SURFACE)
+            self.duplicate_alert_action_btn.bgcolor = AppTheme.WARNING
+            self.duplicate_alert_action_btn.color = AppTheme.SURFACE
             self.duplicate_alert_action_btn.on_click = lambda _, did=result.draft_admission_id: self._resume_draft(did)
             self.duplicate_alert_action_btn.visible = bool(result.draft_admission_id)
             self.save_draft_btn.disabled = False
@@ -691,9 +766,10 @@ class AdmissionFormModal(ft.AlertDialog):
             self.duplicate_alert_title.value = "Alumni Re-admission Allowed" if is_readm else "Returning Student Matched"
             self.duplicate_alert_title.color = AppTheme.SUCCESS if is_readm else AppTheme.PRIMARY
             self.duplicate_alert_message.value = f"{result.message} (Matched Mobile: {result.matched_mobile})"
-            self.duplicate_alert_action_btn.text = "Link Existing Profile"
+            self.duplicate_alert_action_btn.content = "Link Existing Profile"
             self.duplicate_alert_action_btn.icon = ft.Icons.LINK
-            self.duplicate_alert_action_btn.style = ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE)
+            self.duplicate_alert_action_btn.bgcolor = AppTheme.PRIMARY
+            self.duplicate_alert_action_btn.color = AppTheme.SURFACE
             self.duplicate_alert_action_btn.on_click = lambda _, sid=result.existing_student_id: self._select_existing_student(sid)
             self.duplicate_alert_action_btn.visible = bool(result.existing_student_id)
             self.save_draft_btn.disabled = False
@@ -841,36 +917,64 @@ class AdmissionFormModal(ft.AlertDialog):
         Sets initial_enquiry_id so that saving or confirming the admission
         automatically marks the enquiry as CONVERTED.
         """
-        self.initial_enquiry_id = getattr(enq, "id", None)
-        self.first_name_input.value = getattr(enq, "first_name", "") or ""
-        self.middle_name_input.value = getattr(enq, "middle_name", "") or ""
-        self.last_name_input.value = getattr(enq, "last_name", "") or ""
-        self.mobile_input.value = getattr(enq, "mobile_number", "") or ""
+        if isinstance(enq, dict):
+            enq_id = enq.get("enquiry_id") or enq.get("id")
+            first_name = enq.get("first_name", "") or ""
+            middle_name = enq.get("middle_name", "") or ""
+            last_name = enq.get("last_name", "") or ""
+            mob = enq.get("mobile_number", "") or ""
+            sec_mob = enq.get("secondary_mobile") or enq.get("alternate_mobile")
+            gen = enq.get("gender")
+            vil = enq.get("village")
+            addr = enq.get("address")
+            cid = enq.get("course_id")
+            qual = enq.get("qualification")
+            st_name = enq.get("student_name") or f"{first_name} {last_name}".strip()
+            enq_num = enq.get("enquiry_number", f"#{enq_id}" if enq_id else "")
+        else:
+            enq_id = getattr(enq, "id", None)
+            first_name = getattr(enq, "first_name", "") or ""
+            middle_name = getattr(enq, "middle_name", "") or ""
+            last_name = getattr(enq, "last_name", "") or ""
+            mob = getattr(enq, "mobile_number", "") or ""
+            sec_mob = getattr(enq, "secondary_mobile", None) or getattr(enq, "alternate_mobile", None)
+            gen = getattr(enq, "gender", None)
+            vil = getattr(enq, "village", None)
+            addr = getattr(enq, "address", None)
+            cid = getattr(enq, "course_id", None)
+            qual = getattr(enq, "qualification", None)
+            st_name = getattr(enq, "student_name", f"{first_name} {last_name}".strip())
+            enq_num = getattr(enq, "enquiry_number", f"#{enq_id}" if enq_id else "")
 
-        sec_mob = getattr(enq, "secondary_mobile", None) or getattr(enq, "alternate_mobile", None)
+        self.initial_enquiry_id = enq_id
+        self.first_name_input.value = first_name
+        self.middle_name_input.value = middle_name
+        self.last_name_input.value = last_name
+        self.mobile_input.value = mob
+
         if sec_mob:
             self.secondary_mobile_input.value = sec_mob
 
-        gen = getattr(enq, "gender", None)
         if gen:
             self.gender_dropdown.value = gen.upper()
 
-        vil = getattr(enq, "village", None)
         if vil:
             self.village_input.value = vil
             self._load_friend_suggestions()
 
-        addr = getattr(enq, "address", None)
         if addr:
             self.address_input.value = addr
 
-        cid = getattr(enq, "course_id", None)
+        if qual and hasattr(self, "qualification_dropdown"):
+            for opt in self.qualification_dropdown.options:
+                if str(opt.key).strip().lower() == str(qual).strip().lower():
+                    self.qualification_dropdown.value = opt.key
+                    break
+
         if cid:
             self._select_course_by_id(cid)
 
-        enq_num = getattr(enq, "enquiry_number", f"#{getattr(enq, 'id', '')}")
-        st_name = getattr(enq, "student_name", f"{getattr(enq, 'first_name', '')} {getattr(enq, 'last_name', '')}".strip())
-        self._show_success(f"✓ Imported enquiry profile #{enq_num} ({st_name}). Fill remaining fields to complete enrollment.")
+        self._show_success(f"✓ Imported enquiry profile #{enq_num} ({st_name}). Fill remaining fields to complete admission.")
         self._trigger_duplicate_check()
         self._safe_update()
 
@@ -999,7 +1103,7 @@ class AdmissionFormModal(ft.AlertDialog):
                     content=ft.Column(
                         controls=[
                             search_field,
-                            ft.Text("Active leads (pick a profile to auto-fill registration details):", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
+                            ft.Text("Active leads (pick a profile to auto-fill admission details):", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
                             results_col,
                         ],
                         spacing=AppTheme.PAD_SM,
@@ -1036,11 +1140,19 @@ class AdmissionFormModal(ft.AlertDialog):
 
     def _update_batches_for_course(self, course_id: int) -> None:
         batches = self.batch_controller.list_batches_by_course(course_id=course_id, status="OPEN")
+        all_batches, _ = self.batch_controller.list_batches(status="OPEN", limit=100)
         opts = [ft.DropdownOption(key="NONE", text="No Batch Assigned (Allocate Later)")]
+        seen_ids = set()
         for b in batches:
+            seen_ids.add(b.id)
             opts.append(ft.DropdownOption(key=str(b.id), text=f"{b.batch_name} ({b.timing})"))
+        for b in all_batches:
+            if b.id not in seen_ids:
+                c_tag = f" - [{b.course_name}]" if getattr(b, "course_name", None) else ""
+                opts.append(ft.DropdownOption(key=str(b.id), text=f"{b.batch_name} ({b.timing}){c_tag}"))
         self.batch_dropdown.options = opts
-        self.batch_dropdown.value = "NONE"
+        if self.batch_dropdown.value not in [o.key for o in opts]:
+            self.batch_dropdown.value = "NONE"
         self._safe_update()
 
     def _on_qualification_changed(self, e: ft.ControlEvent) -> None:
@@ -1115,6 +1227,10 @@ class AdmissionFormModal(ft.AlertDialog):
                     self._show_error(f"Photo size ({len(raw_bytes) / 1024:.1f} KB) exceeds the maximum allowed limit of 100 KB.")
                     return
 
+                if not is_valid_image_bytes(raw_bytes):
+                    self._show_error("Selected file is not a valid image format.")
+                    return
+
                 self.photo_bytes = raw_bytes
                 self.photo_filename = p.name
                 self.photo_info_text.value = f"Selected: {p.name} ({format_file_size(len(raw_bytes))})"
@@ -1150,6 +1266,10 @@ class AdmissionFormModal(ft.AlertDialog):
                 raw_bytes = p.read_bytes()
                 if len(raw_bytes) > self.MAX_FILE_SIZE_BYTES:
                     self._show_error(f"Signature size ({len(raw_bytes) / 1024:.1f} KB) exceeds the maximum allowed limit of 100 KB.")
+                    return
+
+                if not is_valid_image_bytes(raw_bytes):
+                    self._show_error("Selected file is not a valid image format.")
                     return
 
                 self.signature_bytes = raw_bytes
@@ -1202,30 +1322,30 @@ class AdmissionFormModal(ft.AlertDialog):
             # Mandatory Identity Rules for New Student Creation
             if not first_name or len(first_name) < 2:
                 self._set_control_error(self.first_name_input, "First name is required (min 2 chars)")
-                location_errors.append("[Section 1 - Student Identity]: First Name is required (minimum 2 letters)")
+                location_errors.append("[Section 1 - Student Identity] (Personal Details): First Name is required (minimum 2 letters)")
                 has_error = True
 
             if not last_name or len(last_name) < 2:
                 self._set_control_error(self.last_name_input, "Surname / Last name is required (min 2 chars)")
-                location_errors.append("[Section 1 - Student Identity]: Surname / Last name is required (minimum 2 letters)")
+                location_errors.append("[Section 1 - Student Identity] (Personal Details): Surname / Last name is required (minimum 2 letters)")
                 has_error = True
 
             if not c1:
                 self._set_control_error(self.mobile_input, "Primary mobile number is required")
-                location_errors.append("[Section 1 - Student Identity]: Contact 1 (Primary Mobile) is required")
+                location_errors.append("[Section 1 - Student Identity] (Contact 1): Contact 1 (Primary Mobile) is required")
                 has_error = True
             elif not re.match(r"^[6-9][0-9]{9}$", c1):
                 self._set_control_error(self.mobile_input, "Must be a valid 10-digit Indian mobile number")
-                location_errors.append(f"[Section 1 - Student Identity]: Contact 1 must be a valid 10-digit mobile number (got {len(c1)} digits)")
+                location_errors.append(f"[Section 1 - Student Identity] (Contact 1): Contact 1 must be a valid 10-digit mobile number (got {len(c1)} digits)")
                 has_error = True
 
             if not c2:
                 self._set_control_error(self.secondary_mobile_input, "Secondary mobile number is required")
-                location_errors.append("[Section 1 - Student Identity]: Contact 2 (Secondary Mobile) is required")
+                location_errors.append("[Section 1 - Student Identity] (Contact 2): Contact 2 (Secondary Mobile) is required")
                 has_error = True
             elif not re.match(r"^[6-9][0-9]{9}$", c2):
                 self._set_control_error(self.secondary_mobile_input, "Must be a valid 10-digit Indian mobile number")
-                location_errors.append(f"[Section 1 - Student Identity]: Contact 2 must be a valid 10-digit mobile number (got {len(c2)} digits)")
+                location_errors.append(f"[Section 1 - Student Identity] (Contact 2): Contact 2 must be a valid 10-digit mobile number (got {len(c2)} digits)")
                 has_error = True
             elif c1 and c2 and c1 == c2:
                 self._set_control_error(self.secondary_mobile_input, "Secondary mobile cannot be identical to Primary")
@@ -1234,7 +1354,7 @@ class AdmissionFormModal(ft.AlertDialog):
 
             if not village and not address:
                 self._set_control_error(self.village_input, "At least Village or Residential Address is required")
-                location_errors.append("[Section 2 - Location & Residence]: At least Village OR Address is required")
+                location_errors.append("[Section 2 - Address & Residence]: At least Village OR Address is required")
                 has_error = True
 
         if not self.course_dropdown.value:
@@ -1246,7 +1366,7 @@ class AdmissionFormModal(ft.AlertDialog):
             digits = re.sub(r"\D", "", aadhaar)
             if len(digits) != 12:
                 self._set_control_error(self.aadhaar_input, "Aadhaar must be exactly 12 digits")
-                location_errors.append(f"[Section 2 - KYC Identification]: Aadhaar must be exactly 12 digits (got {len(digits)} digits)")
+                location_errors.append(f"[Section 1 - Personal Details (Aadhaar KYC)]: Aadhaar must be exactly 12 digits (got {len(digits)} digits)")
                 has_error = True
 
         if has_error:

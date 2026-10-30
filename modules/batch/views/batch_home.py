@@ -496,14 +496,15 @@ class BatchHome(ft.Container):
 
             row = ft.DataRow(
                 cells=[
-                    ft.DataCell(batch_name_col),
-                    ft.DataCell(ft.Text(b.course_name or f"Course #{b.course_id}")),
-                    ft.DataCell(ft.Text(b.timing)),
+                    ft.DataCell(batch_name_col, on_double_tap=lambda e, batch_obj=b: self.handle_edit_batch(batch_obj)),
+                    ft.DataCell(ft.Text(b.course_name or f"Course #{b.course_id}"), on_double_tap=lambda e, batch_obj=b: self.handle_edit_batch(batch_obj)),
+                    ft.DataCell(ft.Text(b.timing), on_double_tap=lambda e, batch_obj=b: self.handle_edit_batch(batch_obj)),
                     ft.DataCell(ft.Text(cap_display, weight=ft.FontWeight.W_600, color=cap_color)),
                     ft.DataCell(ft.Text(dates_str, size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY)),
                     ft.DataCell(status_badge),
                     ft.DataCell(ft.Row(controls=[edit_btn, delete_btn], spacing=2)),
-                ]
+                ],
+                on_select_change=lambda e, batch_obj=b: self.handle_edit_batch(batch_obj),
             )
             rows.append(row)
 

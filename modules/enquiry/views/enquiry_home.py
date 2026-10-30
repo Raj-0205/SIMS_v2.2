@@ -31,14 +31,14 @@ STATUS_COLORS = {
 
 CATEGORY_CONFIG = {
     "HOT": {
-        "label": "Confirm Laga (Hot)",
-        "badge_label": "Hot",
-        "icon": ft.Icons.LOCAL_FIRE_DEPARTMENT_ROUNDED,
-        "color": "#DC2626",
-        "bgcolor": "#FEF2F2",
-        "border": "#FCA5A5",
-        "avatar_bg": "#EF4444",
-        "subtext": "Admission pakka",
+        "label": "High Priority (Hot)",
+        "badge_label": "High Priority",
+        "icon": ft.Icons.STAR_ROUNDED,
+        "color": AppTheme.PRIMARY,
+        "bgcolor": AppTheme.PRIMARY_LIGHT,
+        "border": AppTheme.BORDER,
+        "avatar_bg": AppTheme.PRIMARY,
+        "subtext": "Ready to enroll",
     },
     "WARM": {
         "label": "Interested (Warm)",
@@ -51,14 +51,14 @@ CATEGORY_CONFIG = {
         "subtext": "Needs follow-up",
     },
     "COLD": {
-        "label": "Doubtful (Cold)",
-        "badge_label": "Cold",
-        "icon": ft.Icons.AC_UNIT_ROUNDED,
+        "label": "Exploring (Cold)",
+        "badge_label": "Exploring",
+        "icon": ft.Icons.EXPLORE_ROUNDED,
         "color": "#2563EB",
         "bgcolor": "#EFF6FF",
         "border": "#93C5FD",
         "avatar_bg": "#3B82F6",
-        "subtext": "Fee/timing doubt",
+        "subtext": "Evaluating options",
     },
     "LOST": {
         "label": "Not Interested (Lost)",
@@ -161,14 +161,14 @@ class EnquiryHome(ft.Container):
         title_badge = ft.Container(
             content=ft.Row(
                 controls=[
-                    ft.Icon(ft.Icons.FLASH_ON_ROUNDED, size=13, color="#2563EB"),
-                    ft.Text("CRM INTAKE HUB", size=10, weight=ft.FontWeight.BOLD, color="#1D4ED8"),
+                    ft.Icon(ft.Icons.PERSON_SEARCH_ROUNDED, size=13, color=AppTheme.PRIMARY),
+                    ft.Text("REGISTRATION & ENQUIRIES", size=10, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
                 ],
                 spacing=4,
                 tight=True,
             ),
-            bgcolor="#EFF6FF",
-            border=ft.Border.all(1, "#BFDBFE"),
+            bgcolor=AppTheme.PRIMARY_LIGHT,
+            border=ft.Border.all(1, AppTheme.BORDER),
             border_radius=ft.BorderRadius.all(6),
             padding=ft.Padding(7, 3, 7, 3),
         )
@@ -213,41 +213,31 @@ class EnquiryHome(ft.Container):
             on_click=self.handle_toggle_autofit,
         )
 
-        # Primary Quick Walk-in button (15-second fast intake) with gradient glow
-        self.quick_enquiry_btn = ft.ElevatedButton(
+        # Single, prominent rectangular Registration button (natural button proportions, not search-bar sized)
+        self.registration_btn = ft.ElevatedButton(
             content=ft.Row(
                 [
-                    ft.Icon(ft.Icons.FLASH_ON_ROUNDED, size=18, color=ft.Colors.WHITE),
-                    ft.Text("Quick Walk-in (15s)", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                    ft.Icon(ft.Icons.PERSON_ADD_ROUNDED, size=16, color=AppTheme.SURFACE),
+                    ft.Text("Registration", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.W_600),
                 ],
                 spacing=6,
+                tight=True,
             ),
             style=ft.ButtonStyle(
                 bgcolor=AppTheme.PRIMARY,
-                color=ft.Colors.WHITE,
-                shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
-                padding=ft.Padding(left=18, top=12, right=18, bottom=12),
+                color=AppTheme.SURFACE,
+                shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_SM),
+                padding=ft.Padding(left=16, top=10, right=16, bottom=10),
                 elevation=2,
             ),
-            tooltip="Ultra-fast 15-second lead intake with automatic mobile clean and village suggestions",
-            on_click=self.handle_new_enquiry,
+            height=38,
+            tooltip="Open Student Registration Form",
+            on_click=self.handle_registration,
         )
 
-        # Secondary detailed form button
-        self.detailed_enquiry_btn = ft.OutlinedButton(
-            content=ft.Row(
-                [
-                    ft.Icon(ft.Icons.NOTE_ADD_ROUNDED, size=16, color=AppTheme.PRIMARY),
-                    ft.Text("Detailed Form", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.W_600),
-                ],
-                spacing=5,
-            ),
-            style=ft.ButtonStyle(
-                shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
-            ),
-            tooltip="Open full detailed enquiry intake form with qualification and address",
-            on_click=self.handle_detailed_enquiry,
-        )
+        # Backward compatibility aliases
+        self.detailed_enquiry_btn = self.registration_btn
+        self.quick_enquiry_btn = self.registration_btn
 
         self.export_excel_btn = ft.FilledButton(
             content=ft.Text("Export Excel (.xlsx)", size=AppTheme.SIZE_CAPTION),
@@ -269,15 +259,15 @@ class EnquiryHome(ft.Container):
 
         action_buttons_row = ft.Row(
             controls=[
-                self.toggle_controls_btn,
-                self.toggle_autofit_btn,
+                self.registration_btn,
                 self.export_excel_btn,
                 self.refresh_btn,
-                self.detailed_enquiry_btn,
-                self.quick_enquiry_btn,
+                self.toggle_controls_btn,
+                self.toggle_autofit_btn,
             ],
             spacing=AppTheme.PAD_SM,
             wrap=True,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
         )
 
         header_row = ft.Row(
@@ -294,7 +284,7 @@ class EnquiryHome(ft.Container):
         self.kpi_total_text = ft.Text("0", size=24, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY)
         self.kpi_today_text = ft.Text("0", size=24, weight=ft.FontWeight.BOLD, color="#7C3AED")
         self.kpi_today_subtext = ft.Text("Scheduled today", size=10, color=AppTheme.TEXT_SECONDARY)
-        self.kpi_hot_text = ft.Text("0", size=24, weight=ft.FontWeight.BOLD, color="#DC2626")
+        self.kpi_hot_text = ft.Text("0", size=24, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY)
         self.kpi_warm_text = ft.Text("0", size=24, weight=ft.FontWeight.BOLD, color="#D97706")
         self.kpi_cold_text = ft.Text("0", size=24, weight=ft.FontWeight.BOLD, color="#2563EB")
         self.kpi_converted_text = ft.Text("0", size=24, weight=ft.FontWeight.BOLD, color="#059669")
@@ -362,13 +352,13 @@ class EnquiryHome(ft.Container):
             category_key="TODAY",
         )
         self.card_hot = _make_category_kpi_card(
-            "Confirm Laga (Hot)",
+            "High Priority (Hot)",
             self.kpi_hot_text,
-            ft.Text("Admission pakka", size=10, color="#DC2626", weight=ft.FontWeight.W_500),
-            ft.Icons.LOCAL_FIRE_DEPARTMENT_ROUNDED,
-            "#DC2626",
-            "#FEF2F2",
-            border_color="#FECACA",
+            ft.Text("Ready to enroll", size=10, color=AppTheme.TEXT_SECONDARY, weight=ft.FontWeight.W_500),
+            ft.Icons.STAR_ROUNDED,
+            AppTheme.PRIMARY,
+            AppTheme.PRIMARY_LIGHT,
+            border_color=AppTheme.BORDER,
             on_click_action=lambda _: self._set_category_filter("HOT"),
             category_key="HOT",
         )
@@ -384,10 +374,10 @@ class EnquiryHome(ft.Container):
             category_key="WARM",
         )
         self.card_cold = _make_category_kpi_card(
-            "Doubtful (Cold)",
+            "Exploring (Cold)",
             self.kpi_cold_text,
-            ft.Text("Fee/timing doubt", size=10, color="#2563EB", weight=ft.FontWeight.W_500),
-            ft.Icons.AC_UNIT_ROUNDED,
+            ft.Text("Evaluating options", size=10, color="#2563EB", weight=ft.FontWeight.W_500),
+            ft.Icons.EXPLORE_ROUNDED,
             "#2563EB",
             "#EFF6FF",
             border_color="#BFDBFE",
@@ -454,9 +444,9 @@ class EnquiryHome(ft.Container):
             border_radius=AppTheme.RADIUS_MD,
             options=[
                 ft.dropdown.Option("ALL", "All Categories"),
-                ft.dropdown.Option("HOT", "🔥 Confirm Laga (Hot)"),
+                ft.dropdown.Option("HOT", "⭐ High Priority (Hot)"),
                 ft.dropdown.Option("WARM", "👍 Interested (Warm)"),
-                ft.dropdown.Option("COLD", "❄️ Doubtful (Cold)"),
+                ft.dropdown.Option("COLD", "❄️ Exploring (Cold)"),
                 ft.dropdown.Option("LOST", "❌ Not Interested (Lost)"),
                 ft.dropdown.Option("CONVERTED", "🎓 Converted (Admitted)"),
             ],
@@ -571,8 +561,8 @@ class EnquiryHome(ft.Container):
         self.empty_state_cta = ft.ElevatedButton(
             content=ft.Row(
                 [
-                    ft.Icon(ft.Icons.FLASH_ON_ROUNDED, size=16),
-                    ft.Text("Record Walk-in Now", weight=ft.FontWeight.BOLD),
+                    ft.Icon(ft.Icons.PERSON_ADD_ROUNDED, size=16),
+                    ft.Text("Register New Candidate", weight=ft.FontWeight.BOLD),
                 ],
                 spacing=6,
                 tight=True,
@@ -580,9 +570,9 @@ class EnquiryHome(ft.Container):
             style=ft.ButtonStyle(
                 bgcolor=AppTheme.PRIMARY,
                 color=ft.Colors.WHITE,
-                shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_MD),
+                shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_SM),
             ),
-            on_click=self.handle_new_enquiry,
+            on_click=self.handle_registration,
         )
 
         self.empty_state = ft.Container(
@@ -591,11 +581,11 @@ class EnquiryHome(ft.Container):
                     ft.Container(
                         content=ft.Icon(ft.Icons.SUPPORT_AGENT_ROUNDED, size=52, color=AppTheme.PRIMARY),
                         padding=16,
-                        bgcolor="#EFF6FF",
+                        bgcolor=AppTheme.PRIMARY_LIGHT,
                         border_radius=AppTheme.RADIUS_PILL,
                     ),
                     self.empty_state_text,
-                    ft.Text("Try clearing filters or enter a 15-second lead intake.", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
+                    ft.Text("Try clearing filters or register a new candidate.", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
                     self.empty_state_cta,
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -747,11 +737,11 @@ class EnquiryHome(ft.Container):
             self.kpi_today_text.value = str(cat_summary.today_follow_ups)
             if cat_summary.overdue_follow_ups > 0:
                 self.kpi_today_subtext.value = f"⚠️ {cat_summary.overdue_follow_ups} overdue calls"
-                self.kpi_today_subtext.color = "#DC2626"
+                self.kpi_today_subtext.color = AppTheme.WARNING
                 self.kpi_today_subtext.weight = ft.FontWeight.BOLD
-                self.card_today._base_border_color = "#FCA5A5"
+                self.card_today._base_border_color = AppTheme.WARNING_LIGHT
                 if self.selected_follow_up_filter != "TODAY":
-                    self.card_today.border = ft.Border.all(1.5, "#EF4444")
+                    self.card_today.border = ft.Border.all(1.5, AppTheme.WARNING)
             else:
                 self.kpi_today_subtext.value = "All calls up to date"
                 self.kpi_today_subtext.color = AppTheme.TEXT_SECONDARY
@@ -848,10 +838,10 @@ class EnquiryHome(ft.Container):
 
             if enq.follow_up_date and enq.status != "CONVERTED" and enq.category != "LOST":
                 if enq.follow_up_date < today_iso:
-                    follow_up_color = "#DC2626"
+                    follow_up_color = AppTheme.WARNING
                     follow_up_prefix = "⚠️ OVERDUE: "
-                    follow_up_badge_bg = "#FEF2F2"
-                    follow_up_badge_border = "#FECACA"
+                    follow_up_badge_bg = AppTheme.WARNING_LIGHT
+                    follow_up_badge_border = AppTheme.BORDER
                 elif enq.follow_up_date == today_iso:
                     follow_up_color = "#7C3AED"
                     follow_up_prefix = "📅 TODAY: "
@@ -890,7 +880,7 @@ class EnquiryHome(ft.Container):
             )
             delete_btn = ft.IconButton(
                 icon=ft.Icons.DELETE_OUTLINE_ROUNDED,
-                icon_color="#DC2626",
+                icon_color=AppTheme.TEXT_MUTED,
                 icon_size=18,
                 tooltip="Delete Enquiry",
                 on_click=lambda _, e_id=enq.id: self.handle_delete_enquiry(e_id),
@@ -910,9 +900,10 @@ class EnquiryHome(ft.Container):
             loss_res = getattr(enq, "loss_reason", None)
             loss_control = (
                 ft.Container(
-                    content=ft.Text(f"Reason: {loss_res}", size=10, color="#DC2626", italic=True),
+                    content=ft.Text(f"Reason: {loss_res}", size=10, color=AppTheme.TEXT_SECONDARY, italic=True),
                     padding=ft.Padding(4, 1, 4, 1),
-                    bgcolor="#FEF2F2",
+                    bgcolor=AppTheme.SURFACE_VARIANT,
+                    border=ft.Border.all(1, AppTheme.BORDER),
                     border_radius=4,
                 )
                 if (cat_key == "LOST" and loss_res)
@@ -1085,15 +1076,18 @@ class EnquiryHome(ft.Container):
         self.empty_state.visible = (len(rows) == 0)
         self.data_table.visible = (len(rows) > 0)
 
-    def handle_new_enquiry(self, e: ft.ControlEvent) -> None:
-        """Opens the ultra-fast 15-second Quick Walk-in Modal."""
-        modal = QuickEnquiryModal(on_saved=self.load_data)
-        self._open_dialog(modal)
-
-    def handle_detailed_enquiry(self, e: ft.ControlEvent) -> None:
-        """Opens full detailed enquiry intake modal."""
+    def handle_registration(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Opens full student registration intake modal."""
         modal = EnquiryFormModal(on_saved=self.load_data)
         self._open_dialog(modal)
+
+    def handle_detailed_enquiry(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Backward-compatible alias pointing to registration intake."""
+        self.handle_registration(e)
+
+    def handle_new_enquiry(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Backward-compatible alias pointing to registration intake."""
+        self.handle_registration(e)
 
     def handle_follow_up(self, enquiry: EnquiryDTO) -> None:
         """Opens follow-up call log and conversation timeline dialog."""
@@ -1158,7 +1152,7 @@ class EnquiryHome(ft.Container):
             ),
             actions=[
                 ft.TextButton("Cancel", on_click=lambda _: p.pop_dialog() if hasattr(p, "pop_dialog") else setattr(confirm_dlg, "open", False) or p.update()),
-                ft.ElevatedButton("Delete", bgcolor="#DC2626", color=ft.Colors.WHITE, on_click=confirm_delete),
+                ft.ElevatedButton("Delete", bgcolor=AppTheme.DANGER, color=ft.Colors.WHITE, on_click=confirm_delete),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )

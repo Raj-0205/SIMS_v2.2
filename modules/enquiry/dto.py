@@ -30,7 +30,7 @@ class CreateEnquiryDTO:
     qualification: Optional[str] = None
     gender: str = "MALE"
     status: str = "NEW"
-    category: str = "WARM"  # HOT (Confirm Laga), WARM (Interested), COLD (Doubtful), LOST (Not Interested), CONVERTED
+    category: str = "WARM"  # HOT (High Priority), WARM (Interested), COLD (Exploring), LOST (Not Interested), CONVERTED
     preferred_timing: Optional[str] = "ANY"  # MORNING, AFTERNOON, EVENING, WEEKEND, ANY
     source: str = "WALK_IN"
     follow_up_date: Optional[str] = None
@@ -172,9 +172,9 @@ class EnquirySummaryDTO:
 class EnquiryCategorySummaryDTO:
     """High-conversion operational metrics for categorized leads and follow-ups."""
     total: int = 0
-    hot: int = 0             # Confirm Laga (High Intent)
+    hot: int = 0             # High Priority (High Intent)
     warm: int = 0            # Interested (Exploring / Demo)
-    cold: int = 0            # Doubtful / Low Intent
+    cold: int = 0            # Exploring / Low Intent
     lost: int = 0            # Not Interested / Dropped
     converted: int = 0       # Formally Admitted
     today_followup: int = 0  # Calls scheduled for today

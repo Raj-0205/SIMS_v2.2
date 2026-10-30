@@ -141,20 +141,20 @@ class TestAboutAndUniversalTextSelection(unittest.TestCase):
         self.assertIs(claim.content, claim.selection_area)
 
     def test_03_settings_tab4_about_and_copyright_integration(self):
-        """Verifies SettingsHome has Tab 4 for About & Copyright and renders all details."""
+        """Verifies SettingsHome has Tab for About & Copyright and renders all details."""
         settings = SettingsHome()
-        self.assertEqual(len(settings.tabs_row.controls), 5)
+        self.assertEqual(len(settings.tabs_row.controls), 4)
 
-        about_tab_btn = settings.tabs_row.controls[4]
+        about_tab_btn = settings.tabs_row.controls[3]
         btn_text = getattr(about_tab_btn, "text", "") or ""
         if not btn_text and hasattr(about_tab_btn, "content"):
             btn_text = str(about_tab_btn.content)
         self.assertIn("About & Copyright", btn_text)
         self.assertEqual(about_tab_btn.icon, ft.Icons.INFO_OUTLINE)
 
-        # Activate Tab 4
-        settings._set_tab(4)
-        self.assertEqual(settings.active_tab, 4)
+        # Activate About Tab (index 3 after branding tab removal)
+        settings._set_tab(3)
+        self.assertEqual(settings.active_tab, 3)
         active_content = settings.body_container.content
         self.assertIsInstance(active_content, ft.Container)
 

@@ -285,4 +285,5 @@ class ReceiptDialog(ft.AlertDialog):
         )
         encoded_msg = urllib.parse.quote(msg)
         wa_url = f"https://wa.me/{clean_mob}?text={encoded_msg}" if clean_mob else f"https://web.whatsapp.com/send?text={encoded_msg}"
-        webbrowser.open(wa_url)
+        from core.utils.url_utils import safe_open_url
+        safe_open_url(wa_url)

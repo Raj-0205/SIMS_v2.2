@@ -1,6 +1,7 @@
 # ui/widgets/about_dialog.py
 
 from __future__ import annotations
+import inspect
 import webbrowser
 from typing import Optional, Any
 import flet as ft
@@ -28,17 +29,23 @@ COPYRIGHT_NOTICE = "© 2026 The ARP Group. All Rights Reserved."
 
 def open_arp_website(e: Optional[Any] = None) -> None:
     """Safely opens The ARP Group official website in the default browser."""
+    from core.utils.url_utils import _silence_fd
     try:
-        webbrowser.open_new_tab(ARP_GROUP_URL)
+        with _silence_fd():
+            webbrowser.open_new_tab(ARP_GROUP_URL)
     except Exception:
         try:
-            webbrowser.open(ARP_GROUP_URL)
+            with _silence_fd():
+                webbrowser.open(ARP_GROUP_URL)
         except Exception:
             pass
 
-    if e and hasattr(e, "page") and e.page:
+    page = getattr(e, "page", None) if e else None
+    if page and hasattr(page, "launch_url") and callable(page.launch_url):
         try:
-            e.page.launch_url(ARP_GROUP_URL)
+            res = page.launch_url(ARP_GROUP_URL)
+            if inspect.iscoroutine(res):
+                res.close()
         except Exception:
             pass
 

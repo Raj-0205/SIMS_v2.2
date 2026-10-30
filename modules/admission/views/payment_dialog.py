@@ -219,7 +219,7 @@ class PaymentDialog(ft.AlertDialog):
 
         # Live Dynamic UPI QR & Payment Card
         self.upi_qr_image = ft.Image(
-            src="",
+            src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
             width=165,
             height=165,
             fit=ft.BoxFit.CONTAIN,
@@ -400,7 +400,7 @@ class PaymentDialog(ft.AlertDialog):
         )
 
         self.content = ft.Container(
-            width=520,
+            width=480,
             content=ft.SelectionArea(
                 content=ft.Column(
                     controls=[

@@ -91,3 +91,21 @@ class ReceiptRepository(BaseRepository):
         prefix = f"RCP-{year}-%"
         row = self.execute_fetchone(sql, (prefix,))
         return (int(row["total_for_year"]) if row and row["total_for_year"] is not None else 0) + 1
+
+    def delete_by_payment_id(self, payment_id: int) -> int:
+        """Deletes a receipt linked to a specific payment."""
+        sql = "DELETE FROM receipts WHERE payment_id = ?;"
+        return self.execute(sql, (payment_id,))
+
+    def sync_installments_from_payments(self, admission_id: int) -> None:
+        """Synchronizes receipt installment_number with payments table for an admission."""
+        sql = """
+            UPDATE receipts
+            SET installment_number = (
+                SELECT p.installment_number
+                FROM payments p
+                WHERE p.id = receipts.payment_id
+            )
+            WHERE admission_id = ?;
+        """
+        self.execute(sql, (admission_id,))

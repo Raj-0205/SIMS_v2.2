@@ -189,9 +189,9 @@ class QuickEnquiryModal(ft.AlertDialog):
             label="Intent Category *",
             value="HOT",
             options=[
-                ft.dropdown.Option("HOT", "🔥 Confirm Laga (High Intent)"),
+                ft.dropdown.Option("HOT", "⭐ High Priority (High Intent)"),
                 ft.dropdown.Option("WARM", "⚡ Interested (Exploring / Demo)"),
-                ft.dropdown.Option("COLD", "❄️ Doubtful / Low Intent"),
+                ft.dropdown.Option("COLD", "❄️ Exploring / Low Intent"),
             ],
             border_radius=AppTheme.RADIUS_MD,
             width=260,
@@ -322,8 +322,8 @@ class QuickEnquiryModal(ft.AlertDialog):
         self.banner_icon.color = AppTheme.DANGER if is_error else AppTheme.SUCCESS
         self.banner_text.value = message
         self.banner_text.color = AppTheme.DANGER if is_error else AppTheme.SUCCESS
-        self.banner_container.bgcolor = "#FEF2F2" if is_error else "#F0FDF4"
-        self.banner_container.border = ft.Border.all(1, "#FECACA" if is_error else "#BBF7D0")
+        self.banner_container.bgcolor = AppTheme.DANGER_LIGHT if is_error else AppTheme.SUCCESS_LIGHT
+        self.banner_container.border = ft.Border.all(1, AppTheme.DANGER if is_error else AppTheme.SUCCESS)
         self.banner_container.visible = True
         try:
             self.banner_container.update()

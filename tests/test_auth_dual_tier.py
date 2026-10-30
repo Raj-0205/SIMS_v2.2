@@ -452,6 +452,7 @@ class TestDualTierAuthentication(unittest.TestCase):
         """
         all_privs = {
             Permission.PAYMENT_PIN_CHANGE,
+            Permission.PAYMENT_REFUND,
             Permission.STUDENT_DELETE,
             Permission.ADMISSION_DELETE,
             Permission.COURSE_CREATE,

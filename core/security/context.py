@@ -167,6 +167,11 @@ class SecurityContext:
         )
 
     @classmethod
+    def get_current_user(cls) -> Optional[UserIdentity]:
+        """Convenience alias for current_user()."""
+        return cls.current_user()
+
+    @classmethod
     def clear(cls) -> None:
         state = cls._get_state()
         state.user_id = None

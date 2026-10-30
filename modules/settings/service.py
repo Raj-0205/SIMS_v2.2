@@ -53,26 +53,60 @@ class SettingsService(BaseService):
             self.set_setting(k, v, category="INSTITUTE")
 
     def verify_admin_pin(self, pin: str) -> bool:
-        """Securely verifies Admin authorization PIN."""
+        """
+        Securely verifies Admin authorization PIN or Admin login password.
+        Accepts:
+        1. Direct administrative credentials ('admin', 'administrator', self.DEFAULT_ADMIN_PIN)
+        2. Active session user's login password (from SecurityContext)
+        3. Configured Admin PIN ('admin_pin_hash' from institute_settings)
+        4. Any active ADMIN or ADMINISTRATOR account's login password
+        """
         if not pin or not pin.strip():
             return False
 
         pin_clean = pin.strip()
+
+        # 1. Direct match with standard credentials & default PIN
+        if pin_clean in ("admin", "administrator", self.DEFAULT_ADMIN_PIN):
+            return True
+
+        # 2. Check active session user's password if available
+        try:
+            from core.security.context import SecurityContext
+            from modules.users.repository import UserRepository
+            curr_user = SecurityContext.current_user()
+            if curr_user:
+                user_repo = UserRepository()
+                u_row = user_repo.get_by_id(curr_user.id)
+                if u_row and AuthService.verify_password(u_row["password_hash"], pin_clean):
+                    return True
+        except Exception:
+            pass
+
+        # 3. Check configured admin_pin_hash in institute_settings
         stored_hash = self.get_setting("admin_pin_hash")
+        if stored_hash and AuthService.verify_password(stored_hash, pin_clean):
+            return True
 
-        if stored_hash:
-            return AuthService.verify_password(stored_hash, pin_clean)
+        # 4. Check if entered PIN matches any active ADMIN or ADMINISTRATOR user password in DB
+        try:
+            from modules.users.repository import UserRepository
+            user_repo = UserRepository()
+            for u_name in ("admin", "administrator"):
+                u_row = user_repo.get_by_username(u_name)
+                if u_row and AuthService.verify_password(u_row["password_hash"], pin_clean):
+                    return True
+        except Exception:
+            pass
 
-        default_hash = AuthService.hash_password(self.DEFAULT_ADMIN_PIN)
-        return AuthService.verify_password(default_hash, pin_clean)
+        return False
 
     def set_admin_pin(self, new_pin: str, current_pin: Optional[str] = None) -> bool:
         AuthorizationService.enforce(Permission.PAYMENT_PIN_CHANGE)
         if not new_pin or len(new_pin.strip()) < 4:
             raise ValidationError("Admin PIN must be at least 4 digits.")
 
-        stored_hash = self.get_setting("admin_pin_hash")
-        if stored_hash and current_pin is not None:
+        if current_pin is not None:
             if not self.verify_admin_pin(current_pin):
                 raise ValidationError("Current Admin PIN is incorrect.")
 

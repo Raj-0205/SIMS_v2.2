@@ -566,6 +566,8 @@ class TestHumanTesterGroundLevel(unittest.TestCase):
         control_center._handle_pin_update(None)
         self.assertIn("successfully updated", control_center.pin_message_text.value)
         self.assertTrue(SettingsService().verify_admin_pin("5678"))
+        # Reset PIN back to default for subsequent tests
+        SettingsService().set_admin_pin("1234")
 
         # ---------------------------------------------------------------------
         # Ceremony 6: Telemetry Audit Refresh

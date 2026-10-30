@@ -442,6 +442,9 @@ class AdmissionService(BaseService):
         is_confirming = (target_status == AdmissionStatus.CONFIRMED)
         init_amount = float(dto.initial_payment_amount or 0.0)
 
+        if init_amount < 0:
+            raise ValidationError("Initial payment amount cannot be negative.")
+
         # Validate confirmation prerequisites early
         if is_confirming:
             if init_amount < self.MIN_CONFIRMATION_AMOUNT:
@@ -464,9 +467,19 @@ class AdmissionService(BaseService):
                 raise ValidationError(f"Course '{course['name']}' is INACTIVE and cannot accept new admissions.")
 
             course_fee = float(course.get("base_fee", 0.0))
-            agreed_fee = float(dto.agreed_fee) if dto.agreed_fee > 0 else course_fee
+            if dto.agreed_fee is not None and float(dto.agreed_fee) < 0:
+                raise ValidationError("Agreed fee cannot be negative.")
+            agreed_fee = float(dto.agreed_fee) if (dto.agreed_fee is not None and float(dto.agreed_fee) > 0) else course_fee
             discount = float(dto.discount or 0.0)
+            if discount < 0:
+                raise ValidationError("Discount cannot be negative.")
+            if discount > agreed_fee:
+                raise ValidationError("Discount cannot exceed agreed fee.")
             final_fee = max(0.0, agreed_fee - discount)
+            if init_amount > final_fee:
+                raise ValidationError(
+                    f"Initial payment amount (₹{init_amount:,.2f}) cannot exceed final fee (₹{final_fee:,.2f})."
+                )
 
             # 2. Verify Batch Compatibility (if selected)
             if dto.batch_id and dto.batch_id > 0:
@@ -690,6 +703,96 @@ class AdmissionService(BaseService):
             single_rec = ReportsService().fetch_single_admission_fees_record(dto.id)
             if single_rec:
                 FeesCacheManager.targeted_admission_refresh(dto.id, single_rec)
+        else:
+            FeesCacheManager.bump_version()
+
+    def reassign_batch(
+        self,
+        admission_id: int,
+        new_batch_id: Optional[int],
+        actor_id: Optional[int] = None,
+        actor_name: Optional[str] = None,
+    ) -> None:
+        """
+        Reallocates an unallocated student to a batch or switches an active admission's batch.
+        Enforces course compatibility and batch capacity limits.
+        Records an audit activity log entry.
+        """
+        if not admission_id or admission_id <= 0:
+            raise ValidationError("Valid Admission ID is required.")
+
+        with self.unit_of_work():
+            adm_row = self.repository.get_by_id(admission_id)
+            if not adm_row:
+                raise NotFoundError(f"Admission with ID {admission_id} not found.")
+
+            current_status = str(adm_row.get("status") or "").upper()
+            if current_status == AdmissionStatus.CANCELLED.value:
+                raise ValidationError(f"Cannot assign/switch batch for a CANCELLED admission (#{admission_id}).")
+
+            old_batch_id = adm_row.get("batch_id")
+            old_batch_name = "Unassigned"
+            if old_batch_id:
+                old_batch = self.batch_repo.get_by_id(old_batch_id)
+                if old_batch:
+                    old_batch_name = old_batch.get("batch_name", f"Batch #{old_batch_id}")
+
+            new_batch_clean_id = int(new_batch_id) if new_batch_id and int(new_batch_id) > 0 else None
+            new_batch_name = "Unassigned"
+
+            if new_batch_clean_id:
+                new_batch = self.batch_repo.get_by_id(new_batch_clean_id)
+                if not new_batch:
+                    raise ValidationError(f"Target Batch with ID {new_batch_clean_id} not found.")
+
+                new_batch_name = new_batch.get("batch_name", f"Batch #{new_batch_clean_id}")
+
+                # Batch capacity check (only if switching to a new batch)
+                if old_batch_id != new_batch_clean_id:
+                    max_cap = int(new_batch.get("max_capacity") or 0)
+                    if max_cap > 0:
+                        enrolled = self.batch_repo.get_active_enrolled_count(new_batch_clean_id)
+                        if enrolled >= max_cap:
+                            raise ValidationError(
+                                f"Batch '{new_batch_name}' is currently at full capacity ({enrolled}/{max_cap} students). "
+                                f"Cannot assign student to a full batch."
+                            )
+
+            if old_batch_id == new_batch_clean_id:
+                # No change
+                return
+
+            self.repository.update_batch(admission_id, new_batch_clean_id)
+
+            # Action for audit log
+            action_type = "BATCH_ASSIGNED" if not old_batch_id else ("BATCH_UNASSIGNED" if not new_batch_clean_id else "BATCH_SWITCHED")
+            detail_msg = (
+                f"Batch allocated to '{new_batch_name}'."
+                if not old_batch_id
+                else (f"Batch removed (was '{old_batch_name}')." if not new_batch_clean_id else f"Batch switched from '{old_batch_name}' to '{new_batch_name}'.")
+            )
+
+            self.activity_repo.insert(
+                entity_type="ADMISSION",
+                entity_id=admission_id,
+                action=action_type,
+                actor_name=actor_name or "SYSTEM",
+                actor_id=actor_id,
+                details=detail_msg,
+            )
+
+            LogService.info(
+                f"Admission #{admission_id} batch changed from {old_batch_id} to {new_batch_clean_id} ({action_type})",
+                context=self.__class__.__name__,
+            )
+
+        # Cache sync
+        from core.cache.fees_cache import FeesCacheManager
+        if FeesCacheManager.is_loaded():
+            from modules.reports.service import ReportsService
+            single_rec = ReportsService().fetch_single_admission_fees_record(admission_id)
+            if single_rec:
+                FeesCacheManager.targeted_admission_refresh(admission_id, single_rec)
         else:
             FeesCacheManager.bump_version()
 

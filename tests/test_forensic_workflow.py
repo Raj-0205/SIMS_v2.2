@@ -151,7 +151,7 @@ def run_test():
         payment_mode="UPI",
         admin_pin="1234",
         collector_name="Hemant Mahale (Sir)",
-        transaction_ref="UPI/TEST/001",
+        transaction_ref="430299887722",
     )
     print(f"✓ 1st Payment ID: #{pay1_id}")
     adm1 = admission_ctrl.get_admission(adm1_id)

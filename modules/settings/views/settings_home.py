@@ -17,9 +17,10 @@ __all__ = ["SettingsHome"]
 class SettingsHome(ft.Container):
     """
     Settings and Configuration Center.
-    - Institute Profile & Receipt Branding (Name, Contact Person, Mobile, ALC Code, Address)
     - Admin PIN Authorization Configuration
     - School / College Master Management (Add, Edit, Activate/Deactivate)
+    - Theme & Appearance Configuration
+    - System About & Copyright
     """
 
     def __init__(self) -> None:
@@ -35,19 +36,29 @@ class SettingsHome(ft.Container):
         header = ft.Column(
             controls=[
                 ft.Text("Settings & Institute Masters", size=AppTheme.SIZE_H1, weight=ft.FontWeight.BOLD, color=AppTheme.TEXT_PRIMARY),
-                ft.Text("Manage institute branding, security PINs, and school/college educational institutions.", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_SECONDARY),
+                ft.Text("Manage security PINs, appearance themes, and school/college educational institutions.", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_SECONDARY),
             ],
             spacing=2,
         )
 
         # Tab Navigation
+        def _make_tab_btn(title: str, icon: str, idx: int) -> ft.ElevatedButton:
+            is_active = (self.active_tab == idx)
+            return ft.ElevatedButton(
+                title,
+                icon=icon,
+                bgcolor=AppTheme.PRIMARY if is_active else AppTheme.SURFACE,
+                color=AppTheme.SURFACE if is_active else AppTheme.TEXT_PRIMARY,
+                elevation=2 if is_active else 0,
+                on_click=lambda _, i=idx: self._set_tab(i),
+            )
+
         self.tabs_row = ft.Row(
             controls=[
-                ft.ElevatedButton("School / College Master", icon=ft.Icons.SCHOOL, on_click=lambda _: self._set_tab(0)),
-                ft.OutlinedButton("Institute Branding & Profile", icon=ft.Icons.BUSINESS, on_click=lambda _: self._set_tab(1)),
-                ft.OutlinedButton("Security & Admin PIN", icon=ft.Icons.SECURITY, on_click=lambda _: self._set_tab(2)),
-                ft.OutlinedButton("Theme & Appearance", icon=ft.Icons.PALETTE, on_click=lambda _: self._set_tab(3)),
-                ft.OutlinedButton("About & Copyright", icon=ft.Icons.INFO_OUTLINE, on_click=lambda _: self._set_tab(4)),
+                _make_tab_btn("School / College Master", ft.Icons.SCHOOL, 0),
+                _make_tab_btn("Security & Admin PIN", ft.Icons.SECURITY, 1),
+                _make_tab_btn("Theme & Appearance", ft.Icons.PALETTE, 2),
+                _make_tab_btn("About & Copyright", ft.Icons.INFO_OUTLINE, 3),
             ],
             spacing=AppTheme.PAD_SM,
         )
@@ -78,10 +89,10 @@ class SettingsHome(ft.Container):
     def _set_tab(self, index: int) -> None:
         self.active_tab = index
         for i, btn in enumerate(self.tabs_row.controls):
-            if i == index:
-                btn.style = ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE)
-            else:
-                btn.style = ft.ButtonStyle(bgcolor=ft.Colors.TRANSPARENT, color=AppTheme.TEXT_PRIMARY)
+            is_active = (i == index)
+            btn.bgcolor = AppTheme.PRIMARY if is_active else AppTheme.SURFACE
+            btn.color = AppTheme.SURFACE if is_active else AppTheme.TEXT_PRIMARY
+            btn.elevation = 2 if is_active else 0
         self.body_container.content = self._build_active_tab()
         self._safe_update()
 
@@ -120,13 +131,11 @@ class SettingsHome(ft.Container):
         if self.active_tab == 0:
             return self._build_institutions_tab()
         elif self.active_tab == 1:
-            return self._build_branding_tab()
-        elif self.active_tab == 2:
             return self._build_security_tab()
-        elif self.active_tab == 3:
+        elif self.active_tab == 2:
             from ui.themes.theme_selector import ThemeSelector
             return ThemeSelector(on_theme_changed=lambda tid: self.show_toast(f"Theme switched to {tid.capitalize()}.", is_success=True))
-        elif self.active_tab == 4:
+        elif self.active_tab == 3:
             return self._build_about_tab()
         return ft.Text("Tab not found")
 
@@ -135,6 +144,7 @@ class SettingsHome(ft.Container):
         institutions = self.controller.list_institutions()
 
         def open_inst_modal(inst: Optional[dict] = None):
+            p = self.safe_page
             name_input = ft.TextField(
                 label="Institution Name *",
                 value=inst["name"] if inst else "",
@@ -167,7 +177,8 @@ class SettingsHome(ft.Container):
                 if not nm:
                     err_text.value = "Institution name cannot be empty."
                     err_text.visible = True
-                    p.update()
+                    if p:
+                        p.update()
                     return
 
                 try:
@@ -185,13 +196,15 @@ class SettingsHome(ft.Container):
                         msg = f"Created institution '{nm}'."
 
                     dlg.open = False
-                    p.pop_dialog()
+                    if p:
+                        p.pop_dialog()
                     self.show_toast(msg, is_success=True)
                     self._set_tab(0)
                 except Exception as ex:
                     err_text.value = str(ex)
                     err_text.visible = True
-                    p.update()
+                    if p:
+                        p.update()
 
             dlg = ft.AlertDialog(
                 modal=True,
@@ -209,13 +222,12 @@ class SettingsHome(ft.Container):
                     ),
                 ),
                 actions=[
-                    ft.TextButton("Cancel", on_click=lambda _: p.pop_dialog()),
-                    ft.ElevatedButton("Save Institution", style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE), on_click=do_save),
+                    ft.TextButton("Cancel", on_click=lambda _: p.pop_dialog() if p else None),
+                    ft.ElevatedButton("Save Institution", bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE, on_click=do_save),
                 ],
                 actions_alignment=ft.MainAxisAlignment.END,
             )
 
-            p = self.safe_page
             if p:
                 p.show_dialog(dlg)
 
@@ -294,7 +306,8 @@ class SettingsHome(ft.Container):
                             ft.ElevatedButton(
                                 "Add School / College",
                                 icon=ft.Icons.ADD_BUSINESS,
-                                style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE),
+                                bgcolor=AppTheme.PRIMARY,
+                                color=AppTheme.SURFACE,
                                 on_click=lambda _: open_inst_modal(None),
                             ),
                         ],
@@ -316,80 +329,7 @@ class SettingsHome(ft.Container):
             expand=True,
         )
 
-    # ── TAB 1: BRANDING & PROFILE ──
-    def _build_branding_tab(self) -> ft.Container:
-        prof = self.controller.get_institute_profile()
-
-        name_in = ft.TextField(label="Institute Name *", value=prof["institute_name"], border_radius=AppTheme.RADIUS_MD)
-        person_in = ft.TextField(label="Contact Person / Principal *", value=prof["contact_person"], border_radius=AppTheme.RADIUS_MD)
-        mob_in = ft.TextField(label="Official Mobile Number *", value=prof["contact_mobile"], border_radius=AppTheme.RADIUS_MD)
-        alc_in = ft.TextField(label="ALC Code (MKCL / MSBTE) *", value=prof["alc_code"], border_radius=AppTheme.RADIUS_MD)
-        addr1_in = ft.TextField(label="Address Line 1", value=prof["address_line1"], border_radius=AppTheme.RADIUS_MD)
-        addr2_in = ft.TextField(label="Address Line 2", value=prof["address_line2"], border_radius=AppTheme.RADIUS_MD)
-        upi_id_in = ft.TextField(
-            label="Owner UPI ID (for Dynamic QR) *",
-            value=prof.get("upi_id") or "9271226772@yescred",
-            border_radius=AppTheme.RADIUS_MD,
-            prefix_icon=ft.Icons.QR_CODE_2,
-        )
-        upi_payee_in = ft.TextField(
-            label="UPI Payee / Merchant Name *",
-            value=prof.get("upi_payee_name") or "Sudharm Infotech",
-            border_radius=AppTheme.RADIUS_MD,
-            prefix_icon=ft.Icons.VERIFIED_USER_OUTLINED,
-        )
-
-        def save_branding(e):
-            try:
-                self.controller.save_institute_profile({
-                    "institute_name": name_in.value or "",
-                    "contact_person": person_in.value or "",
-                    "contact_mobile": mob_in.value or "",
-                    "alc_code": alc_in.value or "",
-                    "address_line1": addr1_in.value or "",
-                    "address_line2": addr2_in.value or "",
-                    "upi_id": upi_id_in.value or "9271226772@yescred",
-                    "upi_payee_name": upi_payee_in.value or "Sudharm Infotech",
-                })
-                self.show_toast("Institute branding & UPI payment configuration saved.", is_success=True)
-            except Exception as ex:
-                self.show_toast(str(ex), is_error=True)
-
-        return ft.Container(
-            content=HoverCard(
-                content=ft.Column(
-                    controls=[
-                        ft.Row(
-                            controls=[
-                                ft.Icon(ft.Icons.BUSINESS, color=AppTheme.PRIMARY, size=24),
-                                ft.Text("Official Institute Branding & Receipt Header", size=AppTheme.SIZE_H3, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
-                            ],
-                            spacing=8,
-                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                        ),
-                        ft.Text("Configure institute profile, registration ALC codes, and public receipts.", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
-                        ft.Divider(height=1, color=AppTheme.BORDER),
-                        ft.Row([name_in, person_in], spacing=AppTheme.PAD_MD),
-                        ft.Row([mob_in, alc_in], spacing=AppTheme.PAD_MD),
-                        ft.Row([addr1_in, addr2_in], spacing=AppTheme.PAD_MD),
-                        ft.Row([upi_id_in, upi_payee_in], spacing=AppTheme.PAD_MD),
-                        ft.ElevatedButton(
-                            "Save Profile Changes",
-                            icon=ft.Icons.SAVE,
-                            style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE),
-                            on_click=save_branding,
-                        ),
-                    ],
-                    spacing=AppTheme.PAD_MD,
-                    tight=True,
-                ),
-                padding=AppTheme.PAD_LG,
-            ),
-            padding=AppTheme.PAD_MD,
-            expand=True,
-        )
-
-    # ── TAB 2: SECURITY & ADMIN PIN ──
+    # ── TAB 1: SECURITY & ADMIN PIN ──
     def _build_security_tab(self) -> ft.Container:
         curr_pin_in = ft.TextField(label="Current Admin PIN", password=True, can_reveal_password=True, border_radius=AppTheme.RADIUS_MD, width=240)
         new_pin_in = ft.TextField(label="New Admin PIN (4 digits)", password=True, can_reveal_password=True, border_radius=AppTheme.RADIUS_MD, width=240)
@@ -400,6 +340,9 @@ class SettingsHome(ft.Container):
             np = new_pin_in.value or ""
             cnp = confirm_pin_in.value or ""
 
+            if not cp or not cp.strip():
+                self.show_toast("Current Admin PIN is required.", is_error=True)
+                return
             if not np or len(np.strip()) < 4:
                 self.show_toast("New PIN must be at least 4 digits.", is_error=True)
                 return
@@ -437,7 +380,8 @@ class SettingsHome(ft.Container):
                         ft.ElevatedButton(
                             "Update Admin PIN",
                             icon=ft.Icons.LOCK_RESET,
-                            style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE),
+                            bgcolor=AppTheme.PRIMARY,
+                            color=AppTheme.SURFACE,
                             on_click=change_pin,
                         ),
                     ],

@@ -12,8 +12,11 @@ from modules.payments.repository import PaymentRepository
 from modules.admission.repository import AdmissionRepository
 from modules.receipts.service import ReceiptService
 from modules.receipts.dto import ReceiptCreateDTO
+from modules.receipts.repository import ReceiptRepository
 from modules.admission.constants import AdmissionStatus
 from modules.admission.activity_log_repository import ActivityLogRepository
+from core.security.authorization import AuthorizationService
+from core.security.permissions import Permission
 
 
 
@@ -29,10 +32,13 @@ class PaymentService(BaseService):
     MIN_CONFIRMATION_AMOUNT = 500.0
 
     def __init__(self) -> None:
+        from modules.settings.service import SettingsService
         self.repository = PaymentRepository()
         self.admission_repo = AdmissionRepository()
         self.receipt_service = ReceiptService()
+        self.receipt_repo = ReceiptRepository()
         self.activity_repo = ActivityLogRepository()
+        self.settings_service = SettingsService()
 
     def record_payment(self, dto: PaymentCreateDTO) -> int:
         """
@@ -263,3 +269,151 @@ class PaymentService(BaseService):
     def get_next_installment(self, admission_id: int) -> int:
         with self.unit_of_work():
             return self.repository.get_next_installment_number(admission_id)
+
+    def refund_payment(
+        self,
+        payment_id: int,
+        reason: str,
+        admin_pin: str,
+        actor_id: Optional[int] = None,
+        actor_name: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """
+        Executes an audited payment reversal / refund.
+        CRITICAL RULES:
+        1. Exclusively authorized for Role.ADMINISTRATOR (enforces Permission.PAYMENT_REFUND).
+        2. Validates Administrator Security PIN via SettingsService.
+        3. Mandatory reversal reason string.
+        4. Atomic transaction:
+           - Voids and removes linked receipt.
+           - Removes payment transaction record.
+           - Re-sequences any remaining installments for that admission.
+           - Synchronizes receipt installment numbers.
+           - Recalculates total paid and updates admission status:
+             * If new_total_paid == 0 -> transitions to REGISTERED.
+             * If 0 < new_total_paid < final_fee -> transitions to CONFIRMED.
+           - Records immutable audit log in activity_logs.
+        5. Invalidates and syncs FeesCacheManager.
+        """
+        # 1. Security Authorization & Role Enforcement
+        AuthorizationService.enforce(Permission.PAYMENT_REFUND)
+
+        if not admin_pin or not str(admin_pin).strip():
+            raise ValidationError("Administrator Security PIN is required for payment refund.")
+
+        if not self.settings_service.verify_admin_pin(str(admin_pin).strip()):
+            raise ValidationError("Invalid Administrator Security PIN. Payment refund rejected.")
+
+        clean_reason = str(reason).strip() if reason else ""
+        if not clean_reason or len(clean_reason) < 3:
+            raise ValidationError("A clear reason for payment refund is mandatory (minimum 3 characters).")
+
+        if not payment_id or payment_id <= 0:
+            raise ValidationError("Valid Payment ID is required.")
+
+        with self.unit_of_work():
+            # 2. Fetch Payment Record
+            payment = self.repository.get_by_id(payment_id)
+            if not payment:
+                raise ValidationError(f"Payment with ID {payment_id} does not exist.")
+
+            admission_id = payment["admission_id"]
+            student_id = payment["student_id"]
+            refund_amount = float(payment["amount"])
+            installment_no = payment["installment_number"]
+            tx_ref = payment.get("transaction_ref") or "N/A"
+
+            # 3. Fetch Linked Admission
+            adm = self.admission_repo.get_by_id(admission_id)
+            if not adm:
+                raise ValidationError(f"Admission #{admission_id} linked to payment not found.")
+
+            cand_year = adm.get("candidate_year") or datetime.now().year
+            cand_seq = adm.get("candidate_sequence") or admission_id
+            cand_num = f"{cand_year}-{cand_seq:03d}"
+            student_name = f"{adm.get('first_name', '')} {adm.get('last_name', '')}".strip() or "Student"
+            agreed_fee = float(adm.get("agreed_fee") or 0.0)
+            discount = float(adm.get("discount") or 0.0)
+            final_fee = max(0.0, agreed_fee - discount)
+
+            # 4. Atomic Deletions
+            # Delete linked receipt first (foreign key RESTRICT)
+            self.receipt_repo.delete_by_payment_id(payment_id)
+
+            # Delete payment record
+            self.repository.delete_by_id(payment_id)
+
+            # 5. Resequence remaining installments for consecutive continuity
+            self.repository.resequence_installments(admission_id)
+            self.receipt_repo.sync_installments_from_payments(admission_id)
+
+            # 6. Recalculate Financials & Re-evaluate Status
+            new_total_paid = float(self.repository.get_total_paid_for_admission(admission_id) or 0.0)
+            new_pending = max(0.0, final_fee - new_total_paid)
+
+            current_status = str(adm.get("status") or "").upper()
+            target_status = current_status
+
+            if current_status != AdmissionStatus.CANCELLED.value:
+                if new_total_paid <= 0.0:
+                    target_status = AdmissionStatus.REGISTERED.value
+                elif new_total_paid >= final_fee and final_fee > 0.0:
+                    target_status = AdmissionStatus.COMPLETED.value
+                else:
+                    target_status = AdmissionStatus.CONFIRMED.value
+
+                if target_status != current_status:
+                    self.admission_repo.update_status(admission_id, target_status)
+
+            # 7. Permanent Audit Trail Logging
+            effective_actor = actor_name or "ADMINISTRATOR"
+            self.activity_repo.insert(
+                entity_type="PAYMENT",
+                entity_id=payment_id,
+                action="REFUNDED",
+                actor_name=effective_actor,
+                actor_id=actor_id,
+                details=(
+                    f"Refunded payment ₹{refund_amount:,.2f} (Installment #{installment_no}, TxRef: {tx_ref}) "
+                    f"for {student_name} (#{cand_num}). New total paid: ₹{new_total_paid:,.2f}, "
+                    f"Restored balance: ₹{new_pending:,.2f}. Reason: {clean_reason}"
+                ),
+            )
+
+            if target_status != current_status:
+                self.activity_repo.insert(
+                    entity_type="ADMISSION",
+                    entity_id=admission_id,
+                    action="STATUS_REVERTED",
+                    actor_name=effective_actor,
+                    actor_id=actor_id,
+                    details=f"Admission status reverted from {current_status} to {target_status} due to payment refund.",
+                )
+
+            LogService.info(
+                f"Payment #{payment_id} (₹{refund_amount}) refunded by {effective_actor}. "
+                f"Admission #{admission_id} status updated to {target_status}.",
+                context=self.__class__.__name__,
+            )
+
+        # 8. Fees Cache Invalidation & Refresh
+        from core.cache.fees_cache import FeesCacheManager
+        FeesCacheManager.invalidate(reason=f"Payment #{payment_id} refunded")
+        if FeesCacheManager.is_loaded():
+            from modules.reports.service import ReportsService
+            single_rec = ReportsService().fetch_single_admission_fees_record(admission_id)
+            if single_rec:
+                FeesCacheManager.targeted_admission_refresh(admission_id, single_rec)
+        else:
+            FeesCacheManager.bump_version()
+
+        return {
+            "payment_id": payment_id,
+            "admission_id": admission_id,
+            "student_id": student_id,
+            "refunded_amount": refund_amount,
+            "new_total_paid": new_total_paid,
+            "restored_pending_balance": new_pending,
+            "new_admission_status": target_status,
+            "reason": clean_reason,
+        }

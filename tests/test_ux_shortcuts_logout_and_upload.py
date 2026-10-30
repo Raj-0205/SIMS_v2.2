@@ -287,8 +287,12 @@ class TestUXShortcutsLogoutAndUpload(unittest.TestCase):
             self.assertIn("Only JPG, JPEG, and PNG", dialog._upload_panel_status_text.value)
 
             # 3. Valid file (<= 100 KB, .png)
+            from PIL import Image
+            import io
+            img_buf = io.BytesIO()
+            Image.new("RGBA", (20, 20), (0, 0, 0, 0)).save(img_buf, format="PNG")
+            valid_bytes = img_buf.getvalue()
             valid_file = Path(tmpdir) / "valid_sig.png"
-            valid_bytes = b"\x89PNG\r\n\x1a\n" + b"\x00" * 4000
             valid_file.write_bytes(valid_bytes)
 
             path_input.value = str(valid_file)
@@ -314,28 +318,42 @@ class TestUXShortcutsLogoutAndUpload(unittest.TestCase):
         self.assertTrue(True)
 
     def test_10_navigation_trailing_logout_button_and_dashboard_header(self):
-        """Verifies responsive logout button in NavigationMenu and Dashboard header."""
+        """Verifies responsive logout button and notifications log in NavigationMenu."""
         dashboard = DashboardScreen(self.page, on_route_request=self.page.navigate)
         nav = dashboard.nav_menu
 
-        # 1. Extended mode: Trailing has full button with text positioned bottom-left
+        # 1. Extended mode: Trailing has full notifications and logout button with text positioned bottom-left
         self.assertTrue(nav.extended)
-        self.assertIs(nav.trailing_container.content, nav.logout_full_btn)
+        self.assertIn(nav.logout_full_btn, nav.trailing_container.content.controls)
+        self.assertIn(nav.notifications_full_btn, nav.trailing_container.content.controls)
         self.assertEqual(nav.logout_full_btn.content, "Log Out")
+        self.assertEqual(nav.notifications_full_btn.content, "Notifications")
         self.assertEqual(nav.trailing_container.alignment, ft.Alignment.BOTTOM_LEFT)
 
-        # 2. Toggle to compact mode: Trailing swaps to icon button centered at bottom
+        # 2. Toggle to compact mode: Trailing swaps to compact column with icon buttons centered at bottom
         nav.handle_toggle_extended()
         self.assertFalse(nav.extended)
-        self.assertIs(nav.trailing_container.content, nav.logout_icon_btn)
+        self.assertIn(nav.logout_icon_btn, nav.trailing_container.content.controls)
+        self.assertIn(nav.notifications_icon_btn, nav.trailing_container.content.controls)
         self.assertEqual(nav.logout_icon_btn.icon, ft.Icons.LOGOUT)
+        self.assertEqual(nav.notifications_icon_btn.icon, ft.Icons.NOTIFICATIONS_OUTLINED)
         self.assertEqual(nav.trailing_container.alignment, ft.Alignment.BOTTOM_CENTER)
 
         # 3. Toggle back to extended mode
         nav.handle_toggle_extended()
         self.assertTrue(nav.extended)
-        self.assertIs(nav.trailing_container.content, nav.logout_full_btn)
+        self.assertIn(nav.logout_full_btn, nav.trailing_container.content.controls)
+        self.assertIn(nav.notifications_full_btn, nav.trailing_container.content.controls)
         self.assertEqual(nav.trailing_container.alignment, ft.Alignment.BOTTOM_LEFT)
+
+        # 4. Notifications trigger opens Notifications dialog
+        nav.notifications_full_btn.on_click(None)
+        self.assertIsNotNone(self.page.dialog)
+        from ui.widgets.notifications_dialog import NotificationsDialog
+        self.assertIsInstance(self.page.dialog, NotificationsDialog)
+        self.page.dialog.handle_cancel()
+
+        # 5. Clicking logout in navigation triggers confirmation dialog
 
         # 4. Clicking logout in navigation triggers confirmation dialog
         nav.logout_full_btn.on_click(None)

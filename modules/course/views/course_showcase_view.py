@@ -1787,19 +1787,15 @@ class CourseShowcaseView(ft.Column):
         self._show_proposal_dialog(course)
 
     def _launch_whatsapp(self, course_title: str, duration: str) -> None:
+        from core.utils.url_utils import safe_open_url
         text = f"Hello Proff. Hemant Mahale Sir! I am inquiring about admission for {course_title} ({duration}) at Sudharm Infotech. Please share batch timings and counseling slots. Thank you!"
         url = f"https://api.whatsapp.com/send?phone=919271226772&text={text}"
-        try:
-            webbrowser.open(url)
-        except Exception:
-            pass
+        safe_open_url(url)
 
     def _launch_web_slideshow(self) -> None:
+        from core.utils.url_utils import safe_open_url
         url = f"file://{SHOWCASE_ROOT_PATH}/index.html"
-        try:
-            webbrowser.open(url)
-        except Exception:
-            pass
+        safe_open_url(url)
 
     def _toggle_compare(self, course_id: str) -> None:
         if course_id in self.comparison_list:

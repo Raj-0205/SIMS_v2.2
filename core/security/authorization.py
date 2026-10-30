@@ -17,6 +17,7 @@ ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
     Role.ADMIN: set(),  # Operational access only; zero privileged permissions
     Role.ADMINISTRATOR: {
         Permission.PAYMENT_PIN_CHANGE,
+        Permission.PAYMENT_REFUND,
         Permission.STUDENT_DELETE,
         Permission.ADMISSION_DELETE,
         Permission.COURSE_CREATE,

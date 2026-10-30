@@ -356,16 +356,23 @@ class StudentService(BaseService):
                 "Please compress the image before uploading."
             )
 
+        clean_doc_type = str(doc_type).strip().upper()
+        if clean_doc_type not in ("PHOTO", "SIGNATURE"):
+            raise ValidationError("Invalid document type. Allowed types are 'PHOTO' and 'SIGNATURE'.")
+
+        if not original_filename or "\x00" in original_filename:
+            raise ValidationError("Invalid original filename.")
+
         ext = Path(original_filename).suffix.lower()
         if ext not in (".jpg", ".jpeg", ".png"):
             raise ValidationError("Invalid file format. Only JPG, JPEG, and PNG images are allowed.")
 
-        doc_kind = "photos" if doc_type.lower() == "photo" else "signatures"
+        doc_kind = "photos" if clean_doc_type == "PHOTO" else "signatures"
         upload_dir = Path("uploads") / doc_kind
         upload_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        target_filename = f"{doc_type.lower()}_{student_id}_{timestamp_str}{ext}"
+        target_filename = f"{clean_doc_type.lower()}_{student_id}_{timestamp_str}{ext}"
         target_path = upload_dir / target_filename
 
         with open(target_path, "wb") as f:
@@ -374,27 +381,31 @@ class StudentService(BaseService):
         rel_path = str(target_path)
 
         with self.unit_of_work():
-            self.repository.update_document_path(student_id, doc_type, rel_path)
+            self.repository.update_document_path(student_id, clean_doc_type, rel_path)
             self.activity_log_repo.insert(
                 entity_type="STUDENT",
                 entity_id=student_id,
                 action="DOCUMENT_UPLOADED",
                 actor_name="ADMIN",
-                details=f"Uploaded {doc_type} ({len(file_bytes)/1024:.1f} KB): {target_filename}",
+                details=f"Uploaded {clean_doc_type} ({len(file_bytes)/1024:.1f} KB): {target_filename}",
             )
 
         return rel_path
 
     def delete_student_document(self, student_id: int, doc_type: str) -> None:
         """Clears a document path on the student record."""
+        clean_doc_type = str(doc_type).strip().upper()
+        if clean_doc_type not in ("PHOTO", "SIGNATURE"):
+            raise ValidationError("Invalid document type. Allowed types are 'PHOTO' and 'SIGNATURE'.")
+
         with self.unit_of_work():
-            self.repository.update_document_path(student_id, doc_type, None)
+            self.repository.update_document_path(student_id, clean_doc_type, None)
             self.activity_log_repo.insert(
                 entity_type="STUDENT",
                 entity_id=student_id,
                 action="DOCUMENT_REMOVED",
                 actor_name="ADMIN",
-                details=f"Removed {doc_type} document.",
+                details=f"Removed {clean_doc_type} document.",
             )
 
     def get_deletion_impact(self, student_id: int) -> dict[str, Any]:
@@ -803,7 +814,9 @@ class StudentService(BaseService):
 
     def search_students(self, query: str, limit: int = 25) -> list[StudentSearchResultDTO]:
         clean_query = self._sanitize_string(query)
-        if not clean_query or len(clean_query) < 2:
+        if not clean_query:
+            return []
+        if len(clean_query) < 2 and not clean_query.isdigit():
             return []
 
         with self.unit_of_work():

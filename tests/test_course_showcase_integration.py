@@ -48,6 +48,18 @@ class TestCourseShowcaseIntegration(unittest.TestCase):
         self.mock_page = MockPage()
         self.controller = CourseController()
 
+    def tearDown(self):
+        # Ensure any test-created course is removed and showcase data is resynced
+        import modules.course.showcase_adapter as showcase_adapter
+        from core.database.engine import DatabaseEngine
+        try:
+            with DatabaseEngine.connection() as conn:
+                conn.execute("DELETE FROM courses WHERE code = 'KLIC-PYAI-01'")
+                conn.execute("DELETE FROM activity_logs WHERE entity_type = 'COURSE' AND details LIKE '%KLIC-PYAI-01%'")
+        except Exception:
+            pass
+        showcase_adapter.sync_showcase_web_stores(self.controller)
+
     def test_course_home_defaults_to_master_database(self):
         view = CourseHome()
         view._root_page = self.mock_page
@@ -177,9 +189,9 @@ class TestCourseShowcaseIntegration(unittest.TestCase):
 
         # Modify code to a unique non-filtered code
         unique_code = "KLIC-PYAI-01"
-        existing = self.controller.get_course_by_code(unique_code)
-        if existing:
-            self.controller.service.repository.delete(existing.id)
+        from core.database.engine import DatabaseEngine
+        with DatabaseEngine.connection() as conn:
+            conn.execute("DELETE FROM courses WHERE code = ?", (unique_code,))
 
         modal.code_input.value = unique_code
         modal.name_input.value = "Python AI Special Edition"
@@ -206,7 +218,9 @@ class TestCourseShowcaseIntegration(unittest.TestCase):
 
         # Cleanup created test course immediately to maintain DB purity
         try:
-            self.controller.service.repository.delete(db_course.id)
+            with DatabaseEngine.connection() as conn:
+                conn.execute("DELETE FROM courses WHERE id = ?", (db_course.id,))
+                conn.execute("DELETE FROM activity_logs WHERE entity_type = 'COURSE' AND details LIKE '%KLIC-PYAI-01%'")
             # Resync web stores after cleanup
             import modules.course.showcase_adapter as showcase_adapter
             showcase_adapter.sync_showcase_web_stores(self.controller)
@@ -217,33 +231,46 @@ class TestCourseShowcaseIntegration(unittest.TestCase):
         # Find a course
         courses, _ = self.controller.list_courses(limit=1)
         course = courses[0]
+        orig_fee = course.base_fee
 
-        new_fee = course.base_fee + 500.0
-        self.controller.change_institute_fee(
-            raw_data={
-                "new_fee": str(new_fee),
-                "admin_pin": "1234",
-                "reason": "Annual tariff adjustment",
-            },
-            course_id=course.id,
-            user_id=1,
-            username="admin",
-        )
+        try:
+            new_fee = orig_fee + 500.0
+            self.controller.change_institute_fee(
+                raw_data={
+                    "new_fee": str(new_fee),
+                    "admin_pin": "1234",
+                    "reason": "Annual tariff adjustment",
+                },
+                course_id=course.id,
+                user_id=1,
+                username="admin",
+            )
 
-        # Check DB
-        updated_db_course = self.controller.get_course(course.id)
-        self.assertEqual(updated_db_course.base_fee, new_fee)
+            # Check DB
+            updated_db_course = self.controller.get_course(course.id)
+            self.assertEqual(updated_db_course.base_fee, new_fee)
 
-        # Verify CourseHome refresh syncs the updated fee to showcase
-        home = CourseHome()
-        home._root_page = self.mock_page
-        home._page = self.mock_page
-        home.did_mount()
+            # Verify CourseHome refresh syncs the updated fee to showcase
+            home = CourseHome()
+            home._root_page = self.mock_page
+            home._page = self.mock_page
+            home.did_mount()
 
-        showcase_item = next((c for c in home.showcase_view.courses if c.get("db_id") == course.id or c.get("code") == course.code), None)
-        self.assertIsNotNone(showcase_item)
-        self.assertEqual(showcase_item["base_fee"], new_fee)
-        self.assertEqual(showcase_item["fee"], f"₹{new_fee:,.0f}")
+            showcase_item = next((c for c in home.showcase_view.courses if c.get("db_id") == course.id or c.get("code") == course.code), None)
+            self.assertIsNotNone(showcase_item)
+            self.assertEqual(showcase_item["base_fee"], new_fee)
+            self.assertEqual(showcase_item["fee"], f"₹{new_fee:,.0f}")
+        finally:
+            self.controller.change_institute_fee(
+                raw_data={
+                    "new_fee": str(orig_fee),
+                    "admin_pin": "1234",
+                    "reason": "Reverting test tariff adjustment",
+                },
+                course_id=course.id,
+                user_id=1,
+                username="admin",
+            )
 
     def test_course_detail_dialog_actions(self):
         courses, _ = self.controller.list_courses(limit=1)

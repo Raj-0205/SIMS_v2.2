@@ -30,6 +30,7 @@ from modules.attendance.views.offline_upload_modal import OfflineUploadModal
 from shared.utils.formatting import format_whatsapp_url
 from shared.utils.os_helper import open_path_externally
 from shared.utils.export_helper import export_and_prompt_save
+from core.utils.image_utils import is_valid_image_file
 from ui.themes.theme import AppTheme
 from ui.widgets.hover_card import HoverCard
 from ui.widgets.badge import StatusBadge
@@ -1771,7 +1772,7 @@ class AttendanceHome(ft.Container):
             is_present = sw.value
 
             # Student Photo / Avatar
-            has_photo = bool(st.photo_path and Path(st.photo_path).is_file())
+            has_photo = bool(st.photo_path and is_valid_image_file(st.photo_path))
             if has_photo:
                 avatar_content = ft.Image(
                     src=st.photo_path,
@@ -2307,25 +2308,14 @@ class AttendanceHome(ft.Container):
 
     def _show_admin_pin_dialog_for_save(self) -> None:
         """Prompts for Admin PIN confirmation prior to overwriting existing attendance."""
-        pin_field = ft.TextField(
-            label="Admin PIN",
-            password=True,
-            can_reveal_password=True,
-            max_length=10,
-            width=220,
-            border_radius=AppTheme.RADIUS_MD,
-            autofocus=True,
-        )
-        error_text = ft.Text("", color=AppTheme.DANGER, size=11)
-
         def on_confirm(_):
             entered_pin = (pin_field.value or "").strip()
             if not entered_pin:
-                error_text.value = "Admin PIN is required."
+                error_text.value = "Admin Password / PIN is required."
                 self._safe_update()
                 return
             if not self.controller.verify_admin_pin(entered_pin):
-                error_text.value = "Invalid Admin PIN. Authorization failed."
+                error_text.value = "Invalid Admin Password / PIN. Authorization failed."
                 self._safe_update()
                 return
 
@@ -2336,6 +2326,19 @@ class AttendanceHome(ft.Container):
         def on_cancel(_):
             dlg.open = False
             self._safe_update()
+
+        pin_field = ft.TextField(
+            label="Admin Password / PIN",
+            hint_text="Enter login password or Admin PIN",
+            password=True,
+            can_reveal_password=True,
+            max_length=32,
+            width=280,
+            border_radius=AppTheme.RADIUS_MD,
+            autofocus=True,
+            on_submit=on_confirm,
+        )
+        error_text = ft.Text("", color=AppTheme.DANGER, size=11)
 
         dlg = ft.AlertDialog(
             title=ft.SelectionArea(
@@ -2459,9 +2462,10 @@ class AttendanceHome(ft.Container):
         if not mobile_number:
             self._show_toast(f"No mobile number recorded for {student_name}.", is_error=True)
             return
+        from core.utils.url_utils import safe_open_url
         url = format_whatsapp_url(mobile_number)
         try:
-            webbrowser.open(url)
+            safe_open_url(url)
         except Exception as exc:
             LogService.error(f"Failed to open WhatsApp URL: {exc}", context="AttendanceHome")
             self._show_toast(f"Unable to launch browser: {exc}", is_error=True)
@@ -2485,7 +2489,8 @@ class AttendanceHome(ft.Container):
         )
         url = format_whatsapp_url(student.mobile_number, msg)
         try:
-            webbrowser.open(url)
+            from core.utils.url_utils import safe_open_url
+            safe_open_url(url)
             self._show_toast(f"WhatsApp alert opened for {student.student_name} ({status_str})", is_success=True)
         except Exception as exc:
             LogService.error(f"Failed to open WhatsApp URL: {exc}", context="AttendanceHome")
@@ -2518,7 +2523,7 @@ class AttendanceHome(ft.Container):
                 icon_size=16,
                 icon_color="#25D366",
                 tooltip=f"Send WhatsApp to {st.student_name}",
-                on_click=lambda _, mob=st.mobile_number, m=msg: webbrowser.open(format_whatsapp_url(mob, m)),
+                on_click=lambda _, mob=st.mobile_number, m=msg: safe_open_url(format_whatsapp_url(mob, m)),
             )
             items.append(
                 ft.ListTile(
@@ -2594,7 +2599,7 @@ class AttendanceHome(ft.Container):
                 icon_size=16,
                 icon_color="#25D366",
                 tooltip=f"Send Warning WhatsApp to {d.student_name}",
-                on_click=lambda _, mob=d.mobile_number, m=msg: webbrowser.open(format_whatsapp_url(mob, m)),
+                on_click=lambda _, mob=d.mobile_number, m=msg: safe_open_url(format_whatsapp_url(mob, m)),
             )
             items.append(
                 ft.ListTile(

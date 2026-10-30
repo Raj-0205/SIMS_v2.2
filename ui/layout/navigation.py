@@ -24,6 +24,24 @@ class NavigationMenu(ft.NavigationRail):
         self.on_toggle_visibility = on_toggle_visibility
         self.on_logout_request = on_logout_request
 
+        self.notifications_full_btn = ft.OutlinedButton(
+            "Notifications",
+            icon=ft.Icons.NOTIFICATIONS_OUTLINED,
+            tooltip="Daily Notifications & Action History",
+            style=ft.ButtonStyle(
+                color=AppTheme.PRIMARY,
+            ),
+            on_click=self.handle_open_notifications,
+            width=178,
+        )
+
+        self.notifications_icon_btn = ft.IconButton(
+            icon=ft.Icons.NOTIFICATIONS_OUTLINED,
+            tooltip="Daily Notifications & Action History",
+            icon_color=AppTheme.PRIMARY,
+            on_click=self.handle_open_notifications,
+        )
+
         self.logout_full_btn = ft.OutlinedButton(
             "Log Out",
             icon=ft.Icons.LOGOUT,
@@ -42,8 +60,28 @@ class NavigationMenu(ft.NavigationRail):
             on_click=lambda _: self.on_logout_request() if self.on_logout_request else on_nav_change("/logout"),
         )
 
+        self.trailing_column = ft.Column(
+            controls=[
+                self.notifications_full_btn,
+                self.logout_full_btn,
+            ],
+            spacing=8,
+            tight=True,
+            horizontal_alignment=ft.CrossAxisAlignment.START,
+        )
+
+        self.trailing_column_compact = ft.Column(
+            controls=[
+                self.notifications_icon_btn,
+                self.logout_icon_btn,
+            ],
+            spacing=8,
+            tight=True,
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+
         self.trailing_container = ft.Container(
-            content=self.logout_full_btn,
+            content=self.trailing_column,
             padding=ft.Padding(16, 8, 16, 16),
             alignment=ft.Alignment.BOTTOM_LEFT,
         )
@@ -113,6 +151,7 @@ class NavigationMenu(ft.NavigationRail):
             min_width=68,
             min_extended_width=210,
             group_alignment=-0.95,
+            expand=True,
             leading=self.header_container,
             trailing=self.trailing_container,
         )
@@ -139,7 +178,7 @@ class NavigationMenu(ft.NavigationRail):
                 label="Enquiries",
             ),
             ft.NavigationRailDestination(
-                icon=ft.Icons.APP_REGISTRATION,
+                icon=ft.Icons.HOW_TO_REG,
                 label="Admissions",
             ),
             ft.NavigationRailDestination(
@@ -197,6 +236,20 @@ class NavigationMenu(ft.NavigationRail):
         if p:
             open_about_dialog(p)
 
+    def handle_open_notifications(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Opens the Daily Action History Notifications modal."""
+        from ui.widgets.notifications_dialog import open_notifications_dialog
+        p = getattr(self, "_root_page", None) or getattr(self, "_page", None)
+        if not p and e and hasattr(e, "page") and e.page:
+            p = e.page
+        if not p:
+            try:
+                p = self.page
+            except (RuntimeError, AttributeError):
+                p = None
+        if p:
+            open_notifications_dialog(p)
+
     def handle_toggle_extended(self, e: Optional[ft.ControlEvent] = None) -> None:
         """Toggles between full expanded sidebar (210px) and compact icon rail (68px)."""
         self.extended = not self.extended
@@ -212,7 +265,7 @@ class NavigationMenu(ft.NavigationRail):
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
             )
-            self.trailing_container.content = self.logout_full_btn
+            self.trailing_container.content = self.trailing_column
             self.trailing_container.alignment = ft.Alignment.BOTTOM_LEFT
             self.trailing_container.padding = ft.Padding(16, 8, 16, 16)
         else:
@@ -227,7 +280,7 @@ class NavigationMenu(ft.NavigationRail):
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=4,
             )
-            self.trailing_container.content = self.logout_icon_btn
+            self.trailing_container.content = self.trailing_column_compact
             self.trailing_container.alignment = ft.Alignment.BOTTOM_CENTER
             self.trailing_container.padding = ft.Padding(8, 8, 8, 16)
 

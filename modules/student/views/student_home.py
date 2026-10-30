@@ -169,7 +169,7 @@ class StudentHome(ft.Container):
     # ══════════════════════════════════════════════════════════════════════
     def _build_header(self) -> ft.Row:
         self.subtitle_text = ft.Text(
-            "Manage student master records, registrations, and academic history • 0 total students",
+            "Manage student master records, admissions, and academic history • 0 total students",
             size=AppTheme.SIZE_CAPTION,
             color=AppTheme.TEXT_SECONDARY,
         )
@@ -253,7 +253,7 @@ class StudentHome(ft.Container):
                             on_click=lambda _: self._apply_current_state(),
                         ),
                         ft.ElevatedButton(
-                            content=ft.Text("Register Student", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                            content=ft.Text("Add Student", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
                             icon=ft.Icons.PERSON_ADD,
                             style=ft.ButtonStyle(
                                 bgcolor=AppTheme.PRIMARY,
@@ -357,7 +357,7 @@ class StudentHome(ft.Container):
             border_radius=AppTheme.RADIUS_MD,
             options=[
                 ft.DropdownOption(key="ALL", text="All Statuses"),
-                ft.DropdownOption(key="REGISTERED", text="Registered"),
+                ft.DropdownOption(key="REGISTERED", text="Admitted"),
                 ft.DropdownOption(key="CONFIRMED", text="Confirmed"),
                 ft.DropdownOption(key="DRAFT", text="Draft"),
                 ft.DropdownOption(key="CANCELLED", text="Cancelled"),
@@ -648,7 +648,7 @@ class StudentHome(ft.Container):
             self.total_count = total
 
             # Update subtitle total indicator
-            self.subtitle_text.value = f"Manage student master records, registrations, and academic history • {self.total_count} total students"
+            self.subtitle_text.value = f"Manage student master records, admissions, and academic history • {self.total_count} total students"
             self.clear_search_btn.visible = bool(self.current_query)
 
             # Refresh active state chips
@@ -936,7 +936,7 @@ class StudentHome(ft.Container):
             ("Admission Date", 110),
             ("Status", 100),
             ("Total Fee", 110),
-            ("Actions", 100),
+            ("Actions", 130),
         ]
 
         rows = []
@@ -1040,6 +1040,13 @@ class StudentHome(ft.Container):
                                             on_click=lambda e, s=student: self.handle_open_workspace(s.id),
                                         ),
                                         ft.IconButton(
+                                            icon=ft.Icons.SWAP_HORIZ,
+                                            icon_color=AppTheme.PRIMARY,
+                                            icon_size=18,
+                                            tooltip="Switch Batch",
+                                            on_click=lambda e, s=student: self.handle_switch_batch(s),
+                                        ),
+                                        ft.IconButton(
                                             icon=ft.Icons.EDIT_OUTLINED,
                                             icon_color=AppTheme.TEXT_SECONDARY,
                                             icon_size=18,
@@ -1056,7 +1063,7 @@ class StudentHome(ft.Container):
                                     ],
                                     spacing=2,
                                 ),
-                                width=100,
+                                width=130,
                             )
                         ),
                     ],
@@ -1064,7 +1071,7 @@ class StudentHome(ft.Container):
                 )
             )
 
-        col_spacing, horiz_margin = self._compute_column_spacing(num_columns=8, base_content_width=990)
+        col_spacing, horiz_margin = self._compute_column_spacing(num_columns=8, base_content_width=1020)
         header_table = ft.DataTable(
             columns=[
                 ft.DataColumn(ft.Container(content=ft.Text(label, weight=ft.FontWeight.BOLD, size=AppTheme.SIZE_BODY), width=w))
@@ -1190,10 +1197,10 @@ class StudentHome(ft.Container):
             )
         else:
             icon = ft.Icons.PEOPLE_OUTLINE
-            title = "No students registered yet"
-            subtitle = "Click 'Register Student' above to add your first student record."
+            title = "No students found yet"
+            subtitle = "Click 'Add Student' above to add your first student record."
             action_btn = ft.ElevatedButton(
-                content=ft.Text("Register Student", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                content=ft.Text("Add Student", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
                 icon=ft.Icons.PERSON_ADD,
                 style=ft.ButtonStyle(
                     bgcolor=AppTheme.PRIMARY,
@@ -1352,7 +1359,7 @@ class StudentHome(ft.Container):
         """Opens the Student Registration modal."""
         modal = StudentFormModal(
             controller=self.controller,
-            on_saved=lambda: self._on_student_saved("Student registered successfully!"),
+            on_saved=lambda: self._on_student_saved("Student added successfully!"),
         )
         self._open_dialog(modal)
 
@@ -1375,6 +1382,75 @@ class StudentHome(ft.Container):
             on_refresh_required=self._apply_current_state,
         )
         self._open_dialog(workspace)
+
+    def handle_switch_batch(self, student: StudentDTO) -> None:
+        """Opens the Batch Assignment / Switch Batch dialog for the selected student."""
+        from modules.admission.views.batch_assignment_dialog import BatchAssignmentDialog
+
+        admissions = []
+        try:
+            workspace_data = self.controller.get_student_workspace(student.id)
+            admissions = workspace_data.admissions
+        except Exception:
+            admissions = []
+
+        if not admissions and not student.latest_admission_id:
+            self.show_snackbar("This student has no course admissions yet. Please enroll the student in a course first.", is_error=True)
+            return
+
+        def on_batch_updated():
+            self._apply_current_state()
+            self.show_snackbar("Batch allocation updated successfully.")
+
+        try:
+            page = self.page or getattr(self, "_root_page", None)
+        except (RuntimeError, AttributeError):
+            page = getattr(self, "_root_page", None)
+
+        if not page:
+            return
+
+        if len(admissions) <= 1:
+            aid = admissions[0].admission_id if admissions else student.latest_admission_id
+            dlg = BatchAssignmentDialog(admission_id=aid, on_updated=on_batch_updated, page=page)
+            self._open_dialog(dlg)
+        else:
+            def pick_and_open(aid: int):
+                try:
+                    page.pop_dialog()
+                except Exception:
+                    pass
+                dlg = BatchAssignmentDialog(admission_id=aid, on_updated=on_batch_updated, page=page)
+                self._open_dialog(dlg)
+
+            options = []
+            for adm in admissions:
+                c_name = adm.course_name or "Course"
+                b_name = f"{adm.batch_name} ({adm.batch_timing})" if adm.batch_name else "Unallocated"
+                options.append(
+                    ft.ListTile(
+                        leading=ft.Icon(ft.Icons.SCHOOL, color=AppTheme.PRIMARY),
+                        title=ft.Text(f"{c_name} • Adm #{adm.admission_id}", weight=ft.FontWeight.BOLD),
+                        subtitle=ft.Text(f"Current Batch: {b_name}"),
+                        trailing=ft.ElevatedButton(
+                            content=ft.Text("Select"),
+                            style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE),
+                            on_click=lambda _, a=adm.admission_id: pick_and_open(a),
+                        ),
+                    )
+                )
+
+            picker = ft.AlertDialog(
+                title=ft.Text("Select Admission to Switch Batch", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
+                content=ft.Container(
+                    width=460,
+                    content=ft.Column(controls=options, tight=True, spacing=6),
+                ),
+                actions=[
+                    ft.TextButton(content=ft.Text("Cancel"), on_click=lambda _: page.pop_dialog())
+                ],
+            )
+            self._open_dialog(picker)
 
     def handle_delete_student(self, student: StudentDTO) -> None:
         """Opens Administrator Destructive Deletion Dialog with exact dependency breakdown."""

@@ -79,6 +79,7 @@ def seeded_fees_test_data():
                     student_id=st_id,
                     amount=1500.0,
                     payment_mode="UPI",
+                    transaction_ref=f"{random.randint(100000000000, 999999999999)}",
                     collector_name="Accountant",
                 )
             )

@@ -37,3 +37,16 @@ class PaymentController:
 
     def get_total_paid(self, admission_id: int) -> float:
         return self.service.get_total_paid(admission_id)
+
+    def refund_payment(self, payment_id: int, reason: str, admin_pin: str) -> dict[str, Any]:
+        from core.security.context import SecurityContext
+        user = SecurityContext.current_user()
+        actor_id = getattr(user, "id", None) or SecurityContext.get_current_user_id()
+        actor_name = getattr(user, "username", None) or SecurityContext.get_current_username()
+        return self.service.refund_payment(
+            payment_id=payment_id,
+            reason=reason,
+            admin_pin=admin_pin,
+            actor_id=actor_id,
+            actor_name=actor_name,
+        )

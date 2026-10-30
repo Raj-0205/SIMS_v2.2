@@ -133,7 +133,7 @@ class AttendanceService(BaseService):
             if d > date.today():
                 raise ValidationError("Cannot mark attendance for future dates. Attendance cannot be recorded in advance.")
         except ValueError:
-            pass
+            raise ValidationError(f"Invalid session date format '{session_date}'. Expected YYYY-MM-DD.")
 
         with self._tx():
             session_id = self.repository.upsert_session(

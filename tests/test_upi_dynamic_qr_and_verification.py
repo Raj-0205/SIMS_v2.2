@@ -33,6 +33,7 @@ class TestUPIDynamicQRAndVerification(unittest.TestCase):
         self.adm_ctrl = AdmissionController()
         self.pay_service = PaymentService()
         self.settings_service = SettingsService()
+        self.receipt_ctrl = ReceiptController()
 
     def test_01_upi_deep_link_formatting(self):
         """Verify NPCI-compliant UPI deep link format with custom amounts and notes."""
@@ -259,6 +260,81 @@ class TestUPIDynamicQRAndVerification(unittest.TestCase):
         self.assertEqual(updated_adm.total_paid, 1000.0)
         status_val = updated_adm.status.value if hasattr(updated_adm.status, "value") else str(updated_adm.status)
         self.assertEqual(status_val, "CONFIRMED")
+
+    def test_07_receipt_utr_printing_and_dialog_display(self):
+        """Verify UTR is mentioned on ReceiptDTO, ReceiptDialog UI, WhatsApp text, and PDF receipt."""
+        from unittest.mock import patch
+        from pathlib import Path
+
+        adm_id = self.adm_ctrl.create_admission({
+            "first_name": "Rohan",
+            "last_name": "Patil",
+            "village": "Chandwad",
+            "course_id": 1,
+            "agreed_fee": 15000.0,
+            "mobile_number": "9898989805",
+            "secondary_mobile": "9898989895",
+        })
+        adm = self.adm_ctrl.get_admission(adm_id)
+
+        utr_12_digits = "430211223344"
+        pay_id = self.pay_service.record_payment(PaymentCreateDTO(
+            admission_id=adm_id,
+            student_id=adm.student_id,
+            amount=5000.0,
+            payment_mode="UPI",
+            collector_name="Admin",
+            transaction_ref=utr_12_digits,
+        ))
+
+        # 1. Verify ReceiptDTO has transaction_ref populated
+        receipt = self.receipt_ctrl.get_receipt_by_payment(pay_id)
+        self.assertIsNotNone(receipt)
+        self.assertEqual(receipt.transaction_ref, utr_12_digits)
+
+        # 2. Verify ReceiptDialog has transaction_ref and renders UTR row
+        dialog = ReceiptDialog(
+            receipt=receipt,
+            student_name=adm.student_name,
+            candidate_number=adm.admission_number,
+            course_name=adm.course_name,
+            mobile_number=adm.mobile_number,
+        )
+        self.assertEqual(dialog.transaction_ref, utr_12_digits)
+
+        # 3. Verify WhatsApp message contains Bank UTR / Ref
+        with patch("webbrowser.open") as mock_wb:
+            dialog.handle_whatsapp(None)
+            mock_wb.assert_called_once()
+            wa_url = mock_wb.call_args[0][0]
+            self.assertIn("Bank", wa_url)
+            self.assertIn(utr_12_digits, wa_url)
+
+        # 4. Verify PDF receipt generator renders vector receipt with UTR
+        test_pdf_path = Path("/tmp/test_receipt_utr.pdf")
+        if test_pdf_path.exists():
+            test_pdf_path.unlink()
+
+        ReceiptPDFGenerator.generate_receipt_pdf(
+            receipt_data={
+                "receipt_number": receipt.receipt_number,
+                "student_name": adm.student_name,
+                "student_id": adm.student_id,
+                "candidate_number": adm.admission_number,
+                "course_name": adm.course_name,
+                "installment_number": 1,
+                "amount_paid": 5000.0,
+                "total_course_fee": 15000.0,
+                "total_paid_till_now": 5000.0,
+                "pending_amount": 10000.0,
+                "payment_mode": "UPI",
+                "collector_name": "Admin",
+                "transaction_ref": utr_12_digits,
+            },
+            output_path=test_pdf_path,
+        )
+        self.assertTrue(test_pdf_path.exists())
+        self.assertGreater(test_pdf_path.stat().st_size, 500)
 
 
 if __name__ == "__main__":

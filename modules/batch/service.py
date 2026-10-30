@@ -32,6 +32,7 @@ class BatchService(BaseService):
 
     def __init__(self) -> None:
         self.repository = BatchRepository()
+        self.batch_repo = self.repository
 
     def _sanitize_string(self, value: Optional[str]) -> str:
         return str(value).strip() if value else ""

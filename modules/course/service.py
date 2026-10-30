@@ -35,6 +35,7 @@ class CourseService(BaseService):
 
     def __init__(self) -> None:
         self.repository = CourseRepository()
+        self.course_repo = self.repository
         self.settings_service = SettingsService()
         self.activity_log_repo = ActivityLogRepository()
 

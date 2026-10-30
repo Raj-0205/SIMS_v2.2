@@ -262,6 +262,7 @@ class TestForensicSuite(unittest.TestCase):
             "student_id": adm.student_id,
             "amount": 400.0,
             "payment_mode": "UPI",
+            "transaction_ref": "987654321098",
         })
         self.assertIsNotNone(pay2_id)
         adm_after2 = self.admission_ctrl.get_admission(adm_id)

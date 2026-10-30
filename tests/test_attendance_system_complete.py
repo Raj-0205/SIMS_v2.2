@@ -88,12 +88,29 @@ def setup_attendance_fixture():
         adm = adm_service.get_admission(adm_id)
         student_ids.append(adm.student_id)
 
-    return {
-        "course_id": course_id,
-        "batch_id": batch_id,
-        "student_ids": student_ids,
-        "names": names,
-    }
+    try:
+        yield {
+            "course_id": course_id,
+            "batch_id": batch_id,
+            "student_ids": student_ids,
+            "names": names,
+        }
+    finally:
+        repo = course_service.course_repo
+        try:
+            repo.execute("DELETE FROM attendance_records WHERE batch_id = ?", (batch_id,))
+            repo.execute("DELETE FROM attendance_sessions WHERE batch_id = ?", (batch_id,))
+            for sid in student_ids:
+                repo.execute("DELETE FROM payments WHERE student_id = ?", (sid,))
+                repo.execute("DELETE FROM receipts WHERE student_id = ?", (sid,))
+                repo.execute("DELETE FROM admission_courses WHERE admission_id IN (SELECT id FROM admissions WHERE student_id = ?)", (sid,))
+                repo.execute("DELETE FROM admissions WHERE student_id = ?", (sid,))
+                repo.execute("DELETE FROM students WHERE id = ?", (sid,))
+            repo.execute("DELETE FROM batches WHERE id = ?", (batch_id,))
+            repo.execute("DELETE FROM courses WHERE id = ?", (course_id,))
+            repo.execute("DELETE FROM activity_logs WHERE (entity_type = 'COURSE' AND entity_id = ?) OR (entity_type = 'BATCH' AND entity_id = ?)", (course_id, batch_id))
+        except Exception:
+            pass
 
 
 def test_batch_enrolled_students_retrieval(setup_attendance_fixture):

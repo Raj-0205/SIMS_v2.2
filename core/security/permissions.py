@@ -13,6 +13,7 @@ class Permission(str, Enum):
     """
     # Financial Governance
     PAYMENT_PIN_CHANGE = "PAYMENT_PIN_CHANGE"
+    PAYMENT_REFUND = "PAYMENT_REFUND"
 
     # Student & Admission Management Lifecycle
     STUDENT_DELETE = "STUDENT_DELETE"

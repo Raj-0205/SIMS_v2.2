@@ -252,6 +252,15 @@ class CourseDetailDialog(ft.AlertDialog):
                 )
                 target_page.show_dialog(modal)
 
+        def on_edit_batch(batch_dto):
+            target_page = self._root_page or getattr(self, "page", None)
+            if target_page:
+                modal = BatchFormModal(
+                    batch=batch_dto,
+                    on_saved=lambda _: self._refresh_dialog(),
+                )
+                target_page.show_dialog(modal)
+
         batch_items = []
         for b in batches:
             status_color = AppTheme.SUCCESS if b.status.value == "OPEN" else AppTheme.TEXT_MUTED
@@ -266,11 +275,25 @@ class CourseDetailDialog(ft.AlertDialog):
                                 ],
                                 spacing=1,
                             ),
-                            ft.Container(
-                                content=ft.Text(b.status.value, size=AppTheme.SIZE_CAPTION, color=status_color, weight=ft.FontWeight.BOLD),
-                                bgcolor=AppTheme.SURFACE_VARIANT,
-                                padding=ft.Padding(6, 2, 6, 2),
-                                border_radius=AppTheme.RADIUS_SM,
+                            ft.Row(
+                                controls=[
+                                    ft.Container(
+                                        content=ft.Text(b.status.value, size=AppTheme.SIZE_CAPTION, color=status_color, weight=ft.FontWeight.BOLD),
+                                        bgcolor=AppTheme.SURFACE_VARIANT,
+                                        padding=ft.Padding(6, 2, 6, 2),
+                                        border_radius=AppTheme.RADIUS_SM,
+                                    ),
+                                    ft.IconButton(
+                                        icon=ft.Icons.EDIT_OUTLINED,
+                                        icon_size=16,
+                                        icon_color=AppTheme.PRIMARY,
+                                        tooltip="Edit Batch Name & Settings",
+                                        visible=self._is_administrator(),
+                                        on_click=lambda e, batch_obj=b: on_edit_batch(batch_obj),
+                                    ),
+                                ],
+                                spacing=4,
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
                             ),
                         ],
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,

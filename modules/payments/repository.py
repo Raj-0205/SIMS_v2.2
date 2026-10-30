@@ -83,3 +83,34 @@ class PaymentRepository(BaseRepository):
             LIMIT ?;
         """
         return self.execute_fetchall(sql, (limit,))
+
+    def delete_by_id(self, payment_id: int) -> int:
+        """Deletes a payment record by primary key."""
+        sql = "DELETE FROM payments WHERE id = ?;"
+        return self.execute(sql, (payment_id,))
+
+    def resequence_installments(self, admission_id: int) -> None:
+        """
+        Ensures remaining payments for an admission have consecutive 1-based installment numbers,
+        preventing unique constraint collisions and gaps in sequential numbering.
+        """
+        rows = self.execute_fetchall(
+            "SELECT id FROM payments WHERE admission_id = ? ORDER BY installment_number ASC, id ASC;",
+            (admission_id,),
+        )
+        if not rows:
+            return
+
+        # Phase 1: Invert to negative offsets to avert unique constraint clashes
+        for idx, r in enumerate(rows, start=1):
+            self.execute(
+                "UPDATE payments SET installment_number = ? WHERE id = ?;",
+                (-idx, r["id"]),
+            )
+
+        # Phase 2: Assign final consecutive 1-based indices
+        for idx, r in enumerate(rows, start=1):
+            self.execute(
+                "UPDATE payments SET installment_number = ? WHERE id = ?;",
+                (idx, r["id"]),
+            )

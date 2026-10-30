@@ -62,18 +62,18 @@ class EnquiryFormModal(ft.AlertDialog):
             self.courses_list = []
 
         # Header Title
-        title_text = "Edit Enquiry Record" if self.is_edit_mode else "New Student Walk-in / Enquiry"
+        title_text = "Edit Registration Record" if self.is_edit_mode else "Student Registration"
         mode_badge = ft.Container(
             content=ft.Row(
                 controls=[
-                    ft.Icon(ft.Icons.EDIT_NOTE_ROUNDED if self.is_edit_mode else ft.Icons.ADD_TASK_ROUNDED, size=12, color="#1D4ED8" if not self.is_edit_mode else "#D97706"),
-                    ft.Text("EDIT MODE" if self.is_edit_mode else "NEW LEAD INTAKE", size=10, weight=ft.FontWeight.BOLD, color="#1D4ED8" if not self.is_edit_mode else "#B45309"),
+                    ft.Icon(ft.Icons.EDIT_NOTE_ROUNDED if self.is_edit_mode else ft.Icons.APP_REGISTRATION_ROUNDED, size=12, color=AppTheme.PRIMARY if not self.is_edit_mode else "#D97706"),
+                    ft.Text("EDIT REGISTRATION" if self.is_edit_mode else "REGISTRATION", size=10, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY if not self.is_edit_mode else "#B45309"),
                 ],
                 spacing=3,
                 tight=True,
             ),
-            bgcolor="#EFF6FF" if not self.is_edit_mode else "#FFFBEB",
-            border=ft.Border.all(1, "#BFDBFE" if not self.is_edit_mode else "#FDE68A"),
+            bgcolor=AppTheme.PRIMARY_LIGHT if not self.is_edit_mode else "#FFFBEB",
+            border=ft.Border.all(1, AppTheme.BORDER if not self.is_edit_mode else "#FDE68A"),
             border_radius=ft.BorderRadius.all(6),
             padding=ft.Padding(6, 2, 6, 2),
         )
@@ -84,9 +84,9 @@ class EnquiryFormModal(ft.AlertDialog):
                     ft.Row(
                         controls=[
                             ft.Container(
-                                content=ft.Icon(ft.Icons.SUPPORT_AGENT_ROUNDED, color=AppTheme.PRIMARY, size=22),
+                                content=ft.Icon(ft.Icons.APP_REGISTRATION_ROUNDED, color=AppTheme.PRIMARY, size=22),
                                 padding=7,
-                                bgcolor="#EFF6FF",
+                                bgcolor=AppTheme.PRIMARY_LIGHT,
                                 border_radius=AppTheme.RADIUS_SM,
                             ),
                             ft.Column(
@@ -99,7 +99,7 @@ class EnquiryFormModal(ft.AlertDialog):
                                         spacing=8,
                                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                                     ),
-                                    ft.Text("Complete prospective student profile with village friends matching & counseling timeline", size=11, color=AppTheme.TEXT_SECONDARY),
+                                    ft.Text("Complete prospective student registration with village friends matching & counseling timeline", size=11, color=AppTheme.TEXT_SECONDARY),
                                 ],
                                 spacing=1,
                             ),
@@ -293,9 +293,9 @@ class EnquiryFormModal(ft.AlertDialog):
         self.category_dropdown = ft.Dropdown(
             label="Intent Category *",
             options=[
-                ft.dropdown.Option("HOT", "🔥 Confirm Laga (High Intent)"),
+                ft.dropdown.Option("HOT", "⭐ High Priority (High Intent)"),
                 ft.dropdown.Option("WARM", "⚡ Interested (Exploring / Demo)"),
-                ft.dropdown.Option("COLD", "❄️ Doubtful / Low Intent"),
+                ft.dropdown.Option("COLD", "❄️ Exploring / Low Intent"),
                 ft.dropdown.Option("LOST", "❌ Not Interested / Dropped"),
                 ft.dropdown.Option("CONVERTED", "🎓 Converted (Admitted)"),
             ],
@@ -495,9 +495,23 @@ class EnquiryFormModal(ft.AlertDialog):
             height=40,
         )
 
+        self.convert_admission_button = ft.ElevatedButton(
+            content=ft.Row(
+                [ft.Icon(ft.Icons.HOW_TO_REG, size=16), ft.Text("Convert to Admission", weight=ft.FontWeight.BOLD)],
+                spacing=6,
+                alignment=ft.MainAxisAlignment.CENTER,
+            ),
+            bgcolor=AppTheme.SUCCESS,
+            color=ft.Colors.WHITE,
+            elevation=2,
+            height=40,
+            tooltip="Convert this enquiry lead directly into an admission record",
+            on_click=self._on_convert_clicked,
+        )
+
         self.save_button = ft.ElevatedButton(
             content=ft.Row(
-                [ft.Icon(ft.Icons.SAVE_ROUNDED, size=16), ft.Text("Save Enquiry Record", weight=ft.FontWeight.BOLD)],
+                [ft.Icon(ft.Icons.SAVE_ROUNDED, size=16), ft.Text("Save Registration", weight=ft.FontWeight.BOLD)],
                 spacing=6,
                 alignment=ft.MainAxisAlignment.CENTER,
             ),
@@ -513,7 +527,13 @@ class EnquiryFormModal(ft.AlertDialog):
                 controls=[
                     self.back_button,
                     ft.Container(expand=True),
-                    self.save_button,
+                    ft.Row(
+                        controls=[
+                            self.convert_admission_button,
+                            self.save_button,
+                        ],
+                        spacing=AppTheme.PAD_SM,
+                    ),
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             )
@@ -533,17 +553,17 @@ class EnquiryFormModal(ft.AlertDialog):
     def _show_banner(self, text: str, is_error: bool = True) -> None:
         self.banner_text.value = text
         if is_error:
-            self.banner_text.color = "#991B1B"
+            self.banner_text.color = AppTheme.DANGER
             self.banner_icon.name = ft.Icons.ERROR_OUTLINE
-            self.banner_icon.color = "#DC2626"
-            self.banner_container.bgcolor = "#FEF2F2"
-            self.banner_container.border = ft.Border.all(1, "#FECACA")
+            self.banner_icon.color = AppTheme.DANGER
+            self.banner_container.bgcolor = AppTheme.DANGER_LIGHT
+            self.banner_container.border = ft.Border.all(1, AppTheme.DANGER)
         else:
-            self.banner_text.color = "#065F46"
+            self.banner_text.color = AppTheme.SUCCESS
             self.banner_icon.name = ft.Icons.CHECK_CIRCLE_OUTLINE
-            self.banner_icon.color = "#10B981"
-            self.banner_container.bgcolor = "#ECFDF5"
-            self.banner_container.border = ft.Border.all(1, "#A7F3D0")
+            self.banner_icon.color = AppTheme.SUCCESS
+            self.banner_container.bgcolor = AppTheme.SUCCESS_LIGHT
+            self.banner_container.border = ft.Border.all(1, AppTheme.SUCCESS)
         self.banner_container.visible = True
         p = self.safe_page
         if p:
@@ -710,6 +730,97 @@ class EnquiryFormModal(ft.AlertDialog):
         except Exception as exc:
             LogService.error(f"Failed to save enquiry: {exc}", context="EnquiryFormModal")
             self._show_banner(f"Error saving enquiry: {str(exc)}", is_error=True)
+
+    def _on_convert_clicked(self, e: ft.ControlEvent) -> None:
+        """Saves current enquiry details and immediately launches AdmissionFormModal pre-populated."""
+        valid, err_msg = self._validate_form()
+        if not valid:
+            self._show_banner(f"Please fill required details before converting to admission:\n{err_msg}", is_error=True)
+            return
+
+        name = (self.name_input.value or "").strip()
+        mobile = re.sub(r"\D", "", (self.mobile_input.value or "").strip())
+        alt_mobile = re.sub(r"\D", "", (self.alt_mobile_input.value or "").strip()) or None
+        email = (self.email_input.value or "").strip() or None
+        village = (self.village_input.value or "").strip() or None
+        address = (self.address_input.value or "").strip() or None
+        gender = self.gender_dropdown.value or "MALE"
+        qualification = (self.qualification_input.value or "").strip() or None
+
+        course_id_val = self.course_dropdown.value
+        course_id = int(course_id_val) if course_id_val else None
+        selected_course_name = None
+        if course_id:
+            for c in self.courses_list:
+                if c.id == course_id:
+                    selected_course_name = c.name
+                    break
+
+        category = self.category_dropdown.value or "WARM"
+        preferred_timing = self.timing_dropdown.value or "ANY"
+        loss_reason = (self.loss_reason_input.value or "").strip() or None
+        source = self.source_dropdown.value or "WALK_IN"
+        status = self.status_dropdown.value or "NEW"
+        counselor = (self.counselor_input.value or "").strip() or None
+        follow_up = (self.follow_up_input.value or "").strip() or None
+        notes = (self.notes_input.value or "").strip() or None
+
+        payload = {
+            "student_name": name,
+            "mobile_number": mobile,
+            "alternate_mobile": alt_mobile,
+            "email": email,
+            "village": village,
+            "address": address,
+            "course_id": course_id,
+            "interested_course": selected_course_name,
+            "qualification": qualification,
+            "gender": gender,
+            "status": status,
+            "category": category,
+            "preferred_timing": preferred_timing,
+            "loss_reason": loss_reason,
+            "source": source,
+            "follow_up_date": follow_up,
+            "notes": notes,
+            "counselor_name": counselor,
+        }
+
+        try:
+            if self.is_edit_mode and self.enquiry:
+                payload["id"] = self.enquiry.id
+                payload["converted_admission_id"] = self.enquiry.converted_admission_id
+                self.controller.update_enquiry(payload)
+                enquiry_id = self.enquiry.id
+            else:
+                enquiry_id = self.controller.create_enquiry(payload)
+
+            draft = self.controller.convert_to_admission_draft(enquiry_id)
+            root_page = self.safe_page
+            self.close_modal()
+            self.on_saved()
+
+            if root_page:
+                from modules.admission.views.admission_form_modal import AdmissionFormModal
+                adm_modal = AdmissionFormModal(
+                    on_saved=self.on_saved,
+                    initial_enquiry_data=draft,
+                    initial_enquiry_id=enquiry_id,
+                )
+                if hasattr(root_page, "show_dialog"):
+                    root_page.show_dialog(adm_modal)
+                elif hasattr(root_page, "open"):
+                    root_page.open(adm_modal)
+                else:
+                    root_page.dialog = adm_modal
+                    adm_modal.open = True
+                    root_page.update()
+
+        except ValidationError as val_err:
+            self._show_banner(f"Validation Error: {str(val_err)}", is_error=True)
+        except Exception as exc:
+            LogService.error(f"Failed to convert enquiry to admission: {exc}", context="EnquiryFormModal")
+            self._show_banner(f"Error converting enquiry: {str(exc)}", is_error=True)
 
     def close_modal(self, e: Optional[ft.ControlEvent] = None) -> None:
         self.open = False

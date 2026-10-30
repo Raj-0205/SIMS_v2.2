@@ -1,6 +1,7 @@
 # modules/admission/repository.py
 
 from __future__ import annotations
+import re
 from typing import Any, Optional
 from core.database.repository import BaseRepository
 from modules.admission.dto import AdmissionFilterDTO
@@ -146,6 +147,10 @@ class AdmissionRepository(BaseRepository):
         sql = "UPDATE admissions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;"
         return self.execute(sql, (status, admission_id))
 
+    def update_batch(self, admission_id: int, batch_id: Optional[int]) -> int:
+        sql = "UPDATE admissions SET batch_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;"
+        return self.execute(sql, (batch_id, admission_id))
+
     def get_by_id(self, admission_id: int) -> Optional[dict[str, Any]]:
         sql = """
             SELECT a.*,
@@ -201,14 +206,68 @@ class AdmissionRepository(BaseRepository):
 
         if dto.query and dto.query.strip():
             raw_q = dto.query.strip()
-            pattern = f"%{raw_q}%"
-            clauses.append("""(
-                s.first_name LIKE ? OR s.last_name LIKE ? OR (s.first_name || ' ' || s.last_name) LIKE ?
-                OR s.mobile_number LIKE ? OR s.email LIKE ? OR s.aadhaar_number LIKE ?
-                OR CAST(a.id AS TEXT) LIKE ? OR c.name LIKE ? OR c.code LIKE ?
-                OR (CAST(a.candidate_year AS TEXT) || '-' || printf('%03d', a.candidate_sequence)) LIKE ?
-            )""")
-            params.extend([pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern])
+            # Clean punctuation for tokenization while retaining alphanumeric & whitespace
+            clean_q = re.sub(r"[,;:\-_\/|\#]", " ", raw_q)
+            tokens = [t.strip() for t in clean_q.split() if t.strip()]
+
+            # Pattern A: Candidate number (e.g. 2026-001 or 2026-1)
+            cand_m = re.match(r"^(\d{2,4})[-\s/](\d{1,4})$", raw_q)
+            # Pattern B: Explicit ID search (e.g. #1, ID 1, Adm 1, Student 1)
+            id_m = re.match(r"^(?:#|id[:\s#]*|student[:\s#]*|adm[:\s#]*|roll[:\s#]*)\s*(\d+)$", raw_q, re.IGNORECASE)
+            if cand_m:
+                cyear = int(cand_m.group(1))
+                if cyear < 100:
+                    cyear += 2000
+                cseq = int(cand_m.group(2))
+                cpat = f"%{cyear:04d}-{cseq:03d}%"
+                clauses.append("""(
+                    (a.candidate_year = ? AND a.candidate_sequence = ?)
+                    OR (CAST(a.candidate_year AS TEXT) || '-' || printf('%03d', a.candidate_sequence)) LIKE ?
+                    OR CAST(a.id AS TEXT) = ?
+                    OR CAST(s.id AS TEXT) = ?
+                )""")
+                params.extend([cyear, cseq, cpat, str(cseq), str(cseq)])
+            elif id_m:
+                tid = int(id_m.group(1))
+                clauses.append("(a.id = ? OR s.id = ? OR a.candidate_sequence = ?)")
+                params.extend([tid, tid, tid])
+            elif tokens:
+                token_clauses = []
+                for tok in tokens:
+                    tok_pat = f"%{tok}%"
+                    sub_clause = """(
+                        s.first_name LIKE ?
+                        OR s.last_name LIKE ?
+                        OR COALESCE(s.middle_name, '') LIKE ?
+                        OR (s.first_name || ' ' || s.last_name) LIKE ?
+                        OR (s.last_name || ' ' || s.first_name) LIKE ?
+                        OR (s.first_name || ' ' || COALESCE(s.middle_name, '') || ' ' || s.last_name) LIKE ?
+                        OR (s.last_name || ' ' || s.first_name || ' ' || COALESCE(s.middle_name, '')) LIKE ?
+                        OR s.mobile_number LIKE ?
+                        OR s.email LIKE ?
+                        OR s.aadhaar_number LIKE ?
+                        OR CAST(a.id AS TEXT) = ?
+                        OR CAST(s.id AS TEXT) = ?
+                        OR CAST(a.candidate_sequence AS TEXT) = ?
+                        OR c.name LIKE ?
+                        OR c.code LIKE ?
+                        OR (CAST(a.candidate_year AS TEXT) || '-' || printf('%03d', a.candidate_sequence)) LIKE ?
+                    )"""
+                    params.extend([
+                        tok_pat, tok_pat, tok_pat, tok_pat, tok_pat, tok_pat, tok_pat,
+                        tok_pat, tok_pat, tok_pat, tok, tok, tok, tok_pat, tok_pat, tok_pat
+                    ])
+                    token_clauses.append(sub_clause)
+
+                phrase_pat = f"%{' '.join(tokens)}%"
+                phrase_clause = """(
+                    (s.first_name || ' ' || s.last_name) LIKE ?
+                    OR (s.last_name || ' ' || s.first_name) LIKE ?
+                    OR (s.first_name || ' ' || COALESCE(s.middle_name, '') || ' ' || s.last_name) LIKE ?
+                    OR (s.last_name || ' ' || s.first_name || ' ' || COALESCE(s.middle_name, '')) LIKE ?
+                )"""
+                params.extend([phrase_pat, phrase_pat, phrase_pat, phrase_pat])
+                clauses.append(f"(({' AND '.join(token_clauses)}) OR {phrase_clause})")
 
         if dto.course_id and dto.course_id > 0:
             clauses.append("ac.course_id = ?")

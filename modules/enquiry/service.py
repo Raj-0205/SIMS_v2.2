@@ -141,6 +141,12 @@ class EnquiryService(BaseService):
         if dto.category_after_call and dto.category_after_call not in VALID_CATEGORIES:
             raise ValidationError(f"Invalid category '{dto.category_after_call}'.")
 
+        if dto.next_follow_up_date and str(dto.next_follow_up_date).strip():
+            try:
+                datetime.strptime(str(dto.next_follow_up_date).strip(), "%Y-%m-%d")
+            except ValueError:
+                raise ValidationError(f"Invalid follow-up date format '{dto.next_follow_up_date}'. Expected YYYY-MM-DD.")
+
         with self.unit_of_work():
             existing = self.repo.get_by_id(dto.enquiry_id)
             if not existing:

@@ -35,7 +35,7 @@ class StudentFormModal(ft.AlertDialog):
 
         self.modal = True
 
-        title_text = "Edit Student Master Profile" if self.is_edit_mode else "Register New Student Master"
+        title_text = "Edit Student Master Profile" if self.is_edit_mode else "New Student Profile"
         self.title = ft.SelectionArea(
             content=ft.Row(
                 controls=[

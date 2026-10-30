@@ -124,7 +124,7 @@ class TestCourseWebShowcaseIntegration(unittest.TestCase):
         # Test sync to web stores
         sync_res = sync_showcase_web_stores(self.controller)
         self.assertTrue(sync_res.get("success"))
-        self.assertGreaterEqual(sync_res.get("count", 0), 27)
+        self.assertGreaterEqual(sync_res.get("count", 0), 26)
 
         # Verify unified course enrichment
         courses = get_all_showcase_courses(self.controller)

@@ -545,19 +545,12 @@ class CourseHome(ft.Column):
         p.show_dialog(dialog)
 
     def _handle_visit_our_courses(self, e: ft.ControlEvent) -> None:
-        import webbrowser
+        from core.utils.url_utils import safe_open_url
         from modules.course.showcase_server import get_showcase_url
         url = get_showcase_url()
-        try:
-            webbrowser.open(url)
-        except Exception:
-            pass
         p = self.safe_page
+        safe_open_url(url, page=p)
         if p:
-            try:
-                p.launch_url(url)
-            except Exception:
-                pass
             p.snack_bar = ft.SnackBar(
                 ft.Text(f"🌐 Opening Courses Webpage: {url}"),
                 bgcolor=AppTheme.PRIMARY,

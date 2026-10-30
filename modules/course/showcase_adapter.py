@@ -44,22 +44,21 @@ DEFAULT_SHOWCASE_CONFIG = {
         "advanced-excel": "accounting",
         "graphic-designing": "design",
         "autocad": "design",
-        "3d-modelling": "design",
         "introduction-to-3d-animation": "design",
         "video-editing-techniques": "design",
-        "dtp-adobe-corel-draw": "design",
-        "content-illustrator": "design",
+        "desktop-publishing-adobe-and-coreldraw": "design",
+        "content-illustration": "design",
         "python": "software",
         "c-cpp-programming": "software",
         "java": "software",
         "web-designing": "software",
         "php": "software",
         "ai-ml-basics": "emerging",
-        "data-science": "emerging",
+        "foundations-of-data-science-and-ai-with-python": "emerging",
         "digital-freelancing": "emerging",
         "cyber-security": "hardware",
-        "desktop-support": "hardware",
-        "network-support": "hardware",
+        "it-desktop-support": "hardware",
+        "it-network-support": "hardware",
         "data-entry-and-data-management": "office",
         "google-workspace-expert": "office",
         "office-assistance": "office",
@@ -152,22 +151,21 @@ CATALOG_CODE_MAP = {
     "advanced-excel": "KLIC-EXCEL",
     "graphic-designing": "KLIC-GRAPHIC",
     "autocad": "KLIC-AUTOCAD",
-    "3d-modelling": "KLIC-3DMODEL",
     "introduction-to-3d-animation": "KLIC-3DANIM",
     "video-editing-techniques": "KLIC-VIDEO",
-    "dtp-adobe-corel-draw": "KLIC-DTP",
-    "content-illustrator": "KLIC-ILLUST",
+    "desktop-publishing-adobe-and-coreldraw": "KLIC-DTP",
+    "content-illustration": "KLIC-ILLUST",
     "python": "KLIC-PYTHON",
     "c-cpp-programming": "KLIC-CPP",
-    "java": "KLIC-JAVA",
+    "java": "KLIC-ADVJAVA",
     "web-designing": "KLIC-WEB",
     "php": "KLIC-PHP",
     "ai-ml-basics": "KLIC-AIML",
-    "data-science": "KLIC-DATASCI",
+    "foundations-of-data-science-and-ai-with-python": "KLIC-DATASCI",
     "digital-freelancing": "KLIC-FREELANCE",
     "cyber-security": "KLIC-CYBER",
-    "desktop-support": "KLIC-DESKTOP",
-    "network-support": "KLIC-NETWORK",
+    "it-desktop-support": "KLIC-DESKTOP",
+    "it-network-support": "KLIC-NETWORK",
     "data-entry-and-data-management": "KLIC-DATAENTRY",
     "google-workspace-expert": "KLIC-GWORKSPACE",
     "office-assistance": "KLIC-OFFICE",
@@ -182,12 +180,12 @@ DEFAULT_FEES = {
     "KLIC-TALLY": 5000.0,
     "KLIC-EXCEL": 4000.0,
     "KLIC-PYTHON": 5000.0,
+    "KLIC-ADVJAVA": 5000.0,
     "KLIC-JAVA": 5000.0,
     "KLIC-CPP": 4500.0,
     "KLIC-WEB": 5000.0,
     "KLIC-GRAPHIC": 5500.0,
     "KLIC-AUTOCAD": 6000.0,
-    "KLIC-3DMODEL": 6500.0,
     "KLIC-3DANIM": 6500.0,
     "KLIC-VIDEO": 5500.0,
     "KLIC-DTP": 4500.0,
@@ -405,6 +403,27 @@ def db_course_to_showcase(course: CourseDTO, extra_showcase: Optional[Dict[str, 
 format_db_course_to_showcase = db_course_to_showcase
 
 
+def is_excluded_course(code: str, name: str) -> bool:
+    """Returns True if the course is a test course, non-MKCL fake course, or fullstack duplicate."""
+    c_up = (code or "").upper().replace("-", "").replace("_", "")
+    n_low = (name or "").lower()
+    test_prefixes = (
+        "ACTLOG", "ADMCRS", "AUD", "BADPIN", "BATCHCRS", "CCH", "C1", "C2",
+        "FEECHG", "ZEROFEE", "AT2", "INV", "NORSN", "OPSSUM", "DUPCODE",
+        "EX1", "SAMEFEE", "SNAP", "SEARCH", "TESTCRS", "TOGGLE", "UPDCRS",
+        "TSTPY", "TESTFULL", "EXAMPLE", "TEST", "TST",
+    )
+    return (
+        any(c_up.startswith(p) for p in test_prefixes)
+        or "test" in n_low
+        or "fullstack" in n_low
+        or "full stack" in n_low
+        or "fullstack" in c_up.lower()
+        or "fsd" in c_up.lower()
+        or n_low in ("course one", "course two", "3d modelling")
+    )
+
+
 def get_all_showcase_courses(controller: Any) -> List[Dict[str, Any]]:
     """
     Returns the unified showcase course list.
@@ -432,17 +451,8 @@ def get_all_showcase_courses(controller: Any) -> List[Dict[str, Any]]:
     matched_catalog_ids = set()
 
     # 1. Process all DB courses
-    test_prefixes = (
-        "ACTLOG", "ADMCRS", "AUD", "BADPIN", "BATCHCRS", "CCH", "C1", "C2",
-        "FEECHG", "ZEROFEE", "AT2", "INV", "NORSN", "OPSSUM", "DUPCODE",
-        "EX1", "SAMEFEE", "SNAP", "SEARCH", "TESTCRS", "TOGGLE", "UPDCRS",
-        "TSTPY", "TESTFULL", "EXAMPLE"
-    )
-
     for db_c in db_courses:
-        c_up = (db_c.code or "").upper().replace("-", "").replace("_", "")
-        n_low = (db_c.name or "").lower()
-        if any(c_up.startswith(p) for p in test_prefixes) or "test " in n_low or n_low in ("course one", "course two"):
+        if is_excluded_course(db_c.code, db_c.name):
             continue
 
         norm_c = normalize_token(db_c.code)
@@ -628,6 +638,12 @@ def persist_custom_course_to_showcase(course_dict: Dict[str, Any]) -> None:
     Persists a new course into courses_data.json and js/courses_data.js.
     Ensures external browser presentation decks have access to newly created courses.
     """
+    code = course_dict.get("code", "")
+    title = course_dict.get("title", "")
+    if is_excluded_course(code, title):
+        LogService.info(f"Skipping persistence of excluded/test course: {code} - {title}", context="ShowcaseAdapter")
+        return
+
     catalog = load_raw_catalog()
     existing_idx = next((i for i, c in enumerate(catalog) if c.get("id") == course_dict.get("id")), None)
     

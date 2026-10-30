@@ -414,14 +414,11 @@ class WebShowcaseManagerDialog(ft.AlertDialog):
             self.on_synced()
 
     def _handle_open_webpage(self, e: ft.ControlEvent) -> None:
+        from core.utils.url_utils import safe_open_url
         url = get_showcase_url()
-        webbrowser.open(url)
         p = self.safe_page
+        safe_open_url(url, page=p)
         if p:
-            try:
-                p.launch_url(url)
-            except Exception:
-                pass
             p.snack_bar = ft.SnackBar(ft.Text(f"🌐 Opened: {url}"), bgcolor=AppTheme.PRIMARY)
             p.snack_bar.open = True
             try:

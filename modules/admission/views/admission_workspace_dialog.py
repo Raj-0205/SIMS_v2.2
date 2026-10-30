@@ -95,6 +95,13 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
             visible=is_admin,
         )
 
+        self.edit_profile_btn = ft.OutlinedButton(
+            content=ft.Text("Edit Profile"),
+            icon=ft.Icons.EDIT_NOTE,
+            style=ft.ButtonStyle(color=AppTheme.PRIMARY),
+            on_click=self._handle_edit_profile,
+        )
+
         self.pay_btn = ft.ElevatedButton(
             content=ft.Text("Collect Payment"),
             icon=ft.Icons.PAYMENTS,
@@ -130,7 +137,7 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
                         ],
                         spacing=AppTheme.PAD_SM,
                     ),
-                    ft.Row(controls=[self.pay_btn, self.close_btn], spacing=AppTheme.PAD_SM),
+                    ft.Row(controls=[self.edit_profile_btn, self.pay_btn, self.close_btn], spacing=AppTheme.PAD_SM),
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 expand=True,
@@ -284,11 +291,62 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
             expand=True,
         )
 
+        batch_val = adm.batch_name or "Unassigned (No Batch)"
+        is_unassigned = not bool(adm.batch_name)
+
+        def open_batch_modal(e):
+            from modules.admission.views.batch_assignment_dialog import BatchAssignmentDialog
+            p = self.safe_page
+            if p:
+                dlg = BatchAssignmentDialog(admission_id=adm.id, on_updated=self.load_data, page=p)
+                p.show_dialog(dlg)
+
+        batch_action_btn = ft.Container(
+            content=ft.Row(
+                controls=[
+                    ft.Icon(
+                        ft.Icons.ADD_TASK if is_unassigned else ft.Icons.SWAP_HORIZ,
+                        size=13,
+                        color=AppTheme.PRIMARY,
+                    ),
+                    ft.Text(
+                        "Assign Batch" if is_unassigned else "Switch Batch",
+                        size=11,
+                        weight=ft.FontWeight.BOLD,
+                        color=AppTheme.PRIMARY,
+                    ),
+                ],
+                spacing=4,
+                tight=True,
+            ),
+            padding=ft.Padding(6, 2, 8, 2),
+            border_radius=AppTheme.RADIUS_SM,
+            bgcolor=AppTheme.PRIMARY_LIGHT,
+            ink=True,
+            on_click=open_batch_modal,
+            tooltip="Click to assign batch or switch timing",
+        )
+
+        batch_row = ft.Row(
+            controls=[
+                ft.Text("Assigned Batch:", size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.W_600, color=AppTheme.TEXT_SECONDARY, width=130),
+                ft.Text(
+                    batch_val,
+                    size=AppTheme.SIZE_CAPTION,
+                    weight=ft.FontWeight.BOLD if not is_unassigned else ft.FontWeight.NORMAL,
+                    color=AppTheme.TEXT_PRIMARY if not is_unassigned else AppTheme.WARNING,
+                ),
+                batch_action_btn,
+            ],
+            spacing=AppTheme.PAD_XS,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        )
+
         col2 = ft.Column(
             controls=[
                 ft.Text("Enrollment & Financials", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
                 self._info_row("Enrolled Course", adm.course_name),
-                self._info_row("Assigned Batch", adm.batch_name or "Unassigned"),
+                batch_row,
                 self._info_row("Academic Institution", adm.institution_name or "—"),
                 self._info_row("Qualification", adm.qualification or "—"),
                 self._info_row("Agreed Fee", f"₹{adm.agreed_fee:,.2f}"),
@@ -317,6 +375,94 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
             spacing=AppTheme.PAD_XS,
         )
 
+    def _handle_edit_profile(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Opens StudentFormModal to update the student master profile and academic info."""
+        if not self.workspace_dto:
+            return
+        student_id = self.workspace_dto.admission.student_id
+        from modules.student.controller import StudentController
+        from modules.student.views.student_form_modal import StudentFormModal
+        stud_ctrl = StudentController()
+        stud = stud_ctrl.get_student(student_id)
+        p = self.safe_page
+        if p and stud:
+            dlg = StudentFormModal(
+                controller=stud_ctrl,
+                on_saved=self.load_data,
+                student=stud,
+            )
+            p.show_dialog(dlg)
+
+    def _on_payment_refunded(self, refund_res: dict[str, Any]) -> None:
+        """Refreshes workspace data and prompts Administrator for optional profile adjustment."""
+        self.load_data()
+        self._show_post_refund_profile_prompt(refund_res)
+
+    def _show_post_refund_profile_prompt(self, refund_res: dict[str, Any]) -> None:
+        """Prompts the Administrator to edit the student's profile post-refund."""
+        p = self.safe_page
+        if not p or not self.workspace_dto:
+            return
+
+        def open_edit_profile(e):
+            prompt_dialog.open = False
+            if hasattr(p, "pop_dialog"):
+                try:
+                    p.pop_dialog()
+                except Exception:
+                    pass
+            self._handle_edit_profile(e)
+
+        def close_prompt(e):
+            prompt_dialog.open = False
+            if hasattr(p, "pop_dialog"):
+                try:
+                    p.pop_dialog()
+                except Exception:
+                    pass
+            self._safe_update()
+
+        prompt_dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Row(
+                controls=[
+                    ft.Icon(ft.Icons.CHECK_CIRCLE, color=AppTheme.SUCCESS, size=22),
+                    ft.Text("Payment Reversed Successfully", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD),
+                ],
+                spacing=8,
+            ),
+            content=ft.Container(
+                content=ft.Column(
+                    controls=[
+                        ft.Text(
+                            f"Refund of ₹{refund_res.get('refunded_amount', 0):,.2f} completed. "
+                            f"Student pending balance is now ₹{refund_res.get('restored_pending_balance', 0):,.2f}.",
+                            size=AppTheme.SIZE_BODY,
+                        ),
+                        ft.Text(
+                            "Would you like to update this student's profile or admission details now?",
+                            size=AppTheme.SIZE_CAPTION,
+                            color=AppTheme.TEXT_SECONDARY,
+                        ),
+                    ],
+                    spacing=6,
+                    tight=True,
+                ),
+                width=420,
+            ),
+            actions=[
+                ft.TextButton(content=ft.Text("Later / Close"), on_click=close_prompt),
+                ft.ElevatedButton(
+                    content=ft.Text("Update Student Profile"),
+                    icon=ft.Icons.EDIT_NOTE,
+                    style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE),
+                    on_click=open_edit_profile,
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        p.show_dialog(prompt_dialog)
+
     def _build_payments_tab(self) -> ft.Control:
         payments = self.workspace_dto.payments
         if not payments:
@@ -326,23 +472,63 @@ class AdmissionWorkspaceDialog(ft.AlertDialog):
                 padding=ft.Padding(0, 40, 0, 40),
             )
 
+        from core.security.context import SecurityContext
+        from core.security.roles import Role
+        current_role = SecurityContext.get_current_role()
+        is_admin = (str(current_role).upper() == Role.ADMINISTRATOR.value)
+
         rows = []
         for p in payments:
+            payment_controls = [
+                ft.Container(
+                    content=ft.Text(p.formatted_installment, size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
+                    bgcolor=AppTheme.PRIMARY_LIGHT,
+                    padding=ft.Padding(6, 3, 6, 3),
+                    border_radius=AppTheme.RADIUS_SM,
+                ),
+                ft.Text(f"₹{p.amount:,.2f}", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD, color=AppTheme.SUCCESS),
+                ft.Text(f"Mode: {p.payment_mode}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
+                ft.Text(f"Date: {str(p.payment_date or '')[:16]}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
+                ft.Text(f"Collector: {p.collector_name or '—'}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
+            ]
+
+            if is_admin:
+                def handle_refund_click(e, target_payment=p):
+                    from modules.payments.views.payment_refund_dialog import PaymentRefundDialog
+                    p_page = self.safe_page
+                    if p_page:
+                        adm = self.workspace_dto.admission
+                        dlg = PaymentRefundDialog(
+                            payment=target_payment,
+                            student_name=adm.student_name,
+                            admission_number=adm.admission_number,
+                            on_refunded=lambda res: self._on_payment_refunded(res),
+                            page=p_page,
+                        )
+                        p_page.show_dialog(dlg)
+
+                refund_btn = ft.OutlinedButton(
+                    content=ft.Row(
+                        controls=[
+                            ft.Icon(ft.Icons.UNDO, size=14, color=AppTheme.DANGER),
+                            ft.Text("Refund", size=11, color=AppTheme.DANGER, weight=ft.FontWeight.BOLD),
+                        ],
+                        spacing=4,
+                        tight=True,
+                    ),
+                    style=ft.ButtonStyle(
+                        padding=ft.Padding(8, 4, 8, 4),
+                        side=ft.BorderSide(1, AppTheme.DANGER),
+                    ),
+                    tooltip="Refund / Reverse Accidental Payment (Administrator Only)",
+                    on_click=handle_refund_click,
+                )
+                payment_controls.append(refund_btn)
+
             rows.append(
                 ft.Container(
                     content=ft.Row(
-                        controls=[
-                            ft.Container(
-                                content=ft.Text(p.formatted_installment, size=AppTheme.SIZE_CAPTION, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY),
-                                bgcolor=AppTheme.PRIMARY_LIGHT,
-                                padding=ft.Padding(6, 3, 6, 3),
-                                border_radius=AppTheme.RADIUS_SM,
-                            ),
-                            ft.Text(f"₹{p.amount:,.2f}", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.BOLD, color=AppTheme.SUCCESS),
-                            ft.Text(f"Mode: {p.payment_mode}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
-                            ft.Text(f"Date: {str(p.payment_date or '')[:16]}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
-                            ft.Text(f"Collector: {p.collector_name or '—'}", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY),
-                        ],
+                        controls=payment_controls,
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),

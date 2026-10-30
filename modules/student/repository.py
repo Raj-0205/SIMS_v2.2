@@ -146,11 +146,14 @@ class StudentRepository(BaseRepository):
         prefix = f"{table_alias}." if table_alias else ""
         student_id_ref = f"{prefix}id" if prefix else "id"
 
-        cand_match = re.match(r"^(\d{4})-(\d{1,4})$", clean)
+        # Pattern 1: Formatted Candidate number (e.g. 2026-001, 2026-1, 26-1)
+        cand_match = re.match(r"^(\d{2,4})[-\s/](\d{1,4})$", clean)
         if cand_match:
             year = int(cand_match.group(1))
+            if year < 100:
+                year += 2000
             seq = int(cand_match.group(2))
-            cand_pattern = f"%{clean}%"
+            cand_pattern = f"%{year:04d}-{seq:03d}%"
             where = f"""(
                 EXISTS (
                     SELECT 1 FROM admissions a_cand
@@ -160,69 +163,142 @@ class StudentRepository(BaseRepository):
                           OR PRINTF('%04d-%03d', a_cand.candidate_year, a_cand.candidate_sequence) LIKE ?
                       )
                 )
-                OR CAST({prefix}id AS TEXT) LIKE ?
+                OR CAST({prefix}id AS TEXT) = ?
             )"""
-            return where, [year, seq, cand_pattern, cand_pattern]
+            return where, [year, seq, cand_pattern, str(seq)]
 
-        clean_no_phone_chars = re.sub(r"[\s\+\-\(\)]", "", clean)
-        if clean_no_phone_chars.isdigit() and len(clean_no_phone_chars) >= 8 and "-" not in clean:
-            phone_digits = clean_no_phone_chars
-            if phone_digits.startswith("91") and len(phone_digits) == 12:
-                phone_digits = phone_digits[2:]
-
-            pattern = f"%{phone_digits}%"
+        # Pattern 2: Explicit ID search (e.g. #1, #529, ID 1, ID: 1, Student 1, STU-1, Roll 1)
+        id_match = re.match(r"^(?:#|id[:\s#]*|student[:\s#]*|stu[:\s\-#]*|roll[:\s#]*)\s*(\d+)$", clean, re.IGNORECASE)
+        if id_match:
+            target_id = int(id_match.group(1))
+            target_str = str(target_id)
             where = f"""(
-                REPLACE(REPLACE(REPLACE({prefix}mobile_number, ' ', ''), '-', ''), '+', '') LIKE ? OR
-                CAST({prefix}id AS TEXT) LIKE ?
+                {prefix}id = ?
+                OR CAST({prefix}id AS TEXT) = ?
+                OR EXISTS (
+                    SELECT 1 FROM admissions a_id
+                    WHERE a_id.student_id = {student_id_ref}
+                      AND (
+                          a_id.candidate_sequence = ?
+                          OR a_id.id = ?
+                          OR PRINTF('%04d-%03d', a_id.candidate_year, a_id.candidate_sequence) LIKE ?
+                      )
+                )
             )"""
-            return where, [pattern, pattern]
+            return where, [target_id, target_str, target_id, target_id, f"%-{target_id:03d}%"]
 
-        tokens = clean.split()
+        # Pattern 3: Pure digits
+        clean_no_phone = re.sub(r"[\s\+\-\(\)]", "", clean)
+        if clean_no_phone.isdigit():
+            # If 8-12 digits: primarily phone number
+            if len(clean_no_phone) >= 8 and len(clean_no_phone) <= 12:
+                phone_digits = clean_no_phone
+                if phone_digits.startswith("91") and len(phone_digits) == 12:
+                    phone_digits = phone_digits[2:]
+                pattern = f"%{phone_digits}%"
+                where = f"""(
+                    REPLACE(REPLACE(REPLACE({prefix}mobile_number, ' ', ''), '-', ''), '+', '') LIKE ?
+                    OR REPLACE(REPLACE(REPLACE(COALESCE({prefix}secondary_mobile, ''), ' ', ''), '-', ''), '+', '') LIKE ?
+                    OR CAST({prefix}id AS TEXT) = ?
+                )"""
+                return where, [pattern, pattern, clean_no_phone]
+
+            # Short digits (1-6 digits): Student ID, candidate sequence, or name/phone token
+            short_num = int(clean_no_phone)
+            short_str = str(short_num)
+            where = f"""(
+                {prefix}id = ?
+                OR CAST({prefix}id AS TEXT) = ?
+                OR EXISTS (
+                    SELECT 1 FROM admissions a_snum
+                    WHERE a_snum.student_id = {student_id_ref}
+                      AND (
+                          a_snum.candidate_sequence = ?
+                          OR a_snum.id = ?
+                          OR PRINTF('%03d', a_snum.candidate_sequence) = ?
+                          OR PRINTF('%04d-%03d', a_snum.candidate_year, a_snum.candidate_sequence) LIKE ?
+                      )
+                )
+                OR {prefix}first_name LIKE ?
+                OR {prefix}last_name LIKE ?
+                OR {prefix}mobile_number LIKE ?
+            )"""
+            return where, [short_num, short_str, short_num, short_num, f"{short_num:03d}", f"%-{short_num:03d}%", f"%{clean}%", f"%{clean}%", f"%{clean}%"]
+
+        # Pattern 4: General Name, Alter-Name, and Multi-token search
+        sanitized = re.sub(r"[,;:\-_\/|\#]", " ", clean)
+        tokens = [t.strip() for t in sanitized.split() if t.strip()]
+        if not tokens:
+            return "", []
+
+        # Check for words like "ID 529" or "Student 1"
+        if len(tokens) == 2 and tokens[0].upper() in ("ID", "STUDENT", "STU", "ROLL", "NO", "NUM") and tokens[1].isdigit():
+            target_id = int(tokens[1])
+            where = f"""(
+                {prefix}id = ?
+                OR CAST({prefix}id AS TEXT) = ?
+                OR EXISTS (
+                    SELECT 1 FROM admissions a_id2
+                    WHERE a_id2.student_id = {student_id_ref}
+                      AND (a_id2.candidate_sequence = ? OR a_id2.id = ?)
+                )
+            )"""
+            return where, [target_id, str(target_id), target_id, target_id]
+
         token_clauses = []
-        params: list[Any] = []
-
+        params = []
         for token in tokens:
-            token_pattern = f"%{token}%"
+            tp = f"%{token}%"
             token_digits = re.sub(r"\D", "", token)
-            has_token_digits = len(token_digits) >= 4
+            has_digits = len(token_digits) >= 4
 
             clause = f"""(
-                CAST({prefix}id AS TEXT) LIKE ? OR
-                {prefix}first_name LIKE ? OR
-                {prefix}last_name LIKE ? OR
-                ({prefix}first_name || ' ' || {prefix}last_name) LIKE ? OR
-                {prefix}mobile_number LIKE ? OR
-                {prefix}email LIKE ? OR
-                EXISTS (
+                CAST({prefix}id AS TEXT) = ?
+                OR {prefix}first_name LIKE ?
+                OR {prefix}last_name LIKE ?
+                OR COALESCE({prefix}middle_name, '') LIKE ?
+                OR COALESCE({prefix}parent_guardian_name, '') LIKE ?
+                OR COALESCE({prefix}mother_name, '') LIKE ?
+                OR COALESCE({prefix}village, '') LIKE ?
+                OR COALESCE({prefix}email, '') LIKE ?
+                OR ({prefix}first_name || ' ' || {prefix}last_name) LIKE ?
+                OR ({prefix}last_name || ' ' || {prefix}first_name) LIKE ?
+                OR ({prefix}first_name || ' ' || COALESCE({prefix}middle_name, '') || ' ' || {prefix}last_name) LIKE ?
+                OR ({prefix}last_name || ' ' || {prefix}first_name || ' ' || COALESCE({prefix}middle_name, '')) LIKE ?
+                OR EXISTS (
                     SELECT 1 FROM admissions a_tok
                     WHERE a_tok.student_id = {student_id_ref}
                       AND (
                           PRINTF('%04d-%03d', a_tok.candidate_year, a_tok.candidate_sequence) LIKE ?
-                          OR CAST(a_tok.candidate_year AS TEXT) LIKE ?
-                          OR CAST(a_tok.id AS TEXT) LIKE ?
+                          OR CAST(a_tok.candidate_sequence AS TEXT) = ?
+                          OR CAST(a_tok.id AS TEXT) = ?
                       )
                 )
             """
             token_params = [
-                token_pattern,
-                token_pattern,
-                token_pattern,
-                token_pattern,
-                token_pattern,
-                token_pattern,
-                token_pattern,
-                token_pattern,
-                token_pattern,
+                token,
+                tp, tp, tp, tp, tp, tp, tp,
+                tp, tp, tp, tp,
+                tp, token, token
             ]
-            if has_token_digits:
+            if has_digits:
                 clause += f" OR REPLACE(REPLACE(REPLACE({prefix}mobile_number, ' ', ''), '-', ''), '+', '') LIKE ?"
                 token_params.append(f"%{token_digits}%")
-
             clause += ")"
             token_clauses.append(clause)
             params.extend(token_params)
 
-        where_clause = " AND ".join(token_clauses)
+        phrase_str = "%" + " ".join(tokens) + "%"
+        full_phrase_clause = f"""(
+            ({prefix}first_name || ' ' || {prefix}last_name) LIKE ?
+            OR ({prefix}last_name || ' ' || {prefix}first_name) LIKE ?
+            OR ({prefix}first_name || ' ' || COALESCE({prefix}middle_name, '') || ' ' || {prefix}last_name) LIKE ?
+            OR ({prefix}last_name || ' ' || {prefix}first_name || ' ' || COALESCE({prefix}middle_name, '')) LIKE ?
+        )"""
+
+        joined_tokens = " AND ".join(token_clauses)
+        where_clause = f"(({joined_tokens}) OR {full_phrase_clause})"
+        params.extend([phrase_str, phrase_str, phrase_str, phrase_str])
         return where_clause, params
 
     def insert(self, data: dict[str, Any]) -> int:
@@ -527,6 +603,14 @@ class StudentRepository(BaseRepository):
         else:
             order_by = self._build_order_by(sort_by=sort_by, sort_dir=sort_dir)
 
+        if query and query.strip():
+            clean_q = query.strip()
+            num_match = re.search(r"\b(\d{1,6})\b", clean_q)
+            if num_match:
+                target_id = int(num_match.group(1))
+                if order_by.startswith("ORDER BY "):
+                    order_by = f"ORDER BY CASE WHEN s.id = {target_id} THEN 0 ELSE 1 END, " + order_by[9:]
+
         sql = f"""
             {self._STUDENT_SELECT_BASE}
             {where_clause}
@@ -579,6 +663,14 @@ class StudentRepository(BaseRepository):
             order_by = self._build_multi_order_by(sort_keys)
         else:
             order_by = self._build_order_by(sort_by=sort_by, sort_dir=sort_dir)
+
+        if query and query.strip():
+            clean_q = query.strip()
+            num_match = re.search(r"\b(\d{1,6})\b", clean_q)
+            if num_match:
+                target_id = int(num_match.group(1))
+                if order_by.startswith("ORDER BY "):
+                    order_by = f"ORDER BY CASE WHEN s.id = {target_id} THEN 0 ELSE 1 END, " + order_by[9:]
 
         sql = f"""
             {self._STUDENT_SELECT_BASE}
@@ -692,11 +784,16 @@ class StudentRepository(BaseRepository):
             """
             return cast(list[StudentSearchRow], self.execute_fetchall(sql, (limit,)))
 
+        clean_num = re.sub(r"\D", "", query)
+        order_clause = "first_name ASC, last_name ASC"
+        if clean_num and len(clean_num) <= 6:
+            order_clause = f"CASE WHEN id = {int(clean_num)} THEN 0 ELSE 1 END, first_name ASC, last_name ASC"
+
         sql = f"""
             SELECT id, first_name, last_name, mobile_number
             FROM students
             WHERE {where_clause}
-            ORDER BY first_name ASC, last_name ASC
+            ORDER BY {order_clause}
             LIMIT ?;
         """
         params.append(limit)

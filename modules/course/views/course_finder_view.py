@@ -340,10 +340,10 @@ class CourseFinderView(ft.Container):
         elif interest == "coding":
             rec_ids = ["python", "c-cpp", "web-designing"]
             combo_info = {
-                "title": "Full Stack Python Developer & AI Automation Career Combo",
+                "title": "KLiC Diploma in Software Development & Programming",
                 "badge": "🚀 HIGH VALUE SOFTWARE DIPLOMA",
-                "tagline": "Complete Code-to-Cloud Curriculum (KLiC Python + C/C++ + Web Designing)",
-                "courses": ["KLiC Python with AI", "C and C++ Programming Logic", "Web Designing & Responsive UI"],
+                "tagline": "Complete Code & Software Curriculum (KLiC Python + C/C++ + Web Designing)",
+                "courses": ["KLiC Python Programming", "C & C++ Programming", "Web Designing"],
                 "duration": "5 Months (Hands-on Coding Labs)",
                 "regular_fee": 18500,
                 "combo_fee": 14200,
@@ -590,32 +590,16 @@ class CourseFinderView(ft.Container):
             pass
 
     def _handle_open_web_showcase(self, e: ft.ControlEvent) -> None:
+        from core.utils.url_utils import safe_open_url
         url = get_showcase_url()
-        try:
-            webbrowser.open(url)
-        except Exception:
-            pass
-        p = self.safe_page
-        if p:
-            try:
-                p.launch_url(url)
-            except Exception:
-                pass
+        safe_open_url(url, page=self.safe_page)
 
     def _launch_course_webpage(self, course: Dict[str, Any]) -> None:
+        from core.utils.url_utils import safe_open_url
         base_url = get_showcase_url()
         cid = course.get("id") or str(course.get("db_id"))
         url = f"{base_url}#course-{cid}"
-        try:
-            webbrowser.open(url)
-        except Exception:
-            pass
-        p = self.safe_page
-        if p:
-            try:
-                p.launch_url(url)
-            except Exception:
-                pass
+        safe_open_url(url, page=self.safe_page)
 
     def _show_proposal_dialog(self, course: Dict[str, Any]) -> None:
         p = self.safe_page

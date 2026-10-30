@@ -187,7 +187,7 @@ class AdmissionHome(ft.Container):
             options=[
                 ft.DropdownOption(key="ALL", text="All Statuses"),
                 ft.DropdownOption(key="ACTIVE", text="Active Workflow"),
-                ft.DropdownOption(key="REGISTERED", text="Registered"),
+                ft.DropdownOption(key="REGISTERED", text="Admitted"),
                 ft.DropdownOption(key="CONFIRMED", text="Confirmed"),
                 ft.DropdownOption(key="DRAFT", text="Draft"),
                 ft.DropdownOption(key="CANCELLED", text="Cancelled"),
@@ -279,7 +279,7 @@ class AdmissionHome(ft.Container):
                 controls=[
                     ft.Icon(ft.Icons.SEARCH_OFF, size=48, color=AppTheme.TEXT_MUTED),
                     ft.Text("No matching admissions found", size=AppTheme.SIZE_H3, weight=ft.FontWeight.W_600, color=AppTheme.TEXT_SECONDARY),
-                    ft.Text("Click 'New Admission' above to register a candidate.", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
+                    ft.Text("Click 'New Admission' above to admit a student.", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
                 ],
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                 spacing=AppTheme.PAD_XS,
@@ -525,7 +525,8 @@ class AdmissionHome(ft.Container):
 
         for adm in self.admissions:
             variant = "success" if adm.status in ("CONFIRMED", "ENROLLED", "ADMITTED") else ("warning" if adm.status == "PENDING" else ("danger" if adm.status == "CANCELLED" else "primary"))
-            status_badge = StatusBadge(label=adm.status, variant=variant)
+            display_status = "Admitted" if adm.status == "REGISTERED" else adm.status
+            status_badge = StatusBadge(label=display_status, variant=variant)
 
             cand_badge = ft.Container(
                 content=ft.Text(
@@ -581,7 +582,32 @@ class AdmissionHome(ft.Container):
                     ft.DataCell(ft.Container(content=ft.Text(adm.student_name, weight=ft.FontWeight.W_600, size=AppTheme.SIZE_BODY, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS), width=180)),
                     ft.DataCell(ft.Container(content=ft.Text(adm.mobile_number or "—", size=AppTheme.SIZE_BODY, color=AppTheme.TEXT_SECONDARY, no_wrap=True), width=120)),
                     ft.DataCell(ft.Container(content=ft.Text(adm.course_name, size=AppTheme.SIZE_BODY, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS), width=140)),
-                    ft.DataCell(ft.Container(content=ft.Text(adm.batch_name or "Unassigned", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY, no_wrap=True, overflow=ft.TextOverflow.ELLIPSIS), width=120)),
+                    ft.DataCell(
+                        ft.Container(
+                            content=ft.Row(
+                                controls=[
+                                    ft.Icon(
+                                        ft.Icons.ADD_TASK if not adm.batch_name else ft.Icons.CLASS_,
+                                        size=12,
+                                        color=AppTheme.WARNING if not adm.batch_name else AppTheme.TEXT_SECONDARY,
+                                    ),
+                                    ft.Text(
+                                        adm.batch_name or "Unassigned",
+                                        size=AppTheme.SIZE_CAPTION,
+                                        color=AppTheme.WARNING if not adm.batch_name else AppTheme.TEXT_SECONDARY,
+                                        weight=ft.FontWeight.BOLD if not adm.batch_name else ft.FontWeight.NORMAL,
+                                        no_wrap=True,
+                                        overflow=ft.TextOverflow.ELLIPSIS,
+                                    ),
+                                ],
+                                spacing=4,
+                                tight=True,
+                            ),
+                            width=120,
+                            tooltip="Click to assign or switch batch",
+                            on_click=lambda e, a_id=adm.id: self.open_batch_dialog(a_id),
+                        )
+                    ),
                     ft.DataCell(ft.Container(content=ft.Text(adm.created_at[:10] if adm.created_at else "—", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED, no_wrap=True), width=110)),
                     ft.DataCell(ft.Container(content=status_badge, width=100)),
                     ft.DataCell(ft.Container(content=fee_info, width=160)),
@@ -684,6 +710,14 @@ class AdmissionHome(ft.Container):
         p = self.safe_page
         if p:
             dlg = AdmissionWorkspaceDialog(admission_id=admission_id, on_updated=self.load_data)
+            p.show_dialog(dlg)
+
+    def open_batch_dialog(self, admission_id: int) -> None:
+        """Opens modal to assign a batch to unallocated candidate or switch class timing."""
+        from modules.admission.views.batch_assignment_dialog import BatchAssignmentDialog
+        p = self.safe_page
+        if p:
+            dlg = BatchAssignmentDialog(admission_id=admission_id, on_updated=self.load_data, page=p)
             p.show_dialog(dlg)
 
     def handle_delete_admission(self, admission_id: int, admission_number: str, student_name: str) -> None:

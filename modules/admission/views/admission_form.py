@@ -56,8 +56,8 @@ class AdmissionForm(ft.Column):
         
         # --- Submission ---
         self.register_btn = ft.ElevatedButton(
-            content=ft.Text("3. Complete Registration"), icon=ft.Icons.APP_REGISTRATION,
-            on_click=self.handle_register, disabled=True
+            content=ft.Text("3. Submit Admission"), icon=ft.Icons.HOW_TO_REG,
+            on_click=self.handle_submit_admission, disabled=True
         )
 
         self.controls = [
@@ -113,7 +113,7 @@ class AdmissionForm(ft.Column):
         self.update()
 
     def check_form_ready(self) -> None:
-        """Enables the register button only when both dependencies are met."""
+        """Enables the submission button only when both dependencies are met."""
         self.register_btn.disabled = not (self.selected_student_id and self.selected_course_id)
 
     def show_message(self, message: str, is_error: bool = False) -> None:
@@ -123,7 +123,7 @@ class AdmissionForm(ft.Column):
         snackbar = ft.SnackBar(content=ft.Text(message, color=ft.Colors.WHITE), bgcolor=color)
         p.show_dialog(snackbar)
 
-    def handle_register(self, e: ft.ControlEvent) -> None:
+    def handle_submit_admission(self, e: ft.ControlEvent) -> None:
         raw_data = {
             "student_id": self.selected_student_id,
             "course_id": self.selected_course_id
@@ -132,7 +132,7 @@ class AdmissionForm(ft.Column):
         try:
             admission_id = self.admission_controller.create_admission(raw_data)
             admission = self.admission_controller.get_admission(admission_id)
-            self.show_message(f"Admission registered successfully! (Candidate No: {admission.admission_number})")
+            self.show_message(f"Admission created successfully! (Candidate No: {admission.admission_number})")
             
             # Reset UI
             self.selected_student_id = None
@@ -149,3 +149,6 @@ class AdmissionForm(ft.Column):
         except Exception as ex:
             LogService.error(f"Unexpected error in UI: {str(ex)}", context=self.__class__.__name__)
             self.show_message("An unexpected error occurred. Please try again.", is_error=True)
+
+    handle_register = handle_submit_admission
+

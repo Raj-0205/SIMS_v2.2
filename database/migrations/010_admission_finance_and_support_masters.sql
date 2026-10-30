@@ -190,15 +190,12 @@ INSERT OR IGNORE INTO institute_settings (key, value, category, description) VAL
 
 -- 10d. Seed Courses (MS-CIT and KLiC Courses)
 INSERT OR IGNORE INTO courses (code, name, base_fee, duration, category, description, status) VALUES
-('MSCIT', 'MS-CIT (Mastering IT)', 4500.0, '2 Months', 'IT Literacy', 'Maharashtra State Certificate in Information Technology', 'ACTIVE'),
+('MSCIT', 'MS-CIT', 4500.0, '2 Months', 'IT Literacy', 'Maharashtra State Certificate in Information Technology', 'ACTIVE'),
 ('KLIC-PYTHON', 'KLiC Python Programming', 5000.0, '2 Months', 'Programming', 'Python fundamentals, data structures, and automation', 'ACTIVE'),
-('KLIC-JAVA', 'KLiC Java Programming', 5000.0, '2 Months', 'Programming', 'Core Java, OOPs, Collections, and Applications', 'ACTIVE'),
-('KLIC-CPP', 'KLiC C / C++ / C#', 4500.0, '2 Months', 'Programming', 'C, C++, C# Object Oriented System Programming', 'ACTIVE'),
+('KLIC-CPP', 'KLiC C & C++ Programming', 4500.0, '2 Months', 'Programming', 'C and C++ Object Oriented Programming', 'ACTIVE'),
 ('KLIC-TALLY', 'KLiC Tally Prime GST', 5000.0, '2 Months', 'Accounting', 'Computerized Financial Accounting with GST in Tally Prime', 'ACTIVE'),
 ('KLIC-EXCEL', 'KLiC Advanced Excel', 4000.0, '1 Month', 'Office', 'Advanced formulas, Pivot Tables, Dashboards, and Analytics', 'ACTIVE'),
 ('KLIC-WEB', 'KLiC Web Designing', 5000.0, '2 Months', 'Development', 'HTML5, CSS3, JavaScript, Bootstrap, Responsive UI', 'ACTIVE'),
-('KLIC-PHOTO', 'KLiC Photo Editing', 4000.0, '1 Month', 'Design', 'Adobe Photoshop, image retouching, color grading', 'ACTIVE'),
-('KLIC-MOBILE', 'KLiC Mobile App Development', 6000.0, '2 Months', 'Development', 'Android and Cross-platform Mobile App Development', 'ACTIVE'),
 ('KLIC-ADVJAVA', 'KLiC Advanced Java', 6000.0, '2 Months', 'Programming', 'J2EE, Servlets, JSP, Spring Boot, Hibernate', 'ACTIVE'),
-('KLIC-DTP', 'KLiC Desktop Publishing / Adobe', 4500.0, '2 Months', 'Design', 'InDesign, PageMaker, CorelDRAW, print layouts', 'ACTIVE'),
-('KLIC-ILLUST', 'KLiC Content Illustration', 4500.0, '2 Months', 'Design', 'Adobe Illustrator, vector graphic design, branding', 'ACTIVE');
+('KLIC-DTP', 'Desktop Publishing (Adobe & CorelDRAW)', 4500.0, '2 Months', 'Design', 'InDesign, PageMaker, CorelDRAW, print layouts', 'ACTIVE'),
+('KLIC-ILLUST', 'Content Illustration', 4500.0, '2 Months', 'Design', 'Adobe Illustrator, vector graphic design, branding', 'ACTIVE');

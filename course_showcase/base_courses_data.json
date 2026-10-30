@@ -465,98 +465,6 @@
     "is_published_web": true
   },
   {
-    "id": "3d-modelling",
-    "slug": "3d-modelling",
-    "title": "3D Modelling",
-    "category": "Digital Creative Art",
-    "track_id": "design",
-    "badge": "Gaming & VFX Industry",
-    "accent": "#D946EF",
-    "accent_light": "#FDF4FF",
-    "gradient": "linear-gradient(135deg, #D946EF 0%, #A21CAF 100%)",
-    "duration": "120 hours",
-    "level": "Foundation",
-    "language": "English",
-    "summary": "3D modeling and animation have transformed numerous fields, including filmmaking, computer games, and architecture and product design. Yet the underlying basis of high-quality 3D production originates in traditional design and animation methodologies. This course provides an introduction to the exciting world of 3D content creation, while emphasizing its connection to the creative thought process. Students will learn an overview of the artist workflow as it relates to modeling, texturing, animation, lighting and rendering. This course offers a new dimension to the process of filmmaking and design.",
-    "certificate": "MKCL Authorized Career Certificate (YCMOU / MSBTE recognized)",
-    "eligibility": "You should have a keen desire to learn and basic digital curiosity. (Minimum 10th Std / 12th Std or College students)",
-    "tools": [
-      "Blender 3D",
-      "3ds Max Concepts",
-      "UV Mapping",
-      "PBR Texturing",
-      "Lighting & Rendering"
-    ],
-    "job_roles": [
-      "3D Modeler",
-      "Game Asset Artist",
-      "Architectural Visualizer",
-      "Product 3D Artist",
-      "VFX Asset Creator"
-    ],
-    "salary_range": "₹25,000 - ₹50,000 / month",
-    "parent_points": [
-      "Gaming, animated movies, AR/VR, and metaverse industries have massive demand for 3D modelers.",
-      "High-paying global career path with remote international employment options.",
-      "Learners create complete 3D game props, vehicles, and architectural structures.",
-      "Hands-on project-based learning with modern open-source and industry tools."
-    ],
-    "counselor_talking_points": [
-      "Transform your child's passion for video games into a lucrative 3D design career!"
-    ],
-    "student_projects": [
-      "Low-poly & High-poly 3D Game Weapons and Props",
-      "Photorealistic 3D Product Packaging with studio lighting",
-      "Architectural 3D Building Exterior with realistic materials",
-      "3D Character head sculpt and procedural shader texturing"
-    ],
-    "syllabus": [
-      "Watching 3D movies",
-      "Entering into CGI industry",
-      "Beginning with CGI",
-      "Taking a career path in 3D industry",
-      "Getting started with 3D software",
-      "Working with Blender",
-      "Situation: First model",
-      "Situation: Coral",
-      "Situation: Loop cut Rat",
-      "Situation: N-Gon",
-      "Situation: Cactus",
-      "Situation: Pipe",
-      "Situation: Chocolate cube",
-      "Situation: Spring",
-      "Situation: Stone",
-      "Situation: Pillar",
-      "Situation: Screw",
-      "Situation: Top",
-      "Situation: Temple",
-      "Situation: Ceiling fan",
-      "Situation: Rupee",
-      "Situation: Apple",
-      "Situation: Bullock cart wheel",
-      "Situation: Stairs",
-      "Situation: Football",
-      "Situation: Monster character",
-      "Situation: Carom",
-      "Situation: Soccer net",
-      "Situation: Flute",
-      "Adding facial shape keys"
-    ],
-    "syllabus_count": 48,
-    "thumbnail": "assets/images/3d-modelling_thumb.webp",
-    "showcase_image": "assets/images/3d-modelling_showcase.jpg",
-    "official_url": "https://www.mkcl.org/courses/3d-modelling/",
-    "search_center_url": "https://searchcenter.mkcl.org/",
-    "db_id": 408,
-    "code": "KLIC-3DMODEL",
-    "base_fee": 6500.0,
-    "fee": "₹6,500",
-    "is_active": true,
-    "is_recommended": false,
-    "is_trending": false,
-    "is_published_web": true
-  },
-  {
     "id": "introduction-to-3d-animation",
     "slug": "introduction-to-3d-animation",
     "title": "Introduction to 3D Animation",
@@ -739,9 +647,9 @@
     "is_published_web": true
   },
   {
-    "id": "dtp-adobe-corel-draw",
-    "slug": "dtp-adobe-corel-draw",
-    "title": "DTP (Adobe & CorelDRAW)",
+    "id": "desktop-publishing-adobe-and-coreldraw",
+    "slug": "desktop-publishing-adobe-and-coreldraw",
+    "title": "Desktop Publishing (Adobe & CorelDRAW)",
     "category": "Digital Designing",
     "track_id": "design",
     "badge": "Print Media & Advertising",
@@ -830,8 +738,8 @@
     "is_published_web": true
   },
   {
-    "id": "content-illustrator",
-    "slug": "content-illustrator",
+    "id": "content-illustration",
+    "slug": "content-illustration",
     "title": "Content Illustration",
     "category": "Digital Designing",
     "track_id": "design",
@@ -1098,7 +1006,7 @@
   {
     "id": "java",
     "slug": "java",
-    "title": "Java",
+    "title": "Advanced Java",
     "category": "Software Development",
     "track_id": "software",
     "badge": "Enterprise Standard",
@@ -1179,7 +1087,7 @@
     "official_url": "https://www.mkcl.org/courses/java/",
     "search_center_url": "https://searchcenter.mkcl.org/",
     "db_id": 413,
-    "code": "KLIC-JAVA",
+    "code": "KLIC-ADVJAVA",
     "base_fee": 5000.0,
     "fee": "₹5,000",
     "is_active": true,
@@ -1463,9 +1371,9 @@
     "is_published_web": true
   },
   {
-    "id": "data-science",
-    "slug": "data-science",
-    "title": "Data Science",
+    "id": "foundations-of-data-science-and-ai-with-python",
+    "slug": "foundations-of-data-science-and-artificial-intelligence-with-python",
+    "title": "Foundations of Data Science and AI with Python",
     "category": "Data Science",
     "track_id": "emerging",
     "badge": "High Growth Career",
@@ -1702,9 +1610,9 @@
     "is_published_web": true
   },
   {
-    "id": "desktop-support",
-    "slug": "desktop-support",
-    "title": "Desktop Support",
+    "id": "it-desktop-support",
+    "slug": "it-desktop-support",
+    "title": "IT Desktop Support",
     "category": "IT & Cyber Security",
     "track_id": "hardware",
     "badge": "Immediate Job Placement",
@@ -1793,9 +1701,9 @@
     "is_published_web": true
   },
   {
-    "id": "network-support",
-    "slug": "network-support",
-    "title": "Network Support",
+    "id": "it-network-support",
+    "slug": "it-network-support",
+    "title": "IT Network Support",
     "category": "IT & Cyber Security",
     "track_id": "hardware",
     "badge": "Infrastructure & Cloud",
@@ -2335,7 +2243,7 @@
   {
     "id": "it",
     "slug": "it",
-    "title": "IT",
+    "title": "Information Technology",
     "category": "Front Office & Soft Skills",
     "track_id": "frontoffice",
     "badge": "Digital Workplace Readiness",

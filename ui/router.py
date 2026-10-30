@@ -30,6 +30,7 @@ class AppRouter:
         "/settings",
         "/control-center",
         "/about",
+        "/notifications",
     }
 
     def __init__(self, page: ft.Page) -> None:

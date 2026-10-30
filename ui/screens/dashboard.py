@@ -45,7 +45,7 @@ class DashboardHome(ft.Container):
         self.today_adm_text = ft.Text("0 Today", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY)
 
         self.confirmed_adm_text = ft.Text("—", size=26, weight=ft.FontWeight.BOLD, color=AppTheme.SUCCESS)
-        self.registered_adm_text = ft.Text("— Registered", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY)
+        self.registered_adm_text = ft.Text("— Admitted", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY)
 
         self.total_revenue_text = ft.Text("₹0.00", size=26, weight=ft.FontWeight.BOLD, color=AppTheme.PRIMARY_HOVER)
         self.today_revenue_text = ft.Text("Today: ₹0.00", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_SECONDARY)
@@ -424,6 +424,7 @@ class DashboardScreen(ft.Row):
         super().__init__(
             expand=True,
             spacing=0,
+            vertical_alignment=ft.CrossAxisAlignment.STRETCH,
         )
 
         self._page = page
@@ -440,6 +441,8 @@ class DashboardScreen(ft.Row):
             on_toggle_visibility=self.toggle_sidebar,
             on_logout_request=self.prompt_logout_confirmation,
         )
+        self.nav_menu._page = page
+        self.nav_menu._root_page = page
 
         self.sidebar_container = ft.Container(
             content=ft.SelectionArea(content=self.nav_menu),
@@ -647,6 +650,9 @@ class DashboardScreen(ft.Row):
         elif route == "/about":
             from ui.widgets.about_dialog import AboutScreenView
             return AboutScreenView()
+        elif route == "/notifications":
+            from ui.widgets.notifications_dialog import NotificationsScreenView
+            return NotificationsScreenView()
         else:
             return DashboardHome(on_navigate=self.on_route_request)
 

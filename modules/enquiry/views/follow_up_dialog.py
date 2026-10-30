@@ -16,9 +16,9 @@ from ui.themes.theme import AppTheme
 __all__ = ["EnquiryFollowUpDialog"]
 
 CATEGORY_CONFIG = {
-    "HOT": ("🔥 Confirm Laga (High Intent)", "#ECFDF5", "#047857", "#A7F3D0"),
+    "HOT": ("⭐ High Priority (High Intent)", AppTheme.PRIMARY_LIGHT, AppTheme.PRIMARY, AppTheme.BORDER),
     "WARM": ("⚡ Interested (Exploring / Demo)", "#FEF3C7", "#D97706", "#FDE68A"),
-    "COLD": ("❄️ Doubtful (Low Intent)", "#EFF6FF", "#1D4ED8", "#93C5FD"),
+    "COLD": ("❄️ Exploring (Low Intent)", "#EFF6FF", "#1D4ED8", "#93C5FD"),
     "LOST": ("❌ Not Interested / Dropped", "#F1F5F9", "#475569", "#CBD5E1"),
     "CONVERTED": ("✅ Converted (Admitted)", "#F3E8FF", "#7E22CE", "#D8B4FE"),
 }
@@ -155,8 +155,8 @@ class EnquiryFollowUpDialog(ft.AlertDialog):
         self.banner_container = ft.Container(
             content=ft.Row([ft.Icon(ft.Icons.ERROR_OUTLINE_ROUNDED, size=16, color=AppTheme.DANGER), self.banner_text], spacing=6),
             padding=ft.Padding(10, 6, 10, 6),
-            bgcolor="#FEF2F2",
-            border=ft.Border.all(1, "#FECACA"),
+            bgcolor=AppTheme.DANGER_LIGHT,
+            border=ft.Border.all(1, AppTheme.DANGER),
             border_radius=AppTheme.RADIUS_SM,
             visible=False,
             animate_opacity=ft.Animation(180, ft.AnimationCurve.EASE_IN_OUT),
@@ -180,9 +180,9 @@ class EnquiryFollowUpDialog(ft.AlertDialog):
             label="Update Category",
             value=enquiry.category if enquiry.category in CATEGORY_CONFIG else "WARM",
             options=[
-                ft.dropdown.Option("HOT", "🔥 Confirm Laga (High Intent)"),
+                ft.dropdown.Option("HOT", "⭐ High Priority (High Intent)"),
                 ft.dropdown.Option("WARM", "⚡ Interested (Exploring / Demo)"),
-                ft.dropdown.Option("COLD", "❄️ Doubtful / Low Intent"),
+                ft.dropdown.Option("COLD", "❄️ Exploring / Low Intent"),
                 ft.dropdown.Option("LOST", "❌ Not Interested / Dropped"),
             ],
             border_radius=AppTheme.RADIUS_MD,
@@ -512,7 +512,7 @@ class EnquiryFollowUpDialog(ft.AlertDialog):
         name = self.enquiry.student_name
         course = self.enquiry.interested_course or "Course"
         msg = (
-            f"Namaste {name},\n"
+            f"Hello {name},\n"
             f"Thank you for contacting Sudharm Infotech regarding {course}.\n"
             f"We would love to welcome you for a free demo session and help you achieve your career goals.\n"
             f"Please feel free to reply or visit our center anytime."

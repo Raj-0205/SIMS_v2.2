@@ -253,7 +253,7 @@ class TestPipelineIntegrityAndLeakageAudit(unittest.TestCase):
                 amount=5000.0,
                 payment_mode="UPI",
                 collector_name="Admin",
-                transaction_ref=f"UPI-AUDIT-{tag}",
+                transaction_ref=f"4302{int(datetime.now().timestamp()) % 100000000:08d}",
             )
         )
         self.assertIsNotNone(pay_res)

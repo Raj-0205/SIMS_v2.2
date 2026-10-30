@@ -26,6 +26,7 @@ from shared.utils.file_dialog import (
 )
 from shared.utils.os_helper import open_path_externally
 from shared.utils.export_helper import export_and_prompt_save
+from core.utils.image_utils import is_valid_image_file, is_valid_image_bytes
 from ui.themes.theme import AppTheme
 
 __all__ = ["StudentWorkspaceDialog"]
@@ -153,7 +154,7 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             f"{student.last_name[0] if student.last_name else ''}"
         ).upper() or "ST"
 
-        has_photo = bool(student.photo_path and Path(student.photo_path).is_file())
+        has_photo = bool(student.photo_path and is_valid_image_file(student.photo_path))
         if has_photo:
             avatar_content = ft.Image(
                 src=student.photo_path,
@@ -257,7 +258,8 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             return
         url = format_whatsapp_url(mobile_number)
         try:
-            webbrowser.open(url)
+            from core.utils.url_utils import safe_open_url
+            safe_open_url(url)
             self.show_toast(f"Opened WhatsApp for {mobile_number}", is_success=True)
         except Exception as ex:
             LogService.warning(f"Could not open WhatsApp URL: {ex}", context="StudentWorkspace")
@@ -383,6 +385,11 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             expand=True,
         )
 
+        batch_display = "Not Enrolled"
+        if self.workspace_data.admissions:
+            latest_adm = self.workspace_data.admissions[0]
+            batch_display = f"{latest_adm.batch_name} ({latest_adm.batch_timing})" if latest_adm.batch_name else "Unallocated"
+
         academic_card = ft.Container(
             content=ft.Column(
                 controls=[
@@ -390,9 +397,36 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                     ft.Divider(height=1, color=AppTheme.BORDER),
                     info_row("Total Admissions", str(len(self.workspace_data.admissions)), ft.Icons.SCHOOL),
                     info_row("Latest Course", student.current_course or "Not Enrolled", ft.Icons.MENU_BOOK),
+                    info_row("Allocated Batch", batch_display, ft.Icons.CLASS_),
                     info_row("Admission Status", student.admission_status or "REGISTERED", ft.Icons.CHECK_CIRCLE_OUTLINE),
                     info_row("Latest Admission No.", student.latest_admission_number or "None", ft.Icons.BADGE),
                     info_row("Registration Date", student.created_at[:10] if student.created_at else "N/A", ft.Icons.CALENDAR_TODAY),
+                    ft.Container(
+                        content=ft.Row(
+                            controls=[
+                                ft.Row(
+                                    controls=[
+                                        ft.Icon(ft.Icons.SCHEDULE, size=15, color=AppTheme.PRIMARY),
+                                        ft.Text("Batch Action", size=AppTheme.SIZE_BODY, weight=ft.FontWeight.W_500, color=AppTheme.TEXT_SECONDARY),
+                                    ],
+                                    spacing=6,
+                                ),
+                                ft.ElevatedButton(
+                                    content=ft.Text("Switch Batch" if (self.workspace_data.admissions and self.workspace_data.admissions[0].batch_id) else "Assign Batch"),
+                                    icon=ft.Icons.SWAP_HORIZ,
+                                    style=ft.ButtonStyle(
+                                        bgcolor=AppTheme.PRIMARY,
+                                        color=AppTheme.SURFACE,
+                                        shape=ft.RoundedRectangleBorder(radius=AppTheme.RADIUS_SM),
+                                    ),
+                                    on_click=self.handle_switch_batch_action,
+                                ),
+                            ],
+                            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        ),
+                        padding=ft.Padding(0, 4, 0, 0),
+                    ),
                 ],
                 spacing=AppTheme.PAD_XS,
             ),
@@ -584,6 +618,13 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                     dlg = AdmissionWorkspaceDialog(admission_id=aid, on_updated=self.load_workspace_data)
                     p.show_dialog(dlg)
 
+            def open_batch_modal(e, aid=adm.admission_id):
+                from modules.admission.views.batch_assignment_dialog import BatchAssignmentDialog
+                p = self.safe_page
+                if p:
+                    dlg = BatchAssignmentDialog(admission_id=aid, on_updated=self.load_workspace_data, page=p)
+                    p.show_dialog(dlg)
+
             rows.append(
                 ft.DataRow(
                     cells=[
@@ -603,11 +644,24 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                             )
                         ),
                         ft.DataCell(
-                            ft.IconButton(
-                                icon=ft.Icons.OPEN_IN_NEW,
-                                icon_color=AppTheme.PRIMARY,
-                                tooltip="Open Admission Workspace",
-                                on_click=open_adm_workspace,
+                            ft.Row(
+                                controls=[
+                                    ft.IconButton(
+                                        icon=ft.Icons.SWAP_HORIZ,
+                                        icon_size=18,
+                                        icon_color=AppTheme.PRIMARY,
+                                        tooltip="Assign / Switch Batch",
+                                        on_click=open_batch_modal,
+                                    ),
+                                    ft.IconButton(
+                                        icon=ft.Icons.OPEN_IN_NEW,
+                                        icon_size=18,
+                                        icon_color=AppTheme.PRIMARY,
+                                        tooltip="Open Admission Workspace",
+                                        on_click=open_adm_workspace,
+                                    ),
+                                ],
+                                spacing=0,
                             )
                         ),
                     ]
@@ -766,7 +820,8 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             def share_wa(e, rec=r):
                 stud_mobile = self.workspace_data.student.mobile_number
                 msg = f"Sudharm Infotech Receipt: {rec.get('receipt_number')}\nAmount Paid: ₹{float(rec.get('amount_paid') or 0.0):,.2f}\nCourse: {rec.get('course_name') or 'IT Training'}"
-                webbrowser.open(format_whatsapp_url(stud_mobile, msg))
+                from core.utils.url_utils import safe_open_url
+                safe_open_url(format_whatsapp_url(stud_mobile, msg))
 
             rows.append(
                 ft.DataRow(
@@ -1015,10 +1070,11 @@ class StudentWorkspaceDialog(ft.AlertDialog):
 
         def doc_card(doc_title: str, doc_type: str, file_path: Optional[str], default_icon: str) -> ft.Container:
             has_file = bool(file_path and Path(file_path).is_file())
+            is_valid_img = has_file and is_valid_image_file(file_path)
             size_str = format_file_size(Path(file_path).stat().st_size) if has_file else "Not Uploaded"
 
             # Visual preview area
-            if has_file:
+            if is_valid_img:
                 if doc_type.upper() == "PHOTO":
                     preview_ctrl = ft.Container(
                         content=ft.Image(
@@ -1066,11 +1122,12 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             else:
                 h_box = 140 if doc_type.upper() == "PHOTO" else 80
                 w_box = 140 if doc_type.upper() == "PHOTO" else 200
+                placeholder_label = f"Corrupted File ({size_str})" if has_file else f"No {doc_title} Uploaded"
                 preview_ctrl = ft.Container(
                     content=ft.Column(
                         controls=[
-                            ft.Icon(default_icon, size=44, color=AppTheme.TEXT_MUTED),
-                            ft.Text(f"No {doc_title} Uploaded", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED),
+                            ft.Icon(default_icon if not has_file else ft.Icons.BROKEN_IMAGE, size=44, color=AppTheme.TEXT_MUTED if not has_file else AppTheme.DANGER),
+                            ft.Text(placeholder_label, size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED if not has_file else AppTheme.DANGER),
                         ],
                         alignment=ft.MainAxisAlignment.CENTER,
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -1080,12 +1137,12 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                     height=h_box,
                     bgcolor=AppTheme.BACKGROUND,
                     border_radius=AppTheme.RADIUS_MD,
-                    border=ft.Border.all(1, AppTheme.BORDER),
+                    border=ft.Border.all(1, AppTheme.BORDER if not has_file else AppTheme.DANGER),
                     alignment=ft.Alignment.CENTER,
                 )
                 status_chip = ft.Container(
-                    content=ft.Text("Not Uploaded", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED, weight=ft.FontWeight.W_500),
-                    bgcolor=AppTheme.BACKGROUND,
+                    content=ft.Text("Not Uploaded" if not has_file else "Invalid Image", size=AppTheme.SIZE_CAPTION, color=AppTheme.TEXT_MUTED if not has_file else AppTheme.DANGER, weight=ft.FontWeight.W_500),
+                    bgcolor=AppTheme.BACKGROUND if not has_file else AppTheme.DANGER_LIGHT,
                     padding=ft.Padding(left=10, top=4, right=10, bottom=4),
                     border_radius=AppTheme.RADIUS_PILL,
                 )
@@ -1333,6 +1390,13 @@ class StudentWorkspaceDialog(ft.AlertDialog):
                 raw_bytes = p.read_bytes()
                 if len(raw_bytes) > max_file_size_bytes:
                     status_text.value = f"File size ({len(raw_bytes) / 1024:.1f} KB) exceeds the maximum allowed limit of 100 KB."
+                    status_text.color = AppTheme.DANGER
+                    upload_now_btn.disabled = True
+                    self._safe_update()
+                    return
+
+                if not is_valid_image_bytes(raw_bytes):
+                    status_text.value = f"Selected file '{p.name}' is not a valid or supported image file."
                     status_text.color = AppTheme.DANGER
                     upload_now_btn.disabled = True
                     self._safe_update()
@@ -1598,12 +1662,85 @@ class StudentWorkspaceDialog(ft.AlertDialog):
             on_click=handle_edit,
         )
 
+        switch_batch_btn = ft.ElevatedButton(
+            content=ft.Text("Switch Batch"),
+            icon=ft.Icons.SWAP_HORIZ,
+            style=ft.ButtonStyle(
+                bgcolor=AppTheme.SURFACE_VARIANT,
+                color=AppTheme.PRIMARY,
+                side=ft.BorderSide(1, AppTheme.PRIMARY),
+            ),
+            tooltip="Assign or Switch Student's Batch",
+            on_click=self.handle_switch_batch_action,
+        )
+
         close_btn = ft.TextButton(
             content=ft.Text("Close Workspace"),
             on_click=self.close_workspace,
         )
 
-        return [edit_btn, close_btn]
+        return [ft.Row(controls=[edit_btn, switch_batch_btn], spacing=AppTheme.PAD_SM), close_btn]
+
+    def handle_switch_batch_action(self, e: Optional[ft.ControlEvent] = None) -> None:
+        """Opens batch switch / assignment modal for student admissions."""
+        if not self.workspace_data.admissions:
+            self.show_toast("This student has no course admissions yet. Please enroll the student in a course first.", is_error=True)
+            return
+
+        from modules.admission.views.batch_assignment_dialog import BatchAssignmentDialog
+        p = self.safe_page
+        if not p:
+            return
+
+        def on_batch_updated():
+            self.load_workspace_data()
+            self.tab_content_area.content = self._build_active_tab_content()
+            self._safe_update()
+            if self.on_refresh_required:
+                self.on_refresh_required()
+            self.show_toast("Batch allocation updated successfully.", is_success=True)
+
+        if len(self.workspace_data.admissions) == 1:
+            aid = self.workspace_data.admissions[0].admission_id
+            dlg = BatchAssignmentDialog(admission_id=aid, on_updated=on_batch_updated, page=p)
+            p.show_dialog(dlg)
+        else:
+            def pick_and_open(aid: int):
+                try:
+                    p.pop_dialog()
+                except Exception:
+                    pass
+                dlg = BatchAssignmentDialog(admission_id=aid, on_updated=on_batch_updated, page=p)
+                p.show_dialog(dlg)
+
+            options = []
+            for adm in self.workspace_data.admissions:
+                c_name = adm.course_name or "Course"
+                b_name = f"{adm.batch_name} ({adm.batch_timing})" if adm.batch_name else "Unallocated"
+                options.append(
+                    ft.ListTile(
+                        leading=ft.Icon(ft.Icons.SCHOOL, color=AppTheme.PRIMARY),
+                        title=ft.Text(f"{c_name} • Adm #{adm.admission_id}", weight=ft.FontWeight.BOLD),
+                        subtitle=ft.Text(f"Current Batch: {b_name}"),
+                        trailing=ft.ElevatedButton(
+                            content=ft.Text("Select"),
+                            style=ft.ButtonStyle(bgcolor=AppTheme.PRIMARY, color=AppTheme.SURFACE),
+                            on_click=lambda _, aid=adm.admission_id: pick_and_open(aid),
+                        ),
+                    )
+                )
+
+            picker = ft.AlertDialog(
+                title=ft.Text("Select Admission to Switch Batch", size=AppTheme.SIZE_H2, weight=ft.FontWeight.BOLD),
+                content=ft.Container(
+                    width=460,
+                    content=ft.Column(controls=options, tight=True, spacing=6),
+                ),
+                actions=[
+                    ft.TextButton(content=ft.Text("Cancel"), on_click=lambda _: p.pop_dialog())
+                ],
+            )
+            p.show_dialog(picker)
 
     # ── TAB 8: ATTENDANCE & HEALTH ──
     def _build_attendance_tab(self) -> ft.Container:
